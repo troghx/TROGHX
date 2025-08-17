@@ -1,0 +1,9 @@
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <!-- Base de la "casita" (fondo semitransparente) -->
+  <path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z" fill="#4F46E5" opacity="0.2"/>
+  <!-- Engranaje central -->
+  <path d="M12 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zm0 1a3.5 3.5 0 110-7 3.5 3.5 0 010 7z" fill="#4F46E5"/>
+  <path d="M15.5 12a3.5 3.5 0 01-3.5 3.5v1a4.5 4.5 0 004.5-4.5h-1zM12 8.5a3.5 3.5 0 013.5 3.5h1A4.5 4.5 0 0012 7.5v1zm-3.5 3.5a3.5 3.5 0 013.5-3.5v-1a4.5 4.5 0 00-4.5 4.5h1zm3.5 3.5a3.5 3.5 0 01-3.5-3.5h-1a4.5 4.5 0 004.5 4.5v-1z" fill="#4F46E5"/>
+  <!-- Flechas de progreso -->
+  <path d="M18 9l3-3-3-3v2h-4v2h4v2zM6 15l-3 3 3 3v-2h4v-2H6v-2z" fill="#10B981"/>
+</svg>

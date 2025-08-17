@@ -1,0 +1,24 @@
+{
+  "destacados": [
+    {
+      "title": "Grounded 2",
+      "image": "assets/images/Juegos/grounded2/cover.jpg",
+      "description": "Explora un mundo en miniatura lleno de aventuras y peligros. ¡Sobrevive como un insecto en Grounded 2!",
+      "downloadUrl": "assets/downloads/grounded2.zip",
+      "detailsUrl": "#",
+      "previewVideo": "assets/video/grounded2/trailer.mp4"
+    }
+  ],
+  "recientes": [],
+  "favoritos": [
+    {
+      "title": "En proceso",
+      "image": "assets/images/construction/en-proceso.svg",
+      "description": "Este juego está en desarrollo. ¡Vuelve pronto para más detalles!",
+      "downloadUrl": "#",
+      "detailsUrl": "#",
+      "previewVideo": ""
+    }
+  ],
+  "gamepass": []
+}
