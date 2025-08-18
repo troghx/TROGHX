@@ -21,7 +21,6 @@ async function apiList() {
   if (!res.ok) throw new Error('No se pudo listar');
   return res.json();
 }
-
 async function apiCreate(game, token) {
   const res = await fetch(API, {
     method: 'POST',
@@ -37,7 +36,6 @@ async function apiCreate(game, token) {
   }
   return res.json();
 }
-
 async function apiDelete(id, token) {
   const res = await fetch(`${API}/${id}`, {
     method: 'DELETE',
@@ -58,84 +56,42 @@ rehydrate();
 
 // ==== Storage helpers ====
 function rehydrate() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(LS_RECENTES) || "[]");
-    if (Array.isArray(saved)) recientes = saved;
-  } catch {}
-  try {
-    const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS) || "[]");
-    if (Array.isArray(savedS)) socials = savedS;
-  } catch {}
+  try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES) || "[]"); if (Array.isArray(saved)) recientes = saved; } catch {}
+  try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS) || "[]"); if (Array.isArray(savedS)) socials = savedS; } catch {}
   isAdmin = localStorage.getItem(LS_ADMIN) === "1";
 }
-function persistRecientes() {
-  try { localStorage.setItem(LS_RECENTES, JSON.stringify(recientes)); } catch {}
-}
-function persistAdmin(flag) {
-  try { localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); } catch {}
-}
-function persistSocials() {
-  try { localStorage.setItem(LS_SOCIALS, JSON.stringify(socials)); } catch {}
-}
+function persistRecientes() { try { localStorage.setItem(LS_RECENTES, JSON.stringify(recientes)); } catch {} }
+function persistAdmin(flag) { try { localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); } catch {} }
+function persistSocials() { try { localStorage.setItem(LS_SOCIALS, JSON.stringify(socials)); } catch {} }
 
 // ==== Preload helper ====
-function preload(src) {
-  const img = new Image();
-  img.src = src;
-}
+function preload(src) { const img = new Image(); img.src = src; }
 
 // ==== Rich Editor (minimal WYSIWYG) ====
 function initRichEditor(editorRoot) {
   const editorArea = editorRoot.querySelector(".editor-area");
   const toolbar = editorRoot.querySelector(".rich-toolbar");
-
-  function exec(cmd, value = null) {
-    document.execCommand(cmd, false, value);
-    editorArea.focus();
-  }
-
+  function exec(cmd, value = null) { document.execCommand(cmd, false, value); editorArea.focus(); }
   toolbar.addEventListener("click", (e) => {
-    const btn = e.target.closest(".rtb-btn");
-    if (!btn) return;
-    const cmd = btn.dataset.cmd;
-    const block = btn.dataset.block;
-    const list = btn.dataset.list;
-
+    const btn = e.target.closest(".rtb-btn"); if (!btn) return;
+    const { cmd, block, list } = btn.dataset;
     if (cmd) exec(cmd);
     if (block) exec("formatBlock", block);
     if (list === "ul") exec("insertUnorderedList");
-
-    if (btn.classList.contains("rtb-link")) {
-      const url = prompt("URL del enlace:");
-      if (url) {
-        exec("createLink", url);
-      }
-    }
+    if (btn.classList.contains("rtb-link")) { const url = prompt("URL del enlace:"); if (url) exec("createLink", url); }
   });
-
-  // Cambio de fuente
   const fontSel = toolbar.querySelector(".rtb-font");
-  if (fontSel) {
-    fontSel.addEventListener("change", () => {
-      const val = fontSel.value.trim();
-      if (val) exec("fontName", val);
-      else editorArea.focus();
-    });
-  }
-
-  return {
-    getHTML: () => editorArea.innerHTML.trim(),
-    setHTML: (html) => { editorArea.innerHTML = html || ""; }
-  };
+  if (fontSel) fontSel.addEventListener("change", () => { const val = fontSel.value.trim(); if (val) exec("fontName", val); else editorArea.focus(); });
+  return { getHTML: () => editorArea.innerHTML.trim(), setHTML: (html) => { editorArea.innerHTML = html || ""; } };
 }
 
-// ==== Modal helpers ====
+// ==== Modal helpers (usa clase 'active' para que se vea con tu CSS) ====
 function openModalFragment(fragment) {
   document.body.appendChild(fragment);
-  setTimeout(() => fragment.classList.add("show"), 0);
+  setTimeout(() => fragment.classList.add("active"), 0);
 }
 function closeModal(modalNode, removeTrap, onEscape) {
-  modalNode.classList.remove("show");
+  modalNode.classList.remove("active");
   document.body.style.overflow = "";
   if (removeTrap) removeTrap();
   if (onEscape) modalNode.removeEventListener("keydown", onEscape);
@@ -154,48 +110,13 @@ function trapFocus(modalNode) {
   const getList = () => Array.from(modalNode.querySelectorAll(selectors.join(",")));
   function onKey(e) {
     if (e.key !== "Tab") return;
-    const items = getList();
-    if (!items.length) return;
+    const items = getList(); if (!items.length) return;
     const first = items[0], last = items[items.length - 1];
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
   modalNode.addEventListener("keydown", onKey);
   return () => modalNode.removeEventListener("keydown", onKey);
-}
-
-// ==== Plataformas (enlace enriquecido simple) ====
-function detectPlatform(url) {
-  try {
-    const u = new URL(url);
-    const h = u.hostname.toLowerCase();
-    if (h.includes("drive.google")) return { key: "drive", color: "#1a73e8" };
-    if (h.includes("mega")) return { key: "mega", color: "#d9272e" };
-    if (h.includes("mediafire")) return { key: "mediafire", color: "#1da1f2" };
-    if (h.includes("torrent") || h.includes("utorrent") || h.includes("bittorrent")) return { key: "torrent", color: "#2ecc71" };
-    return { key: "link", color: "#00ffff" };
-  } catch {
-    return { key: "link", color: "#00ffff" };
-  }
-}
-
-function insertPlatformLink(area, displayText, url) {
-  const { key } = detectPlatform(url);
-  const a = document.createElement("a");
-  a.href = url;
-  a.target = "_blank";
-  a.rel = "noopener";
-  a.textContent = displayText || url;
-  a.className = `rich-link platform-${key}`;
-
-  const sel = window.getSelection();
-  if (!sel.rangeCount) {
-    area.appendChild(a);
-  } else {
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
-    range.insertNode(a);
-  }
 }
 
 // ==== Render: fila de recientes ====
@@ -216,16 +137,8 @@ function renderRow() {
 
     if (vid && g.previewVideo) {
       let loaded = false;
-      const ensureSrc = () => {
-        if (loaded) return;
-        vid.src = g.previewVideo;
-        loaded = true;
-      };
-      const start = () => {
-        ensureSrc();
-        vid.currentTime = 0;
-        const p = vid.play(); if (p && p.catch) p.catch(() => {});
-      };
+      const ensureSrc = () => { if (loaded) return; vid.src = g.previewVideo; loaded = true; };
+      const start = () => { ensureSrc(); vid.currentTime = 0; const p = vid.play(); if (p && p.catch) p.catch(()=>{}); };
       const stop = () => { vid.pause(); vid.currentTime = 0; };
       const show = () => vid.classList.add("playing");
       const hide = () => vid.classList.remove("playing");
@@ -255,42 +168,32 @@ function renderRow() {
   }
 }
 
-// ==== Render: Hero Carousel ====
+// ==== Render: Hero (sin .hero-title ni .bullets; se adapta a tu HTML) ====
 function renderHeroCarousel() {
   const heroCarousel = document.querySelector(".hero-carousel");
-  const heroTitle = document.querySelector(".hero-title");
   const heroArt = document.querySelector(".hero-art");
-  const bullets = document.querySelector(".bullets");
-  if (!heroCarousel || !heroTitle || !heroArt || !bullets) return;
+  if (!heroCarousel || !heroArt || !recientes.length) return;
 
   heroCarousel.innerHTML = "";
-  bullets.innerHTML = "";
 
   const max = Math.min(5, recientes.length);
   for (let i = 0; i < max; i++) {
     const img = document.createElement("img");
     img.src = recientes[i].image;
+    if (i === 0) img.classList.add('active');
     heroCarousel.appendChild(img);
-
-    const b = document.createElement("button");
-    b.className = i === 0 ? "active" : "";
-    b.setAttribute("aria-label", `Slide ${i + 1}`);
-    b.addEventListener("click", () => setActive(i));
-    bullets.appendChild(b);
   }
+
   const setActive = (i) => {
     const imgs = heroCarousel.querySelectorAll("img");
     imgs.forEach((im, idx) => im.classList.toggle("active", idx === i));
-    const bs = bullets.querySelectorAll("button");
-    bs.forEach((bt, idx) => bt.classList.toggle("active", idx === i));
-    heroTitle.textContent = recientes[i]?.title || "";
     heroArt.style.backgroundImage = `url(${recientes[i]?.image || ""})`;
   };
   setActive(0);
 
   const getActiveIndex = () => {
-    const bs = bullets.querySelectorAll("button");
-    return Array.from(bs).findIndex((g) => g.classList.contains("active"));
+    const imgs = heroCarousel.querySelectorAll("img");
+    return Array.from(imgs).findIndex((im) => im.classList.contains("active"));
   };
 
   heroArt.addEventListener("click", () => {
@@ -305,15 +208,14 @@ function renderHeroCarousel() {
     }
   });
 
-  function tick() {
-    const images = heroCarousel.querySelectorAll("img");
-    if (!images.length) return;
-    const activeIndex = Array.from(images).findIndex((im) => im.classList.contains("active"));
-    const next = (activeIndex + 1) % images.length;
-    setActive(next);
-  }
-  // Auto-slide
-  // setInterval(tick, 8000);
+  // Auto-slide opcional
+  // setInterval(() => {
+  //   const imgs = heroCarousel.querySelectorAll("img");
+  //   if (!imgs.length) return;
+  //   const i = getActiveIndex();
+  //   const next = (i + 1) % imgs.length;
+  //   setActive(next);
+  // }, 8000);
 }
 
 // ==== Modal: Ver juego ====
@@ -330,48 +232,31 @@ function openGame(game) {
 
   modalImage.src = game.image || "assets/images/construction/en-proceso.svg";
   modalTitle.textContent = game.title || "Sin título";
-  // Render WYSIWYG (HTML)
   modalDescription.innerHTML = game.description || "Sin descripción";
   modalDownload.addEventListener("click", () => { if (game.downloadUrl) window.location.href = game.downloadUrl; });
   modalSecondary.addEventListener("click", () => { alert("Pronto: detalles extendidos"); });
 
-  // Admin kebab
+  // Admin (editar/eliminar)
   if (isAdmin) {
     const kebabBtn = document.createElement("button");
-    kebabBtn.className = "kebab-menu";
+    kebabBtn.className = "tw-modal-menu";
     kebabBtn.innerHTML = "⋮";
     const panel = document.createElement("div");
-    panel.className = "kebab-panel";
+    panel.className = "tw-kebab-panel";
     panel.innerHTML = `
-      <button data-action="edit">Editar</button>
-      <button data-action="delete">Eliminar</button>
+      <button class="tw-kebab-item" data-action="edit">Editar</button>
+      <button class="tw-kebab-item danger" data-action="delete">Eliminar</button>
     `;
-    kebabBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      panel.classList.toggle("show");
-    });
-    document.addEventListener("click", (e) => {
-      if (!panel.contains(e.target) && e.target !== kebabBtn) panel.classList.remove("show");
-    });
-
+    kebabBtn.addEventListener("click", (e) => { e.stopPropagation(); panel.classList.toggle("show"); });
+    document.addEventListener("click", (e) => { if (!panel.contains(e.target) && e.target !== kebabBtn) panel.classList.remove("show"); });
     panel.addEventListener("click", (e) => {
       const action = e.target?.dataset?.action;
-      if (action === "edit") {
-        panel.classList.remove("show");
-        openEditGame(game, modalNode, { onUpdated: (updated) => {
-          modalTitle.textContent = updated.title;
-          modalDescription.innerHTML = updated.description;
-          if (updated.image) modalImage.src = updated.image;
-        }});
-      }
+      if (action === "edit") { panel.classList.remove("show"); openEditGame(game, modalNode); }
       if (action === "delete") {
         panel.classList.remove("show");
-        if (confirm("¿Eliminar esta publicación? Esta acción no se puede deshacer.")) {
-          deleteGame(game, modalNode);
-        }
+        if (confirm("¿Eliminar esta publicación? Esta acción no se puede deshacer.")) deleteGame(game, modalNode);
       }
     });
-
     modalContent.appendChild(kebabBtn);
     modalContent.appendChild(panel);
   }
@@ -396,18 +281,14 @@ function deleteGame(game, currentModalNode) {
       if (currentModalNode) closeModal(currentModalNode);
       alert("Publicación eliminada.");
     })
-    .catch(err => {
-      console.error(err);
-      alert("Error al borrar. Revisa la consola.");
-    });
+    .catch(err => { console.error(err); alert("Error al borrar. Revisa la consola."); });
 }
 
-function openEditGame(original, currentModalNode, opts = {}) {
+function openEditGame(original, currentModalNode) {
   const modal = newGameModalTemplate.content.cloneNode(true);
   const node = modal.querySelector(".tw-modal");
   const form = modal.querySelector(".new-game-form");
   const titleInput = modal.querySelector(".new-game-title");
-  // Para edición simple, mantenemos textarea/descripción si existiera; si quieres, después migramos también a WYSIWYG aquí.
   const descriptionInput = modal.querySelector(".new-game-description");
   const imageInput = modal.querySelector(".new-game-image-file");
   const trailerFileInput = modal.querySelector(".new-game-trailer-file");
@@ -416,7 +297,7 @@ function openEditGame(original, currentModalNode, opts = {}) {
   const modalClose = modal.querySelector(".tw-modal-close");
 
   titleInput.value = original.title || "";
-  if (descriptionInput) { descriptionInput.value = (original.description || "").replace(/<[^>]+>/g, ""); }
+  if (descriptionInput) descriptionInput.value = (original.description || "").replace(/<[^>]+>/g, "");
   if (trailerUrlInput) trailerUrlInput.value = original.previewVideo || "";
   if (downloadInput) downloadInput.value = original.downloadUrl || "";
   if (imageInput) imageInput.required = false;
@@ -462,13 +343,8 @@ function openNewGameModal() {
 
     if (!title) { alert("Título es obligatorio."); titleInput.focus(); return; }
     if (!imageFile) { alert("Selecciona una imagen de portada."); imageInput.focus(); return; }
-    if (!descHTML || !descHTML.replace(/<[^>]*>/g, '').trim()) {
-      alert("Escribe una descripción."); return;
-    }
-
-    if (!trailerUrl && trailerFileInput?.files?.[0]) {
-      alert("Por ahora usa una URL pública para el trailer (.mp4). Ignorando el archivo local.");
-    }
+    if (!descHTML || !descHTML.replace(/<[^>]*>/g, '').trim()) { alert("Escribe una descripción."); return; }
+    if (!trailerUrl && trailerFileInput?.files?.[0]) { alert("Por ahora usa una URL pública para el trailer (.mp4). Ignorando el archivo local."); }
 
     const reader = new FileReader();
     reader.onload = async () => {
@@ -476,7 +352,7 @@ function openNewGameModal() {
       if (!token) { alert("Falta AUTH_TOKEN. Inicia sesión de admin y pega el token cuando se te pida."); return; }
       const newGame = {
         title,
-        image: reader.result,           // DataURL (temporal). Recomendado migrar a URL pública.
+        image: reader.result,           // DataURL temporal (mejor usa URL pública)
         description: descHTML,          // HTML enriquecido
         previewVideo: trailerUrl || null,
         downloadUrl,
@@ -499,16 +375,15 @@ function openNewGameModal() {
     reader.readAsDataURL(imageFile);
   });
 
-  document.body.appendChild(modalNode);
-  setTimeout(() => modalNode.classList.add("show"), 0);
+  openModalFragment(modalNode);
 }
 
-// ==== Socials ====
+// ==== Socials (local) ====
 function openNewSocialModal() {
   const modal = newSocialModalTemplate.content.cloneNode(true);
   const modalNode = modal.querySelector(".tw-modal");
   const form = modal.querySelector(".new-social-form");
-  const imageInput = modal.querySelector(".new-social-image");
+  const imageInput = modal.querySelector(".new-social-image-file"); // <- coincide con tu HTML
   const urlInput = modal.querySelector(".new-social-url");
   const modalClose = modal.querySelector(".tw-modal-close");
 
@@ -517,52 +392,36 @@ function openNewSocialModal() {
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const file = imageInput?.files?.[0];
-    if (!file) { alert("Selecciona una imagen."); return; }
-    const url = (urlInput.value || "").trim();
-    if (!url) { alert("Coloca el enlace de la red."); urlInput.focus(); return; }
-
+    const file = imageInput?.files?.[0]; if (!file) { alert("Selecciona una imagen."); return; }
+    const url = (urlInput.value || "").trim(); if (!url) { alert("Coloca el enlace de la red."); urlInput.focus(); return; }
     const reader = new FileReader();
-    reader.onload = () => {
-      socials.push({ image: reader.result, url });
-      persistSocials();
-      renderSocialBar();
-      closeModal(modalNode, removeTrap, onEscape);
-    };
+    reader.onload = () => { socials.push({ image: reader.result, url }); persistSocials(); renderSocialBar(); closeModal(modalNode, removeTrap, onEscape); };
     reader.readAsDataURL(file);
   });
   modalClose.addEventListener("click", () => closeModal(modalNode, removeTrap, onEscape));
   openModalFragment(modalNode);
 }
-
 function renderSocialBar() {
   const bar = document.querySelector(".social-bar");
   if (!bar) return;
   bar.innerHTML = "";
-
   socials.forEach((s) => {
-    const a = document.createElement("a");
-    a.href = s.url;
-    a.target = "_blank";
-    a.rel = "noopener";
-    const img = document.createElement("img");
-    img.src = s.image;
-    a.appendChild(img);
-    bar.appendChild(a);
+    const a = document.createElement("a"); a.href = s.url; a.target = "_blank"; a.rel = "noopener";
+    const img = document.createElement("img"); img.src = s.image; img.className = "social-img";
+    const tile = document.createElement("div"); tile.className = "social-tile"; tile.appendChild(img);
+    a.appendChild(tile); bar.appendChild(a);
   });
-
   if (isAdmin) {
     const btn = document.createElement("button");
-    btn.className = "add-social-btn";
-    btn.textContent = "+";
+    btn.className = "add-social-tile"; btn.textContent = "+";
     btn.addEventListener("click", openNewSocialModal);
     bar.appendChild(btn);
   }
 }
 
-// ==== Búsqueda ====
+// ==== Búsqueda (usa #searchInput, no .search-input) ====
 function setupSearch() {
-  const input = document.querySelector(".search-input");
+  const input = document.getElementById("searchInput");
   if (!input) return;
   input.addEventListener("input", () => {
     const q = input.value.toLowerCase();
@@ -573,7 +432,6 @@ function setupSearch() {
     const container = document.querySelector(`.carousel[data-row="recientes"]`);
     if (!container) return;
     container.innerHTML = "";
-
     filtered.forEach((g) => {
       const node = template.content.cloneNode(true);
       const tile = node.querySelector(".tile");
@@ -587,15 +445,14 @@ function setupSearch() {
   });
 }
 
-// ==== Flechas / teclado ====
+// ==== Flechas / teclado (usa .arrow.prev / .arrow.next) ====
 function setupArrows() {
-  const left = document.querySelector(".arrow-left");
-  const right = document.querySelector(".arrow-right");
+  const prev = document.querySelector(".arrow.prev");
+  const next = document.querySelector(".arrow.next");
   const row = document.querySelector(`.carousel[data-row="recientes"]`);
-  if (!left || !right || !row) return;
-
-  left.addEventListener("click", () => row.scrollBy({ left: -400, behavior: "smooth" }));
-  right.addEventListener("click", () => row.scrollBy({ left: 400, behavior: "smooth" }));
+  if (!prev || !next || !row) return;
+  prev.addEventListener("click", () => row.scrollBy({ left: -400, behavior: "smooth" }));
+  next.addEventListener("click", () => row.scrollBy({ left: 400, behavior: "smooth" }));
 }
 function setupKeyboardNav() {
   const row = document.querySelector(`.carousel[data-row="recientes"]`);
@@ -606,30 +463,17 @@ function setupKeyboardNav() {
   });
 }
 
-// ==== Admin Login ====
-function toHex(buf) {
-  const v = new Uint8Array(buf);
-  return Array.from(v).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-async function sha256(str) {
-  const enc = new TextEncoder().encode(str);
-  const digest = await crypto.subtle.digest("SHA-256", enc);
-  return toHex(digest);
-}
-function genSaltHex(len = 16) {
-  const arr = new Uint8Array(len);
-  crypto.getRandomValues(arr);
-  return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-async function hashCreds(user, pin, saltHex) {
-  return sha256(`${user}::${pin}::${saltHex}`);
-}
+// ==== Admin Login (sin botón .admin-btn; usa .user-pill de tu topbar) ====
+function toHex(buf) { const v = new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
+async function sha256(str) { const enc = new TextEncoder().encode(str); const digest = await crypto.subtle.digest("SHA-256", enc); return toHex(digest); }
+function genSaltHex(len = 16) { const arr = new Uint8Array(len); crypto.getRandomValues(arr); return Array.from(arr).map(b=>b.toString(16).padStart(2,"0")).join(""); }
+async function hashCreds(user, pin, saltHex) { return sha256(`${user}::${pin}::${saltHex}`); }
 
 function openAdminLoginModal() {
   const modal = adminLoginModalTemplate.content.cloneNode(true);
   const modalNode = modal.querySelector(".tw-modal");
   const form = modal.querySelector(".admin-login-form");
-  const h2 = modal.querySelector("h2");
+  const h2 = modal.querySelector(".tw-modal-title") || modal.querySelector("h2");
   const usernameInput = modal.querySelector(".admin-username");
   const pinInput = modal.querySelector(".admin-pin");
   const submitBtn = form.querySelector('button[type="submit"]');
@@ -641,15 +485,12 @@ function openAdminLoginModal() {
   const isFirstRun = !(savedHash && savedSalt && savedUser);
 
   if (isFirstRun) {
-    h2.textContent = "Configurar administrador";
-    submitBtn.textContent = "Crear y entrar";
+    if (h2) h2.textContent = "Configurar administrador";
+    if (submitBtn) submitBtn.textContent = "Crear y entrar";
     const confirmLabel = document.createElement("label");
-    confirmLabel.innerHTML = `
-      Confirmar PIN
-      <input type="password" class="admin-pin2" required>
-      <span class="input-hint">Repite el PIN (4 a 6 dígitos).</span>
-    `;
-    form.insertBefore(confirmLabel, form.querySelector(".tw-modal-actions"));
+    confirmLabel.innerHTML = `Confirmar PIN <input type="password" class="admin-pin2" required>
+      <span class="input-hint">Repite el PIN (4 a 6 dígitos).</span>`;
+    form.insertBefore(confirmLabel, form.querySelector(".tw-modal-actions") || form.lastElementChild);
   }
 
   const removeTrap = trapFocus(modalNode);
@@ -668,85 +509,55 @@ function openAdminLoginModal() {
       if (pin !== pin2) { alert("Los PIN no coinciden."); return; }
       const salt = genSaltHex(16);
       const hash = await hashCreds(user, pin, salt);
-      try {
-        localStorage.setItem(LS_ADMIN_HASH, hash);
-        localStorage.setItem(LS_ADMIN_SALT, salt);
-        localStorage.setItem(LS_ADMIN_USER, user);
-      } catch {}
-      isAdmin = true;
-      persistAdmin(true);
+      try { localStorage.setItem(LS_ADMIN_HASH, hash); localStorage.setItem(LS_ADMIN_SALT, salt); localStorage.setItem(LS_ADMIN_USER, user); } catch {}
+      isAdmin = true; persistAdmin(true);
       closeModal(modalNode, removeTrap, onEscape);
-      renderRow();
-      renderHeroCarousel();
-      renderSocialBar();
-      setupAdminButton();
+      renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
       ensureAuthTokenPrompt();
       alert("Administrador configurado e iniciado.");
     } else {
       if (user !== savedUser) { alert("Usuario o PIN incorrectos."); return; }
       const hash = await hashCreds(user, pin, savedSalt);
       if (hash === savedHash) {
-        isAdmin = true;
-        persistAdmin(true);
+        isAdmin = true; persistAdmin(true);
         closeModal(modalNode, removeTrap, onEscape);
-        renderRow();
-        renderHeroCarousel();
-        renderSocialBar();
-        setupAdminButton();
+        renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
         ensureAuthTokenPrompt();
         alert("¡Sesión iniciada como admin!");
-      } else {
-        alert("Usuario o PIN incorrectos.");
-      }
+      } else { alert("Usuario o PIN incorrectos."); }
     }
   });
 
   openModalFragment(modalNode);
 }
-
 function ensureAuthTokenPrompt() {
   try {
-    const k = 'tgx_admin_token';
-    let t = localStorage.getItem(k);
-    if (!t) {
-      t = prompt('Pega tu AUTH_TOKEN de Netlify para poder crear/borrar publicaciones:');
-      if (t) localStorage.setItem(k, t.trim());
-    }
+    const k = 'tgx_admin_token'; let t = localStorage.getItem(k);
+    if (!t) { t = prompt('Pega tu AUTH_TOKEN de Netlify para poder crear/borrar publicaciones:'); if (t) localStorage.setItem(k, t.trim()); }
   } catch {}
 }
-
-// ==== Botón Admin ====
 function setupAdminButton() {
-  const adminBtn = document.querySelector(".admin-btn");
+  const adminBtn = document.querySelector(".user-pill"); // <— usa el botón de tu topbar
   if (!adminBtn) return;
-
-  adminBtn.textContent = isAdmin ? "Salir (admin)" : "Admin";
   adminBtn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
-
   adminBtn.addEventListener("click", () => {
     if (isAdmin) {
       if (confirm("¿Cerrar sesión de administrador?")) {
-        isAdmin = false;
-        persistAdmin(false);
-        renderRow();
-        renderHeroCarousel();
-        renderSocialBar();
-        setupAdminButton();
+        isAdmin = false; persistAdmin(false);
+        renderRow(); renderHeroCarousel(); renderSocialBar();
         alert("Sesión cerrada.");
       }
-    } else {
-      openAdminLoginModal();
-    }
+    } else { openAdminLoginModal(); }
   });
 }
 
 // ==== Init ====
 async function initData() {
-  try {
-    const data = await apiList();
-    recientes = Array.isArray(data) ? data : [];
-  } catch (e) {
+  try { const data = await apiList(); recientes = Array.isArray(data) ? data : []; }
+  catch (e) {
     console.error('[initData]', e);
+    // Hint útil si la Function no existe en Netlify:
+    // Abre /.netlify/functions/posts en el navegador; si 404, revisa que netlify/functions/posts.js esté en la RAÍZ del repo y que tengas package.json con @neondatabase/serverless instalado.
     recientes = [];
   }
   renderRow();
