@@ -1,164 +1,179 @@
-// ==== Templates ====
+// ===================== TEMPLATES =====================
 const template = document.getElementById("tile-template");
 const modalTemplate = document.getElementById("game-modal-template");
 const adminLoginModalTemplate = document.getElementById("admin-login-modal-template");
 const newGameModalTemplate = document.getElementById("new-game-modal-template");
 const newSocialModalTemplate = document.getElementById("new-social-modal-template");
 
-// ==== LocalStorage Keys ====
+// ===================== LOCALSTORAGE KEYS =====================
 const LS_RECENTES = "tgx_recientes";
 const LS_ADMIN = "tgx_is_admin";
 const LS_ADMIN_HASH = "tgx_admin_hash";
 const LS_ADMIN_SALT = "tgx_admin_salt";
 const LS_ADMIN_USER = "tgx_admin_user";
-const LS_SOCIALS = "tgx_socials";
+const LS_SOCIALS = "tgx_socials"; // ya no se usa para persistir, pero dejamos fallback
 
-// ==== API (Netlify Functions + Neon) ====
-const API = '/.netlify/functions/posts';
+// ===================== API ENDPOINTS =====================
+const API_POSTS = "/.netlify/functions/posts";
+const API_SOC   = "/.netlify/functions/socials";
 
+// ---- POSTS
 async function apiList() {
-  const res = await fetch(API, { cache: 'no-store' });
-  if (!res.ok) throw new Error('No se pudo listar');
-  return res.json();
+  const r = await fetch(API_POSTS, { cache: "no-store" });
+  if (!r.ok) throw new Error("No se pudo listar posts");
+  return r.json();
 }
 async function apiCreate(game, token) {
-  const res = await fetch(API, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token || ''}`
-    },
+  const r = await fetch(API_POSTS, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token||""}` },
     body: JSON.stringify(game)
   });
-  if (!res.ok) {
-    const txt = await res.text().catch(()=> '');
-    throw new Error('No se pudo crear: ' + txt);
-  }
-  return res.json();
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 async function apiDelete(id, token) {
-  const res = await fetch(`${API}/${id}`, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${token || ''}` }
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(()=> '');
-    throw new Error('No se pudo borrar: ' + txt);
-  }
-  return res.json();
+  const r = await fetch(`${API_POSTS}/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token||""}` } });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 
+// ---- SOCIALS
+async function socialsList(){
+  const r = await fetch(API_SOC, { cache: "no-store" });
+  if(!r.ok) throw new Error("No se pudo listar socials");
+  return r.json();
+}
+async function socialsCreate(s, token){
+  const r = await fetch(API_SOC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token||""}` },
+    body: JSON.stringify(s)
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function socialsDelete(id, token){
+  const r = await fetch(`${API_SOC}/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token||""}` } });
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// ===================== STATE =====================
 let isAdmin = false;
 let recientes = [];
-let socials = [];
+let socials  = [];
 
+// ===================== UTIL / STORAGE =====================
 rehydrate();
-
-// ==== Storage helpers ====
 function rehydrate() {
-  try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES) || "[]"); if (Array.isArray(saved)) recientes = saved; } catch {}
-  try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS) || "[]"); if (Array.isArray(savedS)) socials = savedS; } catch {}
+  try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES)||"[]"); if(Array.isArray(saved)) recientes = saved; } catch {}
+  try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS)||"[]"); if(Array.isArray(savedS)) socials = savedS; } catch {}
   isAdmin = localStorage.getItem(LS_ADMIN) === "1";
 }
-function persistRecientes() { try { localStorage.setItem(LS_RECENTES, JSON.stringify(recientes)); } catch {} }
-function persistAdmin(flag) { try { localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); } catch {} }
-function persistSocials() { try { localStorage.setItem(LS_SOCIALS, JSON.stringify(socials)); } catch {} }
+function persistAdmin(flag){ try{ localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); }catch{} }
+function preload(src){ const img = new Image(); img.src = src; }
 
-// ==== Preload helper ====
-function preload(src) { const img = new Image(); img.src = src; }
-
-// ==== Rich Editor (minimal WYSIWYG) ====
-function initRichEditor(editorRoot) {
-  const editorArea = editorRoot.querySelector(".editor-area");
-  const toolbar = editorRoot.querySelector(".rich-toolbar");
-  function exec(cmd, value = null) { document.execCommand(cmd, false, value); editorArea.focus(); }
-  toolbar.addEventListener("click", (e) => {
-    const btn = e.target.closest(".rtb-btn"); if (!btn) return;
-    const { cmd, block, list } = btn.dataset;
-    if (cmd) exec(cmd);
-    if (block) exec("formatBlock", block);
-    if (list === "ul") exec("insertUnorderedList");
-    if (btn.classList.contains("rtb-link")) { const url = prompt("URL del enlace:"); if (url) exec("createLink", url); }
-  });
-  const fontSel = toolbar.querySelector(".rtb-font");
-  if (fontSel) fontSel.addEventListener("change", () => { const val = fontSel.value.trim(); if (val) exec("fontName", val); else editorArea.focus(); });
-  return { getHTML: () => editorArea.innerHTML.trim(), setHTML: (html) => { editorArea.innerHTML = html || ""; } };
-}
-
-// ==== Modal helpers (usa clase 'active' para que se vea con tu CSS) ====
-function openModalFragment(fragment) {
-  document.body.appendChild(fragment);
-  setTimeout(() => fragment.classList.add("active"), 0);
-}
-function closeModal(modalNode, removeTrap, onEscape) {
+function openModalFragment(fragment){ document.body.appendChild(fragment); setTimeout(()=>fragment.classList.add("active"),0); }
+function closeModal(modalNode, removeTrap, onEscape){
   modalNode.classList.remove("active");
   document.body.style.overflow = "";
-  if (removeTrap) removeTrap();
-  if (onEscape) modalNode.removeEventListener("keydown", onEscape);
-  setTimeout(() => { try { modalNode.remove(); } catch {} }, 300);
+  if(removeTrap) removeTrap();
+  if(onEscape) modalNode.removeEventListener("keydown", onEscape);
+  setTimeout(()=>{ try{ modalNode.remove(); }catch{} }, 300);
 }
-
-function findGameRef(game) {
-  const idx = recientes.findIndex(g => g.title === game.title && g.image === game.image);
-  return idx !== -1 ? { row: "recientes", index: idx } : null;
-}
-function trapFocus(modalNode) {
-  const selectors = [
-    "a[href]", "button:not([disabled])", "textarea:not([disabled])",
-    "input:not([disabled])", "select:not([disabled])", "[tabindex]:not([tabindex='-1'])"
-  ];
+function trapFocus(modalNode){
+  const selectors = ["a[href]","button:not([disabled])","textarea:not([disabled])","input:not([disabled])","select:not([disabled])","[tabindex]:not([tabindex='-1'])"];
   const getList = () => Array.from(modalNode.querySelectorAll(selectors.join(",")));
-  function onKey(e) {
-    if (e.key !== "Tab") return;
-    const items = getList(); if (!items.length) return;
-    const first = items[0], last = items[items.length - 1];
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  function onKey(e){
+    if(e.key !== "Tab") return;
+    const items = getList(); if(!items.length) return;
+    const first = items[0], last = items[items.length-1];
+    if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
   }
   modalNode.addEventListener("keydown", onKey);
   return () => modalNode.removeEventListener("keydown", onKey);
 }
 
-// ==== Render: fila de recientes ====
-function renderRow() {
+// ===================== RICH EDITOR (WYSIWYG MIN) =====================
+function initRichEditor(editorRoot){
+  const editorArea = editorRoot.querySelector(".editor-area");
+  const toolbar = editorRoot.querySelector(".rich-toolbar");
+  function exec(cmd,v=null){ document.execCommand(cmd,false,v); editorArea.focus(); }
+  toolbar.addEventListener("click",(e)=>{
+    const btn = e.target.closest(".rtb-btn"); if(!btn) return;
+    const { cmd, block, list } = btn.dataset;
+    if(cmd) exec(cmd);
+    if(block) exec("formatBlock", block);
+    if(list==="ul") exec("insertUnorderedList");
+    if(btn.classList.contains("rtb-link")){
+      const url = prompt("URL del enlace:");
+      if(url) exec("createLink", url);
+    }
+  });
+  const fontSel = toolbar.querySelector(".rtb-font");
+  if(fontSel){ fontSel.addEventListener("change", ()=>{ const v=fontSel.value.trim(); if(v) exec("fontName", v); else editorArea.focus(); }); }
+  return { getHTML: ()=>editorArea.innerHTML.trim(), setHTML: (h)=>{ editorArea.innerHTML = h||""; } };
+}
+
+// ===================== RENDER: CARDS/ROW =====================
+function renderRow(){
   const container = document.querySelector(`.carousel[data-row="recientes"]`);
-  if (!container) return;
+  if(!container) return;
   container.innerHTML = "";
 
-  recientes.forEach((g) => {
+  recientes.forEach((g)=>{
     const node = template.content.cloneNode(true);
     const tile = node.querySelector(".tile");
     const cover = node.querySelector(".cover");
     const title = node.querySelector(".title");
-    const vid = node.querySelector(".tile-video");
+    const vid   = node.querySelector(".tile-video");
 
     cover.style.backgroundImage = `url(${g.image})`;
     preload(g.image);
+    title.textContent = g.title || "";
 
+    // ---- Trailer hover (.mp4/.webm directos)
     if (vid && g.previewVideo) {
-      let loaded = false;
-      const ensureSrc = () => { if (loaded) return; vid.src = g.previewVideo; loaded = true; };
-      const start = () => { ensureSrc(); vid.currentTime = 0; const p = vid.play(); if (p && p.catch) p.catch(()=>{}); };
-      const stop = () => { vid.pause(); vid.currentTime = 0; };
-      const show = () => vid.classList.add("playing");
-      const hide = () => vid.classList.remove("playing");
-      vid.addEventListener("playing", show);
-      vid.addEventListener("pause", hide);
-      vid.addEventListener("ended", hide);
-      vid.addEventListener("error", () => { vid.remove(); });
-      tile.addEventListener("pointerenter", start);
-      tile.addEventListener("pointerleave", stop);
-      tile.addEventListener("focus", start);
-      tile.addEventListener("blur", stop);
+      const okExt = /\.(mp4|webm)(\?.*)?$/i.test(g.previewVideo);
+      if (!okExt) {
+        console.warn("previewVideo no es un .mp4/.webm directo:", g.previewVideo);
+      } else {
+        let loaded = false;
+        vid.muted = true;
+        vid.loop = true;
+        vid.playsInline = true;
+        vid.setAttribute("muted","");
+        vid.setAttribute("playsinline","");
+        vid.preload = "metadata";
+
+        const ensureSrc = ()=>{ if(loaded) return; vid.src = g.previewVideo; loaded = true; };
+        const start = ()=>{
+          ensureSrc();
+          vid.currentTime = 0;
+          const p = vid.play(); if(p && p.catch) p.catch(()=>{});
+        };
+        const stop  = ()=>{ vid.pause(); vid.currentTime = 0; };
+        const show  = ()=>vid.classList.add("playing");
+        const hide  = ()=>vid.classList.remove("playing");
+        vid.addEventListener("playing", show);
+        vid.addEventListener("pause", hide);
+        vid.addEventListener("ended", hide);
+        vid.addEventListener("error", ()=>{ console.warn("Error trailer:", g.previewVideo); vid.remove(); });
+        tile.addEventListener("pointerenter", start);
+        tile.addEventListener("pointerleave", stop);
+        tile.addEventListener("focus", start);
+        tile.addEventListener("blur", stop);
+      }
     }
 
-    title.textContent = g.title;
     tile.tabIndex = 0;
-    tile.addEventListener("click", () => openGame(g));
+    tile.addEventListener("click", ()=>openGame(g));
     container.appendChild(node);
   });
 
-  if (isAdmin) {
+  if(isAdmin){
     const addTile = document.createElement("div");
     addTile.className = "add-game-tile";
     addTile.tabIndex = 0;
@@ -168,58 +183,33 @@ function renderRow() {
   }
 }
 
-// ==== Render: Hero (sin .hero-title ni .bullets; se adapta a tu HTML) ====
-function renderHeroCarousel() {
+// ===================== RENDER: HERO =====================
+function renderHeroCarousel(){
   const heroCarousel = document.querySelector(".hero-carousel");
   const heroArt = document.querySelector(".hero-art");
-  if (!heroCarousel || !heroArt || !recientes.length) return;
+  if(!heroCarousel || !heroArt || !recientes.length) return;
 
   heroCarousel.innerHTML = "";
-
   const max = Math.min(5, recientes.length);
-  for (let i = 0; i < max; i++) {
+  for(let i=0;i<max;i++){
     const img = document.createElement("img");
     img.src = recientes[i].image;
-    if (i === 0) img.classList.add('active');
+    if(i===0) img.classList.add("active");
     heroCarousel.appendChild(img);
   }
-
-  const setActive = (i) => {
+  const setActive = (i)=>{
     const imgs = heroCarousel.querySelectorAll("img");
-    imgs.forEach((im, idx) => im.classList.toggle("active", idx === i));
-    heroArt.style.backgroundImage = `url(${recientes[i]?.image || ""})`;
+    imgs.forEach((im,idx)=>im.classList.toggle("active", idx===i));
+    heroArt.style.backgroundImage = `url(${recientes[i]?.image||""})`;
   };
   setActive(0);
-
-  const getActiveIndex = () => {
-    const imgs = heroCarousel.querySelectorAll("img");
-    return Array.from(imgs).findIndex((im) => im.classList.contains("active"));
-  };
-
-  heroArt.addEventListener("click", () => {
-    const i = getActiveIndex();
-    openGame(recientes[i >= 0 ? i : 0]);
-  });
-  heroArt.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      const i = getActiveIndex();
-      openGame(recientes[i >= 0 ? i : 0]);
-    }
-  });
-
-  // Auto-slide opcional
-  // setInterval(() => {
-  //   const imgs = heroCarousel.querySelectorAll("img");
-  //   if (!imgs.length) return;
-  //   const i = getActiveIndex();
-  //   const next = (i + 1) % imgs.length;
-  //   setActive(next);
-  // }, 8000);
+  const getActiveIndex = ()=> Array.from(heroCarousel.querySelectorAll("img")).findIndex(im=>im.classList.contains("active"));
+  heroArt.addEventListener("click", ()=>{ const i=getActiveIndex(); openGame(recientes[i>=0?i:0]); });
+  heroArt.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); const i=getActiveIndex(); openGame(recientes[i>=0?i:0]); }});
 }
 
-// ==== Modal: Ver juego ====
-function openGame(game) {
+// ===================== MODAL: VER JUEGO =====================
+function openGame(game){
   const modal = modalTemplate.content.cloneNode(true);
   const modalNode = modal.querySelector(".tw-modal");
   const modalContent = modal.querySelector(".tw-modal-content");
@@ -233,11 +223,11 @@ function openGame(game) {
   modalImage.src = game.image || "assets/images/construction/en-proceso.svg";
   modalTitle.textContent = game.title || "Sin título";
   modalDescription.innerHTML = game.description || "Sin descripción";
-  modalDownload.addEventListener("click", () => { if (game.downloadUrl) window.location.href = game.downloadUrl; });
-  modalSecondary.addEventListener("click", () => { alert("Pronto: detalles extendidos"); });
+  modalDownload.addEventListener("click", ()=>{ if(game.downloadUrl) window.location.href = game.downloadUrl; });
+  modalSecondary.addEventListener("click", ()=> alert("Pronto: detalles extendidos"));
 
-  // Admin (editar/eliminar)
-  if (isAdmin) {
+  // Kebab admin (edit/delete)
+  if(isAdmin){
     const kebabBtn = document.createElement("button");
     kebabBtn.className = "tw-modal-menu";
     kebabBtn.innerHTML = "⋮";
@@ -247,14 +237,14 @@ function openGame(game) {
       <button class="tw-kebab-item" data-action="edit">Editar</button>
       <button class="tw-kebab-item danger" data-action="delete">Eliminar</button>
     `;
-    kebabBtn.addEventListener("click", (e) => { e.stopPropagation(); panel.classList.toggle("show"); });
-    document.addEventListener("click", (e) => { if (!panel.contains(e.target) && e.target !== kebabBtn) panel.classList.remove("show"); });
-    panel.addEventListener("click", (e) => {
+    kebabBtn.addEventListener("click",(e)=>{ e.stopPropagation(); panel.classList.toggle("show"); });
+    document.addEventListener("click",(e)=>{ if(!panel.contains(e.target) && e.target!==kebabBtn) panel.classList.remove("show"); });
+    panel.addEventListener("click",(e)=>{
       const action = e.target?.dataset?.action;
-      if (action === "edit") { panel.classList.remove("show"); openEditGame(game, modalNode); }
-      if (action === "delete") {
+      if(action==="edit"){ panel.classList.remove("show"); openEditGame(game, modalNode); }
+      if(action==="delete"){
         panel.classList.remove("show");
-        if (confirm("¿Eliminar esta publicación? Esta acción no se puede deshacer.")) deleteGame(game, modalNode);
+        if(confirm("¿Eliminar esta publicación?")) deleteGame(game, modalNode);
       }
     });
     modalContent.appendChild(kebabBtn);
@@ -262,29 +252,28 @@ function openGame(game) {
   }
 
   const removeTrap = trapFocus(modalNode);
-  const onEscape = (e) => { if (e.key === "Escape") closeModal(modalNode, removeTrap, onEscape); };
-  modalClose.addEventListener("click", () => closeModal(modalNode, removeTrap, onEscape));
+  const onEscape = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
+  modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
   openModalFragment(modalNode);
 }
 
-// ==== CRUD de publicaciones ====
-function deleteGame(game, currentModalNode) {
-  if (!game.id) { alert("No se encontró el ID de la publicación."); return; }
-  const token = localStorage.getItem('tgx_admin_token') || '';
-  if (!token) { alert("Falta AUTH_TOKEN. Inicia sesión de admin y pega el token cuando se te pida."); return; }
+// ===================== CRUD POSTS =====================
+function deleteGame(game, currentModalNode){
+  if(!game.id){ alert("No se encontró ID."); return; }
+  const token = localStorage.getItem("tgx_admin_token") || "";
+  if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
   apiDelete(game.id, token)
-    .then(() => apiList())
-    .then(data => {
-      recientes = Array.isArray(data) ? data : [];
-      renderRow();
-      renderHeroCarousel();
-      if (currentModalNode) closeModal(currentModalNode);
+    .then(()=>apiList())
+    .then(data=>{
+      recientes = Array.isArray(data)?data:[];
+      renderRow(); renderHeroCarousel();
+      if(currentModalNode) closeModal(currentModalNode);
       alert("Publicación eliminada.");
     })
-    .catch(err => { console.error(err); alert("Error al borrar. Revisa la consola."); });
+    .catch(e=>{ console.error(e); alert("Error al borrar."); });
 }
 
-function openEditGame(original, currentModalNode) {
+function openEditGame(original){
   const modal = newGameModalTemplate.content.cloneNode(true);
   const node = modal.querySelector(".tw-modal");
   const form = modal.querySelector(".new-game-form");
@@ -297,31 +286,31 @@ function openEditGame(original, currentModalNode) {
   const modalClose = modal.querySelector(".tw-modal-close");
 
   titleInput.value = original.title || "";
-  if (descriptionInput) descriptionInput.value = (original.description || "").replace(/<[^>]+>/g, "");
-  if (trailerUrlInput) trailerUrlInput.value = original.previewVideo || "";
-  if (downloadInput) downloadInput.value = original.downloadUrl || "";
-  if (imageInput) imageInput.required = false;
+  if(descriptionInput) descriptionInput.value = (original.description||"").replace(/<[^>]+>/g,"");
+  if(trailerUrlInput) trailerUrlInput.value = original.previewVideo || "";
+  if(downloadInput) downloadInput.value = original.downloadUrl || "";
+  if(imageInput) imageInput.required = false;
 
   const removeTrap = trapFocus(node);
-  const onEscape = (e) => { if (e.key === "Escape") closeModal(node, removeTrap, onEscape); };
+  const onEscape = (e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit",(e)=>{
     e.preventDefault();
-    alert("Edición desde UI aún no implementada con API. De momento, elimina y vuelve a crear.");
+    alert("Edición desde UI aún no implementada. Por ahora elimina y vuelve a crear.");
   });
-  modalClose.addEventListener("click", () => closeModal(node, removeTrap, onEscape));
+
+  modalClose.addEventListener("click",()=> closeModal(node, removeTrap, onEscape));
   openModalFragment(node);
 }
 
-// ==== Nuevo juego (API) ====
-function openNewGameModal() {
+function openNewGameModal(){
   const modal = newGameModalTemplate.content.cloneNode(true);
   const modalNode = modal.querySelector(".tw-modal");
   const form = modal.querySelector(".new-game-form");
   const titleInput = modal.querySelector(".new-game-title");
-  const imageInput = modal.querySelector(".new-game-image-file");
-  const trailerFileInput = modal.querySelector(".new-game-trailer-file");
-  const trailerUrlInput = modal.querySelector(".new-game-trailer-url");
+  const imageInput = modal.querySelector(".new-game-image-file"); // portada (file -> DataURL)
+  const trailerFileInput = modal.querySelector(".new-game-trailer-file"); // NO se usa para subir
+  const trailerUrlInput = modal.querySelector(".new-game-trailer-url");   // usamos esta URL
   const downloadInput = modal.querySelector(".new-game-download");
   const modalClose = modal.querySelector(".tw-modal-close");
 
@@ -330,150 +319,208 @@ function openNewGameModal() {
   const editorAPI = initRichEditor(editorRoot);
 
   const removeTrap = trapFocus(modalNode);
-  const onEscape = (e) => { if (e.key === "Escape") closeModal(modalNode, removeTrap, onEscape); };
-  modalClose.addEventListener("click", () => closeModal(modalNode, removeTrap, onEscape));
+  const onEscape = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
+  modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
 
-  form.addEventListener("submit", async (e) => {
+  form.addEventListener("submit", async (e)=>{
     e.preventDefault();
-    const title = (titleInput.value || "").trim();
+    const title = (titleInput.value||"").trim();
     const descHTML = editorAPI.getHTML();
     const imageFile = imageInput?.files?.[0];
-    const trailerUrl = (trailerUrlInput?.value || "").trim();
-    const downloadUrl = (downloadInput?.value || "").trim() || null;
+    const trailerUrl = (trailerUrlInput?.value||"").trim();
+    const downloadUrl = (downloadInput?.value||"").trim() || null;
 
-    if (!title) { alert("Título es obligatorio."); titleInput.focus(); return; }
-    if (!imageFile) { alert("Selecciona una imagen de portada."); imageInput.focus(); return; }
-    if (!descHTML || !descHTML.replace(/<[^>]*>/g, '').trim()) { alert("Escribe una descripción."); return; }
-    if (!trailerUrl && trailerFileInput?.files?.[0]) { alert("Por ahora usa una URL pública para el trailer (.mp4). Ignorando el archivo local."); }
+    if(!title){ alert("Título es obligatorio."); titleInput.focus(); return; }
+    if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput.focus(); return; }
+    if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
+    // Trailer: solo URL directa .mp4/.webm (recomendado: ruta del propio sitio)
+    if (trailerFileInput?.files?.length) {
+      alert("Para el trailer usa una URL directa (.mp4/.webm). Sube el archivo a /assets/video/... en tu repo y pega la ruta, por ejemplo: /assets/video/mi-juego/trailer.mp4");
+      return;
+    }
+    if (trailerUrl && !/\.(mp4|webm)(\?.*)?$/i.test(trailerUrl)) {
+      alert("El trailer debe ser un .mp4/.webm directo. YouTube/Imgur página no sirven para <video>.");
+      return;
+    }
+
+    // Portada -> DataURL (ligero). Trailer -> URL pública (no DataURL).
     const reader = new FileReader();
-    reader.onload = async () => {
-      const token = localStorage.getItem('tgx_admin_token') || '';
-      if (!token) { alert("Falta AUTH_TOKEN. Inicia sesión de admin y pega el token cuando se te pida."); return; }
+    reader.onload = async ()=>{
+      const token = localStorage.getItem("tgx_admin_token") || "";
+      if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
       const newGame = {
         title,
-        image: reader.result,           // DataURL temporal (mejor usa URL pública)
-        description: descHTML,          // HTML enriquecido
+        image: reader.result,          // DataURL
+        description: descHTML,
         previewVideo: trailerUrl || null,
         downloadUrl,
         detailsUrl: "#"
       };
-      try {
+      try{
         await apiCreate(newGame, token);
         const data = await apiList();
-        recientes = Array.isArray(data) ? data : [];
+        recientes = Array.isArray(data)?data:[];
         closeModal(modalNode, removeTrap, onEscape);
-        renderRow();
-        renderHeroCarousel();
-        alert("¡Juego añadido exitosamente!");
-      } catch (err) {
-        console.error(err);
-        alert("Error al guardar. Revisa la consola.");
-      }
+        renderRow(); renderHeroCarousel();
+        alert("¡Juego añadido!");
+      }catch(err){ console.error(err); alert("Error al guardar. Revisa consola."); }
     };
-    reader.onerror = () => alert("No se pudo leer la imagen.");
+    reader.onerror = ()=> alert("No se pudo leer la imagen.");
     reader.readAsDataURL(imageFile);
   });
 
   openModalFragment(modalNode);
 }
 
-// ==== Socials (local) ====
-function openNewSocialModal() {
+// ===================== SOCIALS (render + modal + borrar) =====================
+function openNewSocialModal(){
   const modal = newSocialModalTemplate.content.cloneNode(true);
   const modalNode = modal.querySelector(".tw-modal");
   const form = modal.querySelector(".new-social-form");
-  const imageInput = modal.querySelector(".new-social-image-file"); // <- coincide con tu HTML
-  const urlInput = modal.querySelector(".new-social-url");
+  const imageInput = modal.querySelector(".new-social-image-file");
+  const urlInput   = modal.querySelector(".new-social-url");
+  const nameInput  = modal.querySelector(".new-social-name");
   const modalClose = modal.querySelector(".tw-modal-close");
 
   const removeTrap = trapFocus(modalNode);
-  const onEscape = (e) => { if (e.key === "Escape") closeModal(modalNode, removeTrap, onEscape); };
+  const onEscape = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit",(e)=>{
     e.preventDefault();
-    const file = imageInput?.files?.[0]; if (!file) { alert("Selecciona una imagen."); return; }
-    const url = (urlInput.value || "").trim(); if (!url) { alert("Coloca el enlace de la red."); urlInput.focus(); return; }
+    const file = imageInput?.files?.[0];
+    const url  = (urlInput.value||"").trim();
+    const name = (nameInput?.value||"").trim() || null;
+    if(!file){ alert("Selecciona una imagen."); return; }
+    if(!url){ alert("Coloca el enlace de la red."); urlInput.focus(); return; }
+
     const reader = new FileReader();
-    reader.onload = () => { socials.push({ image: reader.result, url }); persistSocials(); renderSocialBar(); closeModal(modalNode, removeTrap, onEscape); };
+    reader.onload = async ()=>{
+      try{
+        const token = localStorage.getItem("tgx_admin_token") || "";
+        await socialsCreate({ name, image: reader.result, url }, token);
+        socials = await socialsList();
+        renderSocialBar();
+        closeModal(modalNode, removeTrap, onEscape);
+      }catch(err){ console.error(err); alert("Error al guardar red social."); }
+    };
     reader.readAsDataURL(file);
   });
-  modalClose.addEventListener("click", () => closeModal(modalNode, removeTrap, onEscape));
+
+  modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
   openModalFragment(modalNode);
 }
-function renderSocialBar() {
+
+function renderSocialBar(){
   const bar = document.querySelector(".social-bar");
-  if (!bar) return;
+  if(!bar) return;
   bar.innerHTML = "";
-  socials.forEach((s) => {
-    const a = document.createElement("a"); a.href = s.url; a.target = "_blank"; a.rel = "noopener";
+
+  socials.forEach((s)=>{
+    const wrapper = document.createElement("div");
+    wrapper.className = "social-tile-wrap";
+    wrapper.style.position = "relative";
+    wrapper.style.display = "inline-block";
+
+    const a = document.createElement("a");
+    a.href = s.url; a.target = "_blank"; a.rel = "noopener";
+    const tile = document.createElement("div"); tile.className = "social-tile";
     const img = document.createElement("img"); img.src = s.image; img.className = "social-img";
-    const tile = document.createElement("div"); tile.className = "social-tile"; tile.appendChild(img);
-    a.appendChild(tile); bar.appendChild(a);
+    tile.appendChild(img); a.appendChild(tile); wrapper.appendChild(a);
+
+    if (isAdmin && s.id) {
+      const del = document.createElement("button");
+      del.textContent = "×";
+      del.title = "Eliminar";
+      del.style.position = "absolute";
+      del.style.top = "4px";
+      del.style.right = "4px";
+      del.style.width = "24px";
+      del.style.height = "24px";
+      del.style.borderRadius = "12px";
+      del.style.border = "none";
+      del.style.cursor = "pointer";
+      del.style.fontWeight = "bold";
+      del.style.background = "rgba(0,0,0,0.7)";
+      del.style.color = "#fff";
+      del.addEventListener("click", async (e)=>{
+        e.preventDefault(); e.stopPropagation();
+        if (!confirm("¿Eliminar esta red social?")) return;
+        try{
+          const token = localStorage.getItem("tgx_admin_token") || "";
+          await socialsDelete(s.id, token);
+          socials = await socialsList();
+          renderSocialBar();
+        }catch(err){ console.error(err); alert("No se pudo eliminar."); }
+      });
+      wrapper.appendChild(del);
+    }
+
+    bar.appendChild(wrapper);
   });
+
   if (isAdmin) {
     const btn = document.createElement("button");
-    btn.className = "add-social-tile"; btn.textContent = "+";
+    btn.className = "add-social-tile";
+    btn.textContent = "+";
     btn.addEventListener("click", openNewSocialModal);
     bar.appendChild(btn);
   }
 }
 
-// ==== Búsqueda (usa #searchInput, no .search-input) ====
-function setupSearch() {
+// ===================== SEARCH / ARROWS / KEYBOARD =====================
+function setupSearch(){
   const input = document.getElementById("searchInput");
-  if (!input) return;
-  input.addEventListener("input", () => {
+  if(!input) return;
+  input.addEventListener("input", ()=>{
     const q = input.value.toLowerCase();
-    const filtered = recientes.filter((g) =>
-      (g.title || "").toLowerCase().includes(q) ||
-      (g.description || "").toLowerCase().includes(q)
+    const filtered = recientes.filter(g =>
+      (g.title||"").toLowerCase().includes(q) ||
+      (g.description||"").toLowerCase().includes(q)
     );
     const container = document.querySelector(`.carousel[data-row="recientes"]`);
-    if (!container) return;
+    if(!container) return;
     container.innerHTML = "";
-    filtered.forEach((g) => {
+    filtered.forEach((g)=>{
       const node = template.content.cloneNode(true);
       const tile = node.querySelector(".tile");
       const cover = node.querySelector(".cover");
       const title = node.querySelector(".title");
       cover.style.backgroundImage = `url(${g.image})`;
       title.textContent = g.title;
-      tile.addEventListener("click", () => openGame(g));
+      tile.addEventListener("click", ()=>openGame(g));
       container.appendChild(node);
     });
   });
 }
-
-// ==== Flechas / teclado (usa .arrow.prev / .arrow.next) ====
-function setupArrows() {
+function setupArrows(){
   const prev = document.querySelector(".arrow.prev");
   const next = document.querySelector(".arrow.next");
   const row = document.querySelector(`.carousel[data-row="recientes"]`);
-  if (!prev || !next || !row) return;
-  prev.addEventListener("click", () => row.scrollBy({ left: -400, behavior: "smooth" }));
-  next.addEventListener("click", () => row.scrollBy({ left: 400, behavior: "smooth" }));
+  if(!prev || !next || !row) return;
+  prev.addEventListener("click", ()=> row.scrollBy({ left: -400, behavior: "smooth" }));
+  next.addEventListener("click", ()=> row.scrollBy({ left: 400, behavior: "smooth" }));
 }
-function setupKeyboardNav() {
+function setupKeyboardNav(){
   const row = document.querySelector(`.carousel[data-row="recientes"]`);
-  if (!row) return;
-  row.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowRight") row.scrollBy({ left: 200, behavior: "smooth" });
-    if (e.key === "ArrowLeft") row.scrollBy({ left: -200, behavior: "smooth" });
+  if(!row) return;
+  row.addEventListener("keydown",(e)=>{
+    if(e.key==="ArrowRight") row.scrollBy({ left: 200, behavior: "smooth" });
+    if(e.key==="ArrowLeft")  row.scrollBy({ left: -200, behavior: "smooth" });
   });
 }
 
-// ==== Admin Login (sin botón .admin-btn; usa .user-pill de tu topbar) ====
-function toHex(buf) { const v = new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
-async function sha256(str) { const enc = new TextEncoder().encode(str); const digest = await crypto.subtle.digest("SHA-256", enc); return toHex(digest); }
-function genSaltHex(len = 16) { const arr = new Uint8Array(len); crypto.getRandomValues(arr); return Array.from(arr).map(b=>b.toString(16).padStart(2,"0")).join(""); }
-async function hashCreds(user, pin, saltHex) { return sha256(`${user}::${pin}::${saltHex}`); }
+// ===================== ADMIN LOGIN =====================
+function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
+async function sha256(str){ const enc=new TextEncoder().encode(str); const digest=await crypto.subtle.digest("SHA-256",enc); return toHex(digest); }
+function genSaltHex(len=16){ const a=new Uint8Array(len); crypto.getRandomValues(a); return Array.from(a).map(b=>b.toString(16).padStart(2,"0")).join(""); }
+async function hashCreds(user,pin,salt){ return sha256(`${user}::${pin}::${salt}`); }
 
-function openAdminLoginModal() {
+function openAdminLoginModal(){
   const modal = adminLoginModalTemplate.content.cloneNode(true);
-  const modalNode = modal.querySelector(".tw-modal");
+  const node = modal.querySelector(".tw-modal");
   const form = modal.querySelector(".admin-login-form");
-  const h2 = modal.querySelector(".tw-modal-title") || modal.querySelector("h2");
+  const h2   = modal.querySelector(".tw-modal-title") || modal.querySelector("h2");
   const usernameInput = modal.querySelector(".admin-username");
   const pinInput = modal.querySelector(".admin-pin");
   const submitBtn = form.querySelector('button[type="submit"]');
@@ -484,43 +531,43 @@ function openAdminLoginModal() {
   const savedUser = localStorage.getItem(LS_ADMIN_USER);
   const isFirstRun = !(savedHash && savedSalt && savedUser);
 
-  if (isFirstRun) {
-    if (h2) h2.textContent = "Configurar administrador";
-    if (submitBtn) submitBtn.textContent = "Crear y entrar";
+  if(isFirstRun){
+    if(h2) h2.textContent = "Configurar administrador";
+    if(submitBtn) submitBtn.textContent = "Crear y entrar";
     const confirmLabel = document.createElement("label");
     confirmLabel.innerHTML = `Confirmar PIN <input type="password" class="admin-pin2" required>
       <span class="input-hint">Repite el PIN (4 a 6 dígitos).</span>`;
     form.insertBefore(confirmLabel, form.querySelector(".tw-modal-actions") || form.lastElementChild);
   }
 
-  const removeTrap = trapFocus(modalNode);
-  const onEscape = (e) => { if (e.key === "Escape") closeModal(modalNode, removeTrap, onEscape); };
-  modalClose.addEventListener("click", () => closeModal(modalNode, removeTrap, onEscape));
+  const removeTrap = trapFocus(node);
+  const onEscape = (e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
+  modalClose.addEventListener("click", ()=> closeModal(node, removeTrap, onEscape));
 
-  form.addEventListener("submit", async (e) => {
+  form.addEventListener("submit", async (e)=>{
     e.preventDefault();
-    const user = (usernameInput.value || "").trim();
-    const pin = (pinInput.value || "").trim();
-    if (!user || !pin) { alert("Completa usuario y PIN."); return; }
-    if (!/^[0-9]{4,6}$/.test(pin)) { alert("PIN debe ser 4 a 6 dígitos."); return; }
+    const user = (usernameInput.value||"").trim();
+    const pin  = (pinInput.value||"").trim();
+    if(!user || !pin){ alert("Completa usuario y PIN."); return; }
+    if(!/^[0-9]{4,6}$/.test(pin)){ alert("PIN debe ser 4 a 6 dígitos."); return; }
 
-    if (isFirstRun) {
-      const pin2 = modalNode.querySelector(".admin-pin2")?.value?.trim();
-      if (pin !== pin2) { alert("Los PIN no coinciden."); return; }
+    if(isFirstRun){
+      const pin2 = node.querySelector(".admin-pin2")?.value?.trim();
+      if(pin!==pin2){ alert("Los PIN no coinciden."); return; }
       const salt = genSaltHex(16);
-      const hash = await hashCreds(user, pin, salt);
-      try { localStorage.setItem(LS_ADMIN_HASH, hash); localStorage.setItem(LS_ADMIN_SALT, salt); localStorage.setItem(LS_ADMIN_USER, user); } catch {}
+      const hash = await hashCreds(user,pin,salt);
+      try{ localStorage.setItem(LS_ADMIN_HASH,hash); localStorage.setItem(LS_ADMIN_SALT,salt); localStorage.setItem(LS_ADMIN_USER,user); }catch{}
       isAdmin = true; persistAdmin(true);
-      closeModal(modalNode, removeTrap, onEscape);
+      closeModal(node, removeTrap, onEscape);
       renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
       ensureAuthTokenPrompt();
       alert("Administrador configurado e iniciado.");
     } else {
-      if (user !== savedUser) { alert("Usuario o PIN incorrectos."); return; }
-      const hash = await hashCreds(user, pin, savedSalt);
-      if (hash === savedHash) {
+      if(user!==savedUser){ alert("Usuario o PIN incorrectos."); return; }
+      const hash = await hashCreds(user,pin,savedSalt);
+      if(hash===savedHash){
         isAdmin = true; persistAdmin(true);
-        closeModal(modalNode, removeTrap, onEscape);
+        closeModal(node, removeTrap, onEscape);
         renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
         ensureAuthTokenPrompt();
         alert("¡Sesión iniciada como admin!");
@@ -528,38 +575,39 @@ function openAdminLoginModal() {
     }
   });
 
-  openModalFragment(modalNode);
+  openModalFragment(node);
 }
-function ensureAuthTokenPrompt() {
-  try {
-    const k = 'tgx_admin_token'; let t = localStorage.getItem(k);
-    if (!t) { t = prompt('Pega tu AUTH_TOKEN de Netlify para poder crear/borrar publicaciones:'); if (t) localStorage.setItem(k, t.trim()); }
-  } catch {}
+function ensureAuthTokenPrompt(){
+  try{
+    const k="tgx_admin_token"; let t=localStorage.getItem(k);
+    if(!t){ t = prompt("Pega tu AUTH_TOKEN de Netlify para crear/borrar publicaciones/redes:"); if(t) localStorage.setItem(k, t.trim()); }
+  }catch{}
 }
-function setupAdminButton() {
-  const adminBtn = document.querySelector(".user-pill"); // <— usa el botón de tu topbar
-  if (!adminBtn) return;
+function setupAdminButton(){
+  const adminBtn = document.querySelector(".user-pill"); // botón topbar
+  if(!adminBtn) return;
   adminBtn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
-  adminBtn.addEventListener("click", () => {
-    if (isAdmin) {
-      if (confirm("¿Cerrar sesión de administrador?")) {
+  adminBtn.addEventListener("click", ()=>{
+    if(isAdmin){
+      if(confirm("¿Cerrar sesión de administrador?")){
         isAdmin = false; persistAdmin(false);
         renderRow(); renderHeroCarousel(); renderSocialBar();
         alert("Sesión cerrada.");
       }
-    } else { openAdminLoginModal(); }
+    } else {
+      openAdminLoginModal();
+    }
   });
 }
 
-// ==== Init ====
-async function initData() {
-  try { const data = await apiList(); recientes = Array.isArray(data) ? data : []; }
-  catch (e) {
-    console.error('[initData]', e);
-    // Hint útil si la Function no existe en Netlify:
-    // Abre /.netlify/functions/posts en el navegador; si 404, revisa que netlify/functions/posts.js esté en la RAÍZ del repo y que tengas package.json con @neondatabase/serverless instalado.
-    recientes = [];
-  }
+// ===================== INIT =====================
+async function initData(){
+  try{ const data = await apiList(); recientes = Array.isArray(data)?data:[]; }
+  catch(e){ console.error("[initData posts]", e); recientes = []; }
+
+  try{ socials = await socialsList(); }
+  catch(e){ console.error("[initData socials]", e); socials = []; }
+
   renderRow();
   setupArrows();
   setupSearch();
