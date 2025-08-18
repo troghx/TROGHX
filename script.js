@@ -1,99 +1,61 @@
-// ---------- Datos (demo): añade previewVideo con la ruta de cada trailer
-const data = {
-  destacados: [
-    {
-      title: "Grounded 2",
-      image: "assets/images/Juegos/grounded2/cover.jpg",
-      description: "Explora un mundo en miniatura lleno de aventuras y peligros. ¡Sobrevive como un insecto en Grounded 2!",
-      downloadUrl: "assets/downloads/grounded2.zip",
-      detailsUrl: "#"
-    },
-    {
-      title: "En proceso",
-      image: "assets/images/construction/en-proceso.svg",
-      description: "Este juego está en desarrollo. ¡Vuelve pronto para más detalles!",
-      downloadUrl: "#",
-      detailsUrl: "#"
-    }
-  ],
-  recientes: [
-    {
-      title: "Grounded 2",
-      image: "assets/images/Juegos/grounded2/cover.jpg",
-      previewVideo: "assets/video/grounded2/trailer.mp4", // ← tu ruta por juego
-      description: "Explora un mundo en miniatura lleno de aventuras y peligros. ¡Sobrevive como un insecto en Grounded 2!",
-      downloadUrl: "assets/downloads/grounded2.zip",
-      detailsUrl: "#"
-    },
-    {
-      title: "Nueva publicacion",
-      image: "assets/images/Juegos/*****/cover.jpg",
-      previewVideo: "assets/video/****/trailer.mp4", // ← tu ruta por juego
-      description: "ejemplo",
-      downloadUrl: "assets/downloads/****.zip",
-      detailsUrl: "#"
-    },
-  ],
-  favoritos: [
-    {
-      title: "En proceso",
-      image: "assets/images/construction/en-proceso.svg",
-      description: "Este juego está en desarrollo. ¡Vuelve pronto para más detalles!",
-      downloadUrl: "#",
-      detailsUrl: "#"
-    }
-  ],
-  gamepass: [
-    {
-      title: "En proceso",
-      image: "assets/images/construction/en-proceso.svg",
-      description: "Este juego está en desarrollo. ¡Vuelve pronto para más detalles!",
-      downloadUrl: "#",
-      detailsUrl: "#"
-    }
-  ]
-};
-
-// ---------- Plantillas
+// ==== Templates ====
 const template = document.getElementById("tile-template");
 const modalTemplate = document.getElementById("game-modal-template");
 const adminLoginModalTemplate = document.getElementById("admin-login-modal-template");
 const newGameModalTemplate = document.getElementById("new-game-modal-template");
 
-// ---------- Estado / persistencia
+// ==== LocalStorage Keys ====
 const LS_RECENTES = "tgx_recientes";
 const LS_ADMIN = "tgx_is_admin";
+const LS_ADMIN_HASH = "tgx_admin_hash";
+const LS_ADMIN_SALT = "tgx_admin_salt";
+const LS_ADMIN_USER = "tgx_admin_user";
 
 let isAdmin = false;
+let recientes = [];
 rehydrate();
 
+// ==== Storage helpers ====
 function rehydrate() {
   try {
-    const saved = JSON.parse(localStorage.getItem(LS_RECENTES) || "null");
-    if (Array.isArray(saved)) data.recientes = saved;
+    const saved = JSON.parse(localStorage.getItem(LS_RECENTES) || "[]");
+    if (Array.isArray(saved)) recientes = saved;
   } catch {}
   isAdmin = localStorage.getItem(LS_ADMIN) === "1";
 }
 function persistRecientes() {
-  try { localStorage.setItem(LS_RECENTES, JSON.stringify(data.recientes)); } catch {}
+  try { localStorage.setItem(LS_RECENTES, JSON.stringify(recientes)); } catch {}
 }
 function persistAdmin(flag) {
   try { localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); } catch {}
 }
 
-// ---------- Utils
-function preload(src) { if (!src) return; const i = new Image(); i.src = src; }
-function safeFocus(el) { try { el && el.focus && el.focus(); } catch {} }
-const ROW_KEYS = ["recientes", "favoritos", "gamepass", "destacados"];
-function findGameRef(game) {
-  for (const row of ROW_KEYS) {
-    const idx = (data[row] || []).findIndex(g => g.title === game.title && g.image === game.image);
-    if (idx !== -1) return { row, index: idx };
-  }
-  return null;
+// ==== Crypto helpers (SHA-256 + salt) ====
+function toHex(buf) {
+  const v = new Uint8Array(buf);
+  return Array.from(v).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function sha256(str) {
+  const enc = new TextEncoder().encode(str);
+  const digest = await crypto.subtle.digest("SHA-256", enc);
+  return toHex(digest);
+}
+function genSaltHex(len = 16) {
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function hashCreds(user, pin, salt) {
+  return sha256(`${user}:${pin}:${salt}`);
 }
 
-// Trap de foco para modales
+// ==== Utils de UI ====
+function preload(src) { if (src) { const i = new Image(); i.src = src; } }
+function safeFocus(el) { try { el && el.focus && el.focus(); } catch {} }
+function findGameRef(game) {
+  const idx = recientes.findIndex(g => g.title === game.title && g.image === game.image);
+  return idx !== -1 ? { row: "recientes", index: idx } : null;
+}
 function trapFocus(modalNode) {
   const selectors = [
     "a[href]", "button:not([disabled])", "textarea:not([disabled])",
@@ -112,28 +74,24 @@ function trapFocus(modalNode) {
   return () => modalNode.removeEventListener("keydown", onKey);
 }
 
-// ---------- Render de filas
-function renderRow(rowName) {
-  const container = document.querySelector(`.carousel[data-row="${rowName}"]`);
+// ==== Render de fila "recientes" ====
+function renderRow() {
+  const container = document.querySelector(`.carousel[data-row="recientes"]`);
   if (!container) return;
   container.innerHTML = "";
-  const items = data[rowName] || [];
 
-  items.forEach((g) => {
+  recientes.forEach((g) => {
     const node = template.content.cloneNode(true);
     const tile = node.querySelector(".tile");
     const cover = node.querySelector(".cover");
     const title = node.querySelector(".title");
     const vid = node.querySelector(".tile-video");
 
-    // Imagen de portada
     cover.style.backgroundImage = `url(${g.image})`;
     preload(g.image);
 
-    // Video preview: el video ya existe en el template; solo conectamos eventos
     if (vid && g.previewVideo) {
       vid.poster = g.image;
-      // Carga perezosa: solo se asigna src al primer hover/focus
       let loaded = false;
       const ensureSrc = () => {
         if (!loaded) {
@@ -148,31 +106,25 @@ function renderRow(rowName) {
         if (p && p.catch) p.catch(() => {});
       };
       const stop = () => { vid.pause(); vid.currentTime = 0; };
-
-      // Mostrar video solo cuando realmente está reproduciendo
       const show = () => vid.classList.add("playing");
       const hide = () => vid.classList.remove("playing");
       vid.addEventListener("playing", show);
       vid.addEventListener("pause", hide);
       vid.addEventListener("ended", hide);
       vid.addEventListener("error", () => { vid.remove(); });
-
-      // Hover/focus
       tile.addEventListener("pointerenter", start);
       tile.addEventListener("pointerleave", stop);
       tile.addEventListener("focus", start);
       tile.addEventListener("blur", stop);
     }
 
-    // Click abre modal
     title.textContent = g.title;
     tile.tabIndex = 0;
     tile.addEventListener("click", () => openGame(g));
     container.appendChild(node);
   });
 
-  // Tile de añadir (solo admin, en 'recientes')
-  if (isAdmin && rowName === "recientes") {
+  if (isAdmin) {
     const addTile = document.createElement("div");
     addTile.className = "add-game-tile";
     addTile.tabIndex = 0;
@@ -182,15 +134,14 @@ function renderRow(rowName) {
   }
 }
 
-// ---------- Hero / destacados
-let heroTimer = null;
+// ==== Hero carousel ====
 function renderHeroCarousel() {
   const heroCarousel = document.querySelector(".hero-carousel");
   const heroArt = document.querySelector(".hero-art");
-  if (!heroCarousel || !data.destacados) return;
+  if (!heroCarousel) return;
 
   heroCarousel.innerHTML = "";
-  data.destacados.forEach((g, index) => {
+  recientes.slice(0, 3).forEach((g, index) => {
     const img = document.createElement("img");
     img.src = g.image;
     img.alt = `Portada de ${g.title}`;
@@ -206,13 +157,13 @@ function renderHeroCarousel() {
 
   heroArt.addEventListener("click", () => {
     const i = getActiveIndex();
-    openGame(data.destacados[i >= 0 ? i : 0]);
+    openGame(recientes[i >= 0 ? i : 0]);
   });
   heroArt.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       const i = getActiveIndex();
-      openGame(data.destacados[i >= 0 ? i : 0]);
+      openGame(recientes[i >= 0 ? i : 0]);
     }
   });
 
@@ -228,13 +179,14 @@ function renderHeroCarousel() {
 
   const start = () => { stop(); heroTimer = setInterval(tick, 5000); };
   const stop = () => { if (heroTimer) { clearInterval(heroTimer); heroTimer = null; } };
+  let heroTimer = null;
 
   heroArt.addEventListener("mouseenter", stop);
   heroArt.addEventListener("mouseleave", start);
   start();
 }
 
-// ---------- Modales (juego) + menú admin
+// ==== Modales: juego ====
 function openGame(game) {
   const modal = modalTemplate.content.cloneNode(true);
   const modalNode = modal.querySelector(".tw-modal");
@@ -252,7 +204,6 @@ function openGame(game) {
   modalDownload.addEventListener("click", () => { if (game.downloadUrl) window.location.href = game.downloadUrl; });
   modalSecondary.addEventListener("click", () => { if (game.detailsUrl) window.location.href = game.detailsUrl; });
 
-  // Botón de 3 puntos (solo admin)
   if (isAdmin) {
     const kebabBtn = document.createElement("button");
     kebabBtn.className = "tw-modal-menu";
@@ -322,19 +273,18 @@ function closeModal(modalNode, removeTrap, onEscape) {
   setTimeout(() => { try { modalNode.remove(); } catch {} }, 300);
 }
 
-// ---------- Eliminar publicación
+// ==== CRUD de publicaciones ====
 function deleteGame(game, currentModalNode) {
   const ref = findGameRef(game);
   if (!ref) { alert("No se encontró la publicación."); return; }
-  const arr = data[ref.row];
-  arr.splice(ref.index, 1);
-  if (ref.row === "recientes") persistRecientes();
-  ["recientes", "favoritos", "gamepass"].forEach(renderRow);
+  recientes.splice(ref.index, 1);
+  persistRecientes();
+  renderRow();
+  renderHeroCarousel();
   if (currentModalNode) closeModal(currentModalNode);
   alert("Publicación eliminada.");
 }
 
-// ---------- Editar publicación (reusa el modal de 'nuevo juego')
 function openEditGame(original, currentModalNode, opts = {}) {
   const modal = newGameModalTemplate.content.cloneNode(true);
   const node = modal.querySelector(".tw-modal");
@@ -342,11 +292,16 @@ function openEditGame(original, currentModalNode, opts = {}) {
   const titleInput = modal.querySelector(".new-game-title");
   const descriptionInput = modal.querySelector(".new-game-description");
   const imageInput = modal.querySelector(".new-game-image-file");
+  const trailerFileInput = modal.querySelector(".new-game-trailer-file");
+  const trailerUrlInput = modal.querySelector(".new-game-trailer-url");
+  const downloadInput = modal.querySelector(".new-game-download");
   const modalClose = modal.querySelector(".tw-modal-close");
 
   titleInput.value = original.title || "";
   descriptionInput.value = original.description || "";
   imageInput.required = false;
+  trailerUrlInput.value = original.previewVideo || "";
+  downloadInput.value = original.downloadUrl || "";
 
   const removeTrap = trapFocus(node);
   const onEscape = (e) => { if (e.key === "Escape") closeModal(node, removeTrap, onEscape); };
@@ -355,19 +310,22 @@ function openEditGame(original, currentModalNode, opts = {}) {
     e.preventDefault();
     const ref = findGameRef(original);
     if (!ref) { alert("No se encontró la publicación."); return; }
-    const arr = data[ref.row];
-    const current = arr[ref.index];
+    const current = recientes[ref.index];
 
     const applyUpdate = (imgBase64) => {
       const updated = {
         ...current,
         title: titleInput.value.trim() || current.title,
         description: descriptionInput.value.trim() || current.description,
-        image: imgBase64 || current.image
+        image: imgBase64 || current.image,
+        previewVideo: trailerUrlInput.value.trim() || current.previewVideo,
+        downloadUrl: downloadInput.value.trim() || current.downloadUrl,
+        detailsUrl: current.detailsUrl
       };
-      arr[ref.index] = updated;
-      if (ref.row === "recientes") persistRecientes();
-      ["recientes", "favoritos", "gamepass"].forEach(renderRow);
+      recientes[ref.index] = updated;
+      persistRecientes();
+      renderRow();
+      renderHeroCarousel();
       closeModal(node, removeTrap, onEscape);
       if (typeof opts.onUpdated === "function") opts.onUpdated(updated);
       alert("Publicación actualizada.");
@@ -393,43 +351,7 @@ function openEditGame(original, currentModalNode, opts = {}) {
   setTimeout(() => { node.classList.add("active"); safeFocus(titleInput); }, 10);
 }
 
-// ---------- Modal login admin
-function openAdminLoginModal() {
-  const modal = adminLoginModalTemplate.content.cloneNode(true);
-  const modalNode = modal.querySelector(".tw-modal");
-  const form = modal.querySelector(".admin-login-form");
-  const usernameInput = modal.querySelector(".admin-username");
-  const pinInput = modal.querySelector(".admin-pin");
-  const modalClose = modal.querySelector(".tw-modal-close");
-
-  const removeTrap = trapFocus(modalNode);
-  const onEscape = (e) => { if (e.key === "Escape") closeModal(modalNode, removeTrap, onEscape); };
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    if (!/^\d{4,6}$/.test(pinInput.value.trim())) { alert("El PIN debe ser numérico de 4 a 6 dígitos."); pinInput.focus(); return; }
-    if (usernameInput.value === "TROLOT-2144" && pinInput.value === "3315") {
-      isAdmin = true;
-      persistAdmin(true);
-      closeModal(modalNode, removeTrap, onEscape);
-      renderRow("recientes");
-      alert("¡Sesión iniciada como admin!");
-    } else {
-      alert("Usuario o PIN incorrectos");
-    }
-  });
-
-  modalNode.addEventListener("keydown", onEscape);
-  modalClose.addEventListener("click", () => closeModal(modalNode, removeTrap, onEscape));
-  modalNode.addEventListener("click", (e) => { if (e.target === modalNode) closeModal(modalNode, removeTrap, onEscape); });
-
-  document.body.appendChild(modal);
-  document.body.classList.add("modal-open");
-  document.body.style.overflow = "hidden";
-  setTimeout(() => { modalNode.classList.add("active"); safeFocus(usernameInput); }, 10);
-}
-
-// ---------- Modal nuevo juego
+// ==== Modal: NUEVA publicación ====
 function openNewGameModal() {
   const modal = newGameModalTemplate.content.cloneNode(true);
   const modalNode = modal.querySelector(".tw-modal");
@@ -463,10 +385,11 @@ function openNewGameModal() {
         detailsUrl: "#",
         previewVideo: trailer || ""
       };
-      data.recientes.unshift(newGame);
+      recientes.unshift(newGame);
       persistRecientes();
       closeModal(modalNode, removeTrap, onEscape);
-      renderRow("recientes");
+      renderRow();
+      renderHeroCarousel();
       alert("¡Juego añadido exitosamente!");
     };
     reader.readAsDataURL(file);
@@ -482,29 +405,113 @@ function openNewGameModal() {
   setTimeout(() => { modalNode.classList.add("active"); safeFocus(titleInput); }, 10);
 }
 
-// ---------- Flechas de scroll
-function setupArrows() {
-  document.querySelectorAll(".row").forEach((row) => {
-    const carousel = row.querySelector(".carousel");
-    const prev = row.querySelector(".arrow.prev");
-    const next = row.querySelector(".arrow.next");
-    if (!carousel || !prev || !next) return;
+// ==== Modal: LOGIN/SETUP ADMIN seguro (sin credenciales hardcodeadas) ====
+function openAdminLoginModal() {
+  const modal = adminLoginModalTemplate.content.cloneNode(true);
+  const modalNode = modal.querySelector(".tw-modal");
+  const form = modal.querySelector(".admin-login-form");
+  const h2 = modal.querySelector("h2");
+  const usernameInput = modal.querySelector(".admin-username");
+  const pinInput = modal.querySelector(".admin-pin");
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const modalClose = modal.querySelector(".tw-modal-close");
 
-    function step() {
-      const first = carousel.querySelector(".tile, .add-game-tile");
-      if (!first) return 320;
-      const rect = first.getBoundingClientRect();
-      const styles = getComputedStyle(carousel);
-      const gap = parseFloat(styles.columnGap || styles.gap || "14");
-      return Math.ceil(rect.width + gap);
+  // ¿Ya existe admin configurado?
+  const savedHash = localStorage.getItem(LS_ADMIN_HASH);
+  const savedSalt = localStorage.getItem(LS_ADMIN_SALT);
+  const savedUser = localStorage.getItem(LS_ADMIN_USER);
+  const isFirstRun = !(savedHash && savedSalt && savedUser);
+
+  if (isFirstRun) {
+    // Modo SETUP: pedimos Confirmar PIN y cambiamos textos
+    h2.textContent = "Configurar administrador";
+    submitBtn.textContent = "Crear y entrar";
+
+    const confirmLabel = document.createElement("label");
+    confirmLabel.innerHTML = `
+      Confirmar PIN
+      <input type="password" class="admin-pin2" required>
+      <span class="input-hint">Repite el PIN (4 a 6 dígitos).</span>
+    `;
+    pinInput.parentElement.after(confirmLabel);
+  } else {
+    h2.textContent = "Acceso administrador";
+    submitBtn.textContent = "Entrar";
+    if (usernameInput) usernameInput.value = savedUser || "";
+  }
+
+  const removeTrap = trapFocus(modalNode);
+  const onEscape = (e) => { if (e.key === "Escape") closeModal(modalNode, removeTrap, onEscape); };
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const user = (usernameInput.value || "").trim();
+    const pin = (pinInput.value || "").trim();
+    if (!/^\d{4,6}$/.test(pin)) { alert("El PIN debe ser numérico de 4 a 6 dígitos."); pinInput.focus(); return; }
+    if (!user) { alert("Escribe un usuario."); usernameInput.focus(); return; }
+
+    if (isFirstRun) {
+      const pin2 = modalNode.querySelector(".admin-pin2")?.value?.trim() || "";
+      if (pin !== pin2) { alert("El PIN no coincide."); return; }
+      const salt = genSaltHex(16);
+      const hash = await hashCreds(user, pin, salt);
+      try {
+        localStorage.setItem(LS_ADMIN_HASH, hash);
+        localStorage.setItem(LS_ADMIN_SALT, salt);
+        localStorage.setItem(LS_ADMIN_USER, user);
+      } catch {}
+      isAdmin = true;
+      persistAdmin(true);
+      closeModal(modalNode, removeTrap, onEscape);
+      renderRow();
+      setupAdminButton();
+      alert("Administrador configurado e iniciado.");
+    } else {
+      if (user !== savedUser) { alert("Usuario o PIN incorrectos."); return; }
+      const hash = await hashCreds(user, pin, savedSalt);
+      if (hash === savedHash) {
+        isAdmin = true;
+        persistAdmin(true);
+        closeModal(modalNode, removeTrap, onEscape);
+        renderRow();
+        setupAdminButton();
+        alert("¡Sesión iniciada como admin!");
+      } else {
+        alert("Usuario o PIN incorrectos.");
+      }
     }
-
-    prev.addEventListener("click", () => carousel.scrollBy({ left: -step(), behavior: "smooth" }));
-    next.addEventListener("click", () => carousel.scrollBy({ left: step(), behavior: "smooth" }));
   });
+
+  modalNode.addEventListener("keydown", onEscape);
+  modalClose.addEventListener("click", () => closeModal(modalNode, removeTrap, onEscape));
+  modalNode.addEventListener("click", (e) => { if (e.target === modalNode) closeModal(modalNode, removeTrap, onEscape); });
+
+  document.body.appendChild(modal);
+  document.body.classList.add("modal-open");
+  document.body.style.overflow = "hidden";
+  setTimeout(() => { modalNode.classList.add("active"); safeFocus(usernameInput); }, 10);
 }
 
-// ---------- Búsqueda
+// ==== Controles, búsqueda, teclado, etc. ====
+function setupArrows() {
+  const row = document.querySelector(".row");
+  const carousel = row.querySelector(".carousel");
+  const prev = row.querySelector(".arrow.prev");
+  const next = row.querySelector(".arrow.next");
+  if (!carousel || !prev || !next) return;
+
+  function step() {
+    const first = carousel.querySelector(".tile, .add-game-tile");
+    if (!first) return 320;
+    const rect = first.getBoundingClientRect();
+    const styles = getComputedStyle(carousel);
+    const gap = parseFloat(styles.columnGap || styles.gap || "14");
+    return Math.ceil(rect.width + gap);
+  }
+
+  prev.addEventListener("click", () => carousel.scrollBy({ left: -step(), behavior: "smooth" }));
+  next.addEventListener("click", () => carousel.scrollBy({ left: step(), behavior: "smooth" }));
+}
 function setupSearch() {
   const input = document.getElementById("searchInput");
   if (!input) return;
@@ -516,25 +523,18 @@ function setupSearch() {
     });
   });
 }
-
-// ---------- Navegación con teclado
 function setupKeyboardNav() {
-  const rows = [...document.querySelectorAll(".carousel")];
+  const carousel = document.querySelector(".carousel");
   document.addEventListener("keydown", (e) => {
-    const dirs = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+    const dirs = ["ArrowLeft", "ArrowRight"];
     if (!dirs.includes(e.key)) return;
-
     const allTiles = [...document.querySelectorAll(".tile, .add-game-tile")];
     if (!allTiles.length) return;
-
     const active = (document.activeElement && (document.activeElement.classList.contains("tile") || document.activeElement.classList.contains("add-game-tile")))
       ? document.activeElement
       : allTiles[0];
-
-    const parent = active.closest(".carousel") || rows[0];
-    const tiles = [...parent.querySelectorAll(".tile, .add-game-tile")];
+    const tiles = [...carousel.querySelectorAll(".tile, .add-game-tile")];
     const idx = tiles.indexOf(active);
-
     if (e.key === "ArrowLeft" && idx > 0) {
       tiles[idx - 1].focus({ preventScroll: true });
       tiles[idx - 1].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
@@ -543,26 +543,12 @@ function setupKeyboardNav() {
       tiles[idx + 1].focus({ preventScroll: true });
       tiles[idx + 1].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
     }
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      const currentRowIndex = rows.indexOf(parent);
-      const nextRowIndex = e.key === "ArrowUp" ? currentRowIndex - 1 : currentRowIndex + 1;
-      if (rows[nextRowIndex]) {
-        const targetRowTiles = [...rows[nextRowIndex].querySelectorAll(".tile, .add-game-tile")];
-        const target = targetRowTiles[Math.min(Math.max(idx, 0), targetRowTiles.length - 1)];
-        if (target) {
-          target.focus({ preventScroll: true });
-          target.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-        }
-      }
-    }
   });
 }
-
-// ---------- Acciones del hero / admin
 function setupHeroActions() {
   const play = document.getElementById("playNowBtn");
   const queue = document.getElementById("queueBtn");
-  if (play) play.addEventListener("click", () => openGame(data.destacados[0]));
+  if (play && recientes.length) play.addEventListener("click", () => openGame(recientes[0]));
   if (queue) queue.addEventListener("click", () => alert("Añadido a la cola"));
 }
 function setupAdminButton() {
@@ -577,7 +563,7 @@ function setupAdminButton() {
       if (ok) {
         isAdmin = false;
         persistAdmin(false);
-        renderRow("recientes");
+        renderRow();
         setupAdminButton();
         alert("Sesión cerrada.");
       }
@@ -587,8 +573,8 @@ function setupAdminButton() {
   });
 }
 
-// ---------- Render inicial
-["recientes", "favoritos", "gamepass"].forEach(renderRow);
+// ==== Boot ====
+renderRow();
 setupArrows();
 setupSearch();
 setupKeyboardNav();
