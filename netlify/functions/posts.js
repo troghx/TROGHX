@@ -1,27 +1,6 @@
 // netlify/functions/posts.js
 import { neon } from '@neondatabase/serverless';
 
-function getDbUrl() {
-  const raw =
-    process.env.DATABASE_URL ||
-    process.env.NETLIFY_DATABASE_URL ||
-    process.env.NETLIFY_DATABASE_URL_UNPOOLED ||
-    '';
-  // Limpia prefijos de Neon UI: psql 'postgresql://...'
-  const cleaned = raw
-    .replace(/^psql\s+['"]?/, '')
-    .replace(/['"]?$/, '');
-  if (!/^postgres(ql)?:\/\//.test(cleaned)) {
-    throw new Error('Bad or missing DATABASE_URL');
-  }
-  return cleaned;
-}
-
-const sql = neon(getDbUrl()); // <- usa "sql" en el resto del handler
-
-
-import { neon } from '@neondatabase/serverless';
-
 const sql = neon(process.env.DATABASE_URL);
 
 // Respuestas comunes
