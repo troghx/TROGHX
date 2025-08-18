@@ -146,7 +146,7 @@
       <div class="tw-modal-content">
         <button class="tw-modal-close" aria-label="Cerrar">×</button>
         <h2>Añadir nuevo juego</h2>
-        <form class="new-game-form">
+        <form class="new-game-form" novalidate>
           <label>
             Título
             <input type="text" class="new-game-title" required />
@@ -190,7 +190,9 @@
           </label>
           <label>
             URL del trailer (opcional)
-            <input type="url" class="new-game-trailer-url" placeholder="https://.../trailer.mp4" />
+            <input type="text" class="new-game-trailer-url"
+             inputmode="url"
+             placeholder="https://... o /assets/video/astroneer/trailer.mp4">
           </label>
           <!-- Campo opcional
           <label>
