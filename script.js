@@ -11,7 +11,7 @@ const LS_ADMIN = "tgx_is_admin";
 const LS_ADMIN_HASH = "tgx_admin_hash";
 const LS_ADMIN_SALT = "tgx_admin_salt";
 const LS_ADMIN_USER = "tgx_admin_user";
-const LS_SOCIALS = "tgx_socials"; // ya no se usa para persistir, pero dejamos fallback
+const LS_SOCIALS = "tgx_socials"; // fallback local (ya no se usa para persistir)
 
 // ===================== API ENDPOINTS =====================
 const API_POSTS = "/.netlify/functions/posts";
@@ -96,7 +96,7 @@ function trapFocus(modalNode){
   return () => modalNode.removeEventListener("keydown", onKey);
 }
 
-// ---- Normaliza rutas de video (acepta absolutas y relativas del sitio)
+// ---- Helpers varios
 function normalizeVideoUrl(u){
   if(!u) return "";
   u = u.trim();
@@ -104,6 +104,14 @@ function normalizeVideoUrl(u){
   if (u.startsWith('/')) return u;                           // /assets/...
   if (u.startsWith('assets/')) return '/' + u;               // assets/... -> /assets/...
   return u;
+}
+function readAsDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const fr = new FileReader();
+    fr.onload = ()=> resolve(fr.result);
+    fr.onerror = ()=> reject(new Error("No se pudo leer el archivo"));
+    fr.readAsDataURL(file);
+  });
 }
 
 // ===================== RICH EDITOR (WYSIWYG MIN) =====================
@@ -144,11 +152,12 @@ function renderRow(){
     preload(g.image);
     title.textContent = g.title || "";
 
-    // ---- Trailer hover (.mp4/.webm directos)
+    // ---- Trailer hover (URL o DataURL)
     if (vid && g.previewVideo) {
-      const okExt = /\.(mp4|webm)(\?.*)?$/i.test(g.previewVideo);
-      if (!okExt) {
-        console.warn("previewVideo no es un .mp4/.webm directo:", g.previewVideo);
+      const isPlayableURL  = /\.(mp4|webm)(\?.*)?$/i.test(g.previewVideo);
+      const isPlayableDATA = /^data:video\/(mp4|webm)/i.test(g.previewVideo);
+      if (!isPlayableURL && !isPlayableDATA) {
+        console.warn("previewVideo no es .mp4/.webm directo ni dataURL:", g.previewVideo);
       } else {
         let loaded = false;
         vid.poster = g.image;
@@ -320,8 +329,8 @@ function openNewGameModal(){
   const form = modal.querySelector(".new-game-form");
   const titleInput = modal.querySelector(".new-game-title");
   const imageInput = modal.querySelector(".new-game-image-file"); // portada (file -> DataURL)
-  const trailerFileInput = modal.querySelector(".new-game-trailer-file"); // NO se usa para subir
-  const trailerUrlInput = modal.querySelector(".new-game-trailer-url");   // usamos esta URL
+  const trailerFileInput = modal.querySelector(".new-game-trailer-file"); // ahora permitido
+  const trailerUrlInput = modal.querySelector(".new-game-trailer-url");   // o URL directa
   const downloadInput = modal.querySelector(".new-game-download");
   const modalClose = modal.querySelector(".tw-modal-close");
 
@@ -340,46 +349,71 @@ function openNewGameModal(){
     const imageFile = imageInput?.files?.[0];
     const rawTrailer = (trailerUrlInput?.value||"").trim();
     const trailerUrl = normalizeVideoUrl(rawTrailer);
+    const trailerFile = trailerFileInput?.files?.[0] || null;
     const downloadUrl = (downloadInput?.value||"").trim() || null;
 
     if(!title){ alert("Título es obligatorio."); titleInput.focus(); return; }
     if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput.focus(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
-    // Trailer: solo URL directa .mp4/.webm (recomendado: ruta del propio sitio)
-    if (trailerFileInput?.files?.length) {
-      alert("Para el trailer usa una URL directa (.mp4/.webm). Sube el archivo a /assets/video/... en tu repo y pega la ruta, por ejemplo: /assets/video/mi-juego/trailer.mp4");
-      return;
+    // Validación trailer:
+    // Opción 1: URL directa .mp4/.webm
+    let previewSrc = null;
+    if (trailerUrl) {
+      if (!/\.(mp4|webm)(\?.*)?$/i.test(trailerUrl)) {
+        alert("El trailer por URL debe ser .mp4/.webm directo. YouTube/Imgur página no sirven.");
+        return;
+      }
+      previewSrc = trailerUrl;
     }
-    if (trailerUrl && !/\.(mp4|webm)(\?.*)?$/i.test(trailerUrl)) {
-      alert("El trailer debe ser un .mp4/.webm directo. YouTube/Imgur página no sirven para <video>.");
+    // Opción 2: Archivo local -> DataURL (2–5MB ok)
+    else if (trailerFile) {
+      if (!/^video\/(mp4|webm)$/i.test(trailerFile.type)) {
+        alert("El archivo de trailer debe ser MP4 o WEBM.");
+        return;
+      }
+      // (opcional) limitar tamaño ~6MB por límites de función
+      if (trailerFile.size > 6 * 1024 * 1024) {
+        alert("El trailer es muy pesado (>6MB). Sube uno más ligero o usa URL.");
+        return;
+      }
+      try {
+        previewSrc = await readAsDataURL(trailerFile);
+      } catch {
+        alert("No se pudo leer el trailer. Intenta con URL o archivo más pequeño.");
+        return;
+      }
+    }
+
+    // Portada -> DataURL
+    let coverDataUrl = null;
+    try {
+      coverDataUrl = await readAsDataURL(imageFile);
+    } catch {
+      alert("No se pudo leer la portada.");
       return;
     }
 
-    // Portada -> DataURL (ligero). Trailer -> URL pública (no DataURL).
-    const reader = new FileReader();
-    reader.onload = async ()=>{
-      const token = localStorage.getItem("tgx_admin_token") || "";
-      if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
-      const newGame = {
-        title,
-        image: reader.result,          // DataURL
-        description: descHTML,
-        previewVideo: trailerUrl || null,
-        downloadUrl,
-        detailsUrl: "#"
-      };
-      try{
-        await apiCreate(newGame, token);
-        const data = await apiList();
-        recientes = Array.isArray(data)?data:[];
-        closeModal(modalNode, removeTrap, onEscape);
-        renderRow(); renderHeroCarousel();
-        alert("¡Juego añadido!");
-      }catch(err){ console.error(err); alert("Error al guardar. Revisa consola."); }
+    const token = localStorage.getItem("tgx_admin_token") || "";
+    if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
+
+    const newGame = {
+      title,
+      image: coverDataUrl,     // DataURL
+      description: descHTML,
+      previewVideo: previewSrc || null, // DataURL o URL
+      downloadUrl,
+      detailsUrl: "#"
     };
-    reader.onerror = ()=> alert("No se pudo leer la imagen.");
-    reader.readAsDataURL(imageFile);
+
+    try{
+      await apiCreate(newGame, token);
+      const data = await apiList();
+      recientes = Array.isArray(data)?data:[];
+      closeModal(modalNode, removeTrap, onEscape);
+      renderRow(); renderHeroCarousel();
+      alert("¡Juego añadido!");
+    }catch(err){ console.error(err); alert("Error al guardar. Revisa consola."); }
   });
 
   openModalFragment(modalNode);
