@@ -198,43 +198,46 @@ function initRichEditor(editorRoot){
 }
 
 // ===================== RENDER: CARDS/ROW =====================
-async function applyLinkStatusPill(tile, game){
-  // crea/encontrar pill
-  let pill = tile.querySelector(".status-pill");
-  if(!pill){
-    pill = document.createElement("div");
-    pill.className = "status-pill status-checking";
-    pill.innerHTML = `<span class="pill-icon"></span><span class="pill-text">Comprobando…</span>`;
-    tile.appendChild(pill);
+async function applyLinkStatusBadge(tile, game){
+  // badge ya viene del template
+  let badge = tile.querySelector(".tile-info .badge");
+  if(!badge){
+    badge = document.createElement("span");
+    badge.className = "badge";
+    tile.querySelector(".tile-info")?.appendChild(badge);
   }
-  // 1er link de la descripción
+
+  // primer enlace de la descripción
   const url = extractFirstLink(game.description || "");
+  const plat = platformFromUrl(url);
+  const platformClass = `pill-${plat}`;
+
+  // estado por defecto mientras consulta
+  badge.className = `badge badge-status status-checking ${platformClass}`;
+  badge.innerHTML = `<span class="pill-icon"></span><span class="pill-text">Comprobando…</span>`;
+  badge.querySelector(".pill-icon").innerHTML = platformIconSVG(plat);
+
   if(!url){
-    pill.className = "status-pill status-warn";
-    pill.querySelector(".pill-icon").innerHTML = platformIconSVG("generic");
-    pill.querySelector(".pill-text").textContent = "Sin enlace";
+    badge.className = `badge badge-status status-warn ${platformClass}`;
+    badge.querySelector(".pill-text").textContent = "Sin enlace";
     return;
   }
-  const plat = platformFromUrl(url);
-  pill.classList.add(`pill-${plat}`);
 
   try{
-    const res = await checkLink(url);
+    const res = await checkLink(url); // usa /.netlify/functions/linkcheck
     const ok = !!res.ok;
-    pill.classList.remove("status-checking","status-warn","status-down","status-ok");
+    badge.classList.remove("status-checking","status-warn","status-down","status-ok");
     if (ok){
-      pill.classList.add("status-ok");
-      pill.querySelector(".pill-text").textContent = "Disponible";
+      badge.classList.add("status-ok");
+      badge.querySelector(".pill-text").textContent = "Disponible";
     } else {
-      pill.classList.add("status-warn");
-      pill.querySelector(".pill-text").textContent = "Revisar enlace";
+      badge.classList.add("status-warn");
+      badge.querySelector(".pill-text").textContent = "Revisar enlace";
     }
-    pill.querySelector(".pill-icon").innerHTML = platformIconSVG(plat);
   }catch{
-    pill.classList.remove("status-checking");
-    pill.classList.add("status-warn");
-    pill.querySelector(".pill-icon").innerHTML = platformIconSVG(plat);
-    pill.querySelector(".pill-text").textContent = "Revisar enlace";
+    badge.classList.remove("status-checking");
+    badge.classList.add("status-warn");
+    badge.querySelector(".pill-text").textContent = "Revisar enlace";
   }
 }
 
@@ -290,7 +293,7 @@ function renderRow(){
     container.appendChild(node);
 
     // Estado del enlace (pill)
-    applyLinkStatusPill(tile, g);
+    applyLinkStatusBadge(tile, g);
   });
 
   if(isAdmin){
