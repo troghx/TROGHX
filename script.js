@@ -153,38 +153,56 @@ function renderRow(){
     title.textContent = g.title || "";
 
     // ---- Trailer hover (URL o DataURL)
-    if (vid && g.previewVideo) {
-      const isPlayableURL  = /\.(mp4|webm)(\?.*)?$/i.test(g.previewVideo);
-      const isPlayableDATA = /^data:video\/(mp4|webm)/i.test(g.previewVideo);
-      if (!isPlayableURL && !isPlayableDATA) {
-        console.warn("previewVideo no es .mp4/.webm directo ni dataURL:", g.previewVideo);
-      } else {
-        let loaded = false;
-        vid.poster = g.image;
-        vid.muted = true;
-        vid.loop = true;
-        vid.playsInline = true;
-        vid.setAttribute("muted","");
-        vid.setAttribute("playsinline","");
-        vid.preload = "metadata";
-
-        const ensureSrc = ()=>{ if(loaded) return; vid.src = g.previewVideo; loaded = true; };
-        const start = ()=>{
-          ensureSrc();
-          vid.currentTime = 0;
-          const p = vid.play(); if(p && p.catch) p.catch(()=>{});
-        };
-        const stop  = ()=>{ vid.pause(); vid.currentTime = 0; };
-        const show  = ()=>vid.classList.add("playing");
-        const hide  = ()=>vid.classList.remove("playing");
-        vid.addEventListener("playing", show);
-        vid.addEventListener("pause", hide);
-        vid.addEventListener("ended", hide);
-        vid.addEventListener("error", ()=>{ console.warn("Error trailer:", g.previewVideo); vid.remove(); });
-        tile.addEventListener("pointerenter", start);
-        tile.addEventListener("pointerleave", stop);
-        tile.addEventListener("focus", start);
-        tile.addEventListener("blur", stop);
+    if (vid) {
+      const pv = g.previewVideo || g.preview_video || "";
+      if (pv) {
+        const isPlayableURL  = /\.(mp4|webm)(\?.*)?$/i.test(pv);
+        const isPlayableDATA = /^data:video\/(mp4|webm)/i.test(pv);
+        if (!isPlayableURL && !isPlayableDATA) {
+          console.warn("previewVideo no es .mp4/.webm directo ni dataURL:", pv);
+        } else {
+          let loaded = false;
+          vid.poster = g.image;
+          vid.muted = true;
+          vid.loop = true;
+          vid.playsInline = true;
+          vid.setAttribute("muted","");
+          vid.setAttribute("playsinline","");
+          vid.preload = "metadata";
+    
+          // <- NUEVO: si existe <source>, úsalo y llama load()
+          const sourceEl = vid.querySelector('source');
+    
+          const ensureSrc = ()=> {
+            if (loaded) return;
+            if (sourceEl) {
+              sourceEl.src = pv;
+              vid.load();              // importante cuando hay <source>
+            } else {
+              vid.src = pv;
+            }
+            loaded = true;
+          };
+    
+          const start = ()=>{
+            ensureSrc();
+            vid.currentTime = 0;
+            const p = vid.play(); if(p && p.catch) p.catch(()=>{});
+          };
+          const stop  = ()=>{ vid.pause(); vid.currentTime = 0; };
+          const show  = ()=> vid.classList.add("playing");
+          const hide  = ()=> vid.classList.remove("playing");
+    
+          vid.addEventListener("playing", show);
+          vid.addEventListener("pause", hide);
+          vid.addEventListener("ended", hide);
+          vid.addEventListener("error", ()=>{ console.warn("Error trailer:", pv); vid.remove(); });
+    
+          tile.addEventListener("pointerenter", start);
+          tile.addEventListener("pointerleave", stop);
+          tile.addEventListener("focus", start);
+          tile.addEventListener("blur", stop);
+        }
       }
     }
 
