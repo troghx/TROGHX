@@ -372,11 +372,12 @@ function openNewGameModal(){
         alert("El archivo de trailer debe ser MP4 o WEBM.");
         return;
       }
-      // (opcional) limitar tamaño ~6MB por límites de función
-      if (trailerFile.size > 6 * 1024 * 1024) {
-        alert("El trailer es muy pesado (>6MB). Sube uno más ligero o usa URL.");
+      const MAX_VIDEO_MB = 12; // o 15, bajo tu riesgo
+      if (trailerFile.size > MAX_VIDEO_MB * 1024 * 1024) {
+        alert(`El trailer es muy pesado (> ${MAX_VIDEO_MB}MB). Sube uno más ligero o usa URL.`);
         return;
       }
+      
       try {
         previewSrc = await readAsDataURL(trailerFile);
       } catch {
