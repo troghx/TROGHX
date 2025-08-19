@@ -20,7 +20,7 @@ const API_LINK  = "/.netlify/functions/linkcheck";
 
 // ---- POSTS
 async function apiList() {
-  const r = await fetch(API_POSTS, { cache: "no-store" });
+  const r = await fetch(`${API_POSTS}?lite=1&limit=24`, { cache: "no-store" });
   if (!r.ok) throw new Error("No se pudo listar posts");
   return r.json();
 }
@@ -38,6 +38,12 @@ async function apiDelete(id, token) {
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+async function apiGet(id) {
+  const r = await fetch(`${API_POSTS}/${id}`, { cache: "no-store" });
+  if (!r.ok) throw new Error("No se pudo obtener el post");
+  return r.json();
+}
+
 
 // ---- SOCIALS
 async function socialsList(){
@@ -271,8 +277,27 @@ function renderRow(){
         vid.setAttribute("muted","");
         vid.setAttribute("playsinline","");
         vid.preload = "metadata";
-        const sourceEl = vid.querySelector("source");
-        const ensureSrc = ()=>{ if(loaded) return; if(sourceEl){ sourceEl.src = pv; vid.load(); } else { vid.src = pv; } loaded = true; };
+const sourceEl = vid.querySelector("source");
+
+const ensureSrc = async () => {
+  if (loaded) return;
+  let pv = g.previewVideo || g.preview_video || "";
+
+  // si el listado es "lite", quizá no vino el trailer; lo pedimos por ID
+  if (!pv && g.id) {
+    try {
+      const full = await apiGet(g.id);
+      pv = full.previewVideo || full.preview_video || "";
+      // guarda en el objeto para siguientes hovers
+      if (pv) { g.previewVideo = pv; }
+    } catch {}
+  }
+  if (!pv) return;
+
+  if (sourceEl) { sourceEl.src = pv; vid.load(); } else { vid.src = pv; }
+  loaded = true;
+};
+
         const start = ()=>{ ensureSrc(); vid.currentTime = 0; const p = vid.play(); if(p && p.catch) p.catch(()=>{}); };
         const stop  = ()=>{ vid.pause(); vid.currentTime = 0; };
         const show  = ()=>vid.classList.add("playing");
