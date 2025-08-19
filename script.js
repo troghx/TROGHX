@@ -114,6 +114,34 @@ function readAsDataURL(file){
   });
 }
 
+// ====== Link chip (detectar plataforma y aplicar clase) ======
+function platformFromUrl(u){
+  const s = (u||"").toLowerCase();
+  if (s.startsWith("magnet:") || s.endsWith(".torrent")) return "torrent";
+  if (s.includes("utorrent")) return "utorrent";
+  if (s.includes("mega.nz")) return "mega";
+  if (s.includes("mediafire.com")) return "mediafire";
+  if (s.includes("drive.google.com")) return "drive";
+  if (s.includes("dropbox.com")) return "dropbox";
+  if (s.includes("1drv.ms") || s.includes("onedrive")) return "onedrive";
+  if (s.includes("gofile.io")) return "gofile";
+  if (s.includes("pixeldrain.com")) return "pixeldrain";
+  return "generic";
+}
+function insertLinkChip(editorArea){
+  editorArea.focus();
+  const text = (prompt("Nombre a mostrar del enlace:") || "").trim();
+  if(!text) return;
+  let url = (prompt("Pega la URL del enlace:") || "").trim();
+  if(!url) return;
+  if (!/^https?:\/\//i.test(url) && !url.startsWith("magnet:")) {
+    url = "https://" + url;
+  }
+  const plat = platformFromUrl(url);
+  const html = `<a href="${url.replace(/"/g,"&quot;")}" target="_blank" rel="noopener" class="link-chip chip-${plat}">${text.replace(/[<>]/g,"")}</a>`;
+  document.execCommand("insertHTML", false, html);
+}
+
 // ===================== RICH EDITOR (WYSIWYG MIN) =====================
 function initRichEditor(editorRoot){
   const editorArea = editorRoot.querySelector(".editor-area");
@@ -126,8 +154,7 @@ function initRichEditor(editorRoot){
     if(block) exec("formatBlock", block);
     if(list==="ul") exec("insertUnorderedList");
     if(btn.classList.contains("rtb-link")){
-      const url = prompt("URL del enlace:");
-      if(url) exec("createLink", url);
+      insertLinkChip(editorArea); // 👈 pide nombre, luego URL, colorea según plataforma
     }
   });
   const fontSel = toolbar.querySelector(".rtb-font");
@@ -152,57 +179,47 @@ function renderRow(){
     preload(g.image);
     title.textContent = g.title || "";
 
-    // ---- Trailer hover (URL o DataURL)
-    if (vid) {
-      const pv = g.previewVideo || g.preview_video || "";
-      if (pv) {
-        const isPlayableURL  = /\.(mp4|webm)(\?.*)?$/i.test(pv);
-        const isPlayableDATA = /^data:video\/(mp4|webm)/i.test(pv);
-        if (!isPlayableURL && !isPlayableDATA) {
-          console.warn("previewVideo no es .mp4/.webm directo ni dataURL:", pv);
-        } else {
-          let loaded = false;
-          vid.poster = g.image;
-          vid.muted = true;
-          vid.loop = true;
-          vid.playsInline = true;
-          vid.setAttribute("muted","");
-          vid.setAttribute("playsinline","");
-          vid.preload = "metadata";
-    
-          // <- NUEVO: si existe <source>, úsalo y llama load()
-          const sourceEl = vid.querySelector('source');
-    
-          const ensureSrc = ()=> {
-            if (loaded) return;
-            if (sourceEl) {
-              sourceEl.src = pv;
-              vid.load();              // importante cuando hay <source>
-            } else {
-              vid.src = pv;
-            }
-            loaded = true;
-          };
-    
-          const start = ()=>{
-            ensureSrc();
-            vid.currentTime = 0;
-            const p = vid.play(); if(p && p.catch) p.catch(()=>{});
-          };
-          const stop  = ()=>{ vid.pause(); vid.currentTime = 0; };
-          const show  = ()=> vid.classList.add("playing");
-          const hide  = ()=> vid.classList.remove("playing");
-    
-          vid.addEventListener("playing", show);
-          vid.addEventListener("pause", hide);
-          vid.addEventListener("ended", hide);
-          vid.addEventListener("error", ()=>{ console.warn("Error trailer:", pv); vid.remove(); });
-    
-          tile.addEventListener("pointerenter", start);
-          tile.addEventListener("pointerleave", stop);
-          tile.addEventListener("focus", start);
-          tile.addEventListener("blur", stop);
-        }
+    // ---- Trailer hover (URL o DataURL) — acepta previewVideo o preview_video
+    const pv = g.previewVideo || g.preview_video || "";
+    if (vid && pv) {
+      const isPlayableURL  = /\.(mp4|webm)(\?.*)?$/i.test(pv);
+      const isPlayableDATA = /^data:video\/(mp4|webm)/i.test(pv);
+      if (!isPlayableURL && !isPlayableDATA) {
+        console.warn("previewVideo no es .mp4/.webm directo ni dataURL:", pv);
+      } else {
+        let loaded = false;
+        vid.poster = g.image;
+        vid.muted = true;
+        vid.loop = true;
+        vid.playsInline = true;
+        vid.setAttribute("muted","");
+        vid.setAttribute("playsinline","");
+        vid.preload = "metadata";
+
+        const sourceEl = vid.querySelector("source");
+
+        const ensureSrc = ()=>{ 
+          if(loaded) return; 
+          if(sourceEl){ sourceEl.src = pv; vid.load(); }
+          else { vid.src = pv; }
+          loaded = true; 
+        };
+        const start = ()=>{
+          ensureSrc();
+          vid.currentTime = 0;
+          const p = vid.play(); if(p && p.catch) p.catch(()=>{});
+        };
+        const stop  = ()=>{ vid.pause(); vid.currentTime = 0; };
+        const show  = ()=>vid.classList.add("playing");
+        const hide  = ()=>vid.classList.remove("playing");
+        vid.addEventListener("playing", show);
+        vid.addEventListener("pause", hide);
+        vid.addEventListener("ended", hide);
+        vid.addEventListener("error", ()=>{ console.warn("Error trailer:", pv); vid.remove(); });
+        tile.addEventListener("pointerenter", start);
+        tile.addEventListener("pointerleave", stop);
+        tile.addEventListener("focus", start);
+        tile.addEventListener("blur", stop);
       }
     }
 
@@ -250,44 +267,14 @@ function renderHeroCarousel(){
 function openGame(game){
   const modal = modalTemplate.content.cloneNode(true);
   const modalNode = modal.querySelector(".tw-modal");
-  const modalContent = modal.querySelector(".tw-modal-content");
   const modalImage = modal.querySelector(".tw-modal-image");
   const modalTitle = modal.querySelector(".tw-modal-title");
   const modalDescription = modal.querySelector(".tw-modal-description");
-  const modalDownload = modal.querySelector(".tw-modal-download");
-  const modalSecondary = modal.querySelector(".tw-modal-secondary");
   const modalClose = modal.querySelector(".tw-modal-close");
 
   modalImage.src = game.image || "assets/images/construction/en-proceso.svg";
   modalTitle.textContent = game.title || "Sin título";
   modalDescription.innerHTML = game.description || "Sin descripción";
-  modalDownload.addEventListener("click", ()=>{ if(game.downloadUrl) window.location.href = game.downloadUrl; });
-  modalSecondary.addEventListener("click", ()=> alert("Pronto: detalles extendidos"));
-
-  // Kebab admin (edit/delete)
-  if(isAdmin){
-    const kebabBtn = document.createElement("button");
-    kebabBtn.className = "tw-modal-menu";
-    kebabBtn.innerHTML = "⋮";
-    const panel = document.createElement("div");
-    panel.className = "tw-kebab-panel";
-    panel.innerHTML = `
-      <button class="tw-kebab-item" data-action="edit">Editar</button>
-      <button class="tw-kebab-item danger" data-action="delete">Eliminar</button>
-    `;
-    kebabBtn.addEventListener("click",(e)=>{ e.stopPropagation(); panel.classList.toggle("show"); });
-    document.addEventListener("click",(e)=>{ if(!panel.contains(e.target) && e.target!==kebabBtn) panel.classList.remove("show"); });
-    panel.addEventListener("click",(e)=>{
-      const action = e.target?.dataset?.action;
-      if(action==="edit"){ panel.classList.remove("show"); openEditGame(game, modalNode); }
-      if(action==="delete"){
-        panel.classList.remove("show");
-        if(confirm("¿Eliminar esta publicación?")) deleteGame(game, modalNode);
-      }
-    });
-    modalContent.appendChild(kebabBtn);
-    modalContent.appendChild(panel);
-  }
 
   const removeTrap = trapFocus(modalNode);
   const onEscape = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
@@ -325,7 +312,7 @@ function openEditGame(original){
 
   titleInput.value = original.title || "";
   if(descriptionInput) descriptionInput.value = (original.description||"").replace(/<[^>]+>/g,"");
-  if(trailerUrlInput) trailerUrlInput.value = original.previewVideo || "";
+  if(trailerUrlInput) trailerUrlInput.value = original.previewVideo || original.preview_video || "";
   if(downloadInput) downloadInput.value = original.downloadUrl || "";
   if(imageInput) imageInput.required = false;
 
@@ -375,7 +362,6 @@ function openNewGameModal(){
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
     // Validación trailer:
-    // Opción 1: URL directa .mp4/.webm
     let previewSrc = null;
     if (trailerUrl) {
       if (!/\.(mp4|webm)(\?.*)?$/i.test(trailerUrl)) {
@@ -383,34 +369,16 @@ function openNewGameModal(){
         return;
       }
       previewSrc = trailerUrl;
-    }
-    // Opción 2: Archivo local -> DataURL (2–5MB ok)
-    else if (trailerFile) {
-      if (!/^video\/(mp4|webm)$/i.test(trailerFile.type)) {
-        alert("El archivo de trailer debe ser MP4 o WEBM.");
-        return;
-      }
-      // (opcional) limitar tamaño ~6MB por límites de función
-      if (trailerFile.size > 6 * 1024 * 1024) {
-        alert("El trailer es muy pesado (>6MB). Sube uno más ligero o usa URL.");
-        return;
-      }
-      try {
-        previewSrc = await readAsDataURL(trailerFile);
-      } catch {
-        alert("No se pudo leer el trailer. Intenta con URL o archivo más pequeño.");
-        return;
-      }
+    } else if (trailerFile) {
+      if (!/^video\/(mp4|webm)$/i.test(trailerFile.type)) { alert("El archivo de trailer debe ser MP4 o WEBM."); return; }
+      if (trailerFile.size > 6 * 1024 * 1024) { alert("El trailer es muy pesado (>6MB). Usa URL o comprímelo."); return; }
+      try { previewSrc = await readAsDataURL(trailerFile); } 
+      catch { alert("No se pudo leer el trailer. Intenta con URL o archivo más pequeño."); return; }
     }
 
-    // Portada -> DataURL
     let coverDataUrl = null;
-    try {
-      coverDataUrl = await readAsDataURL(imageFile);
-    } catch {
-      alert("No se pudo leer la portada.");
-      return;
-    }
+    try { coverDataUrl = await readAsDataURL(imageFile); }
+    catch { alert("No se pudo leer la portada."); return; }
 
     const token = localStorage.getItem("tgx_admin_token") || "";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
@@ -496,17 +464,7 @@ function renderSocialBar(){
       const del = document.createElement("button");
       del.textContent = "×";
       del.title = "Eliminar";
-      del.style.position = "absolute";
-      del.style.top = "4px";
-      del.style.right = "4px";
-      del.style.width = "24px";
-      del.style.height = "24px";
-      del.style.borderRadius = "12px";
-      del.style.border = "none";
-      del.style.cursor = "pointer";
-      del.style.fontWeight = "bold";
-      del.style.background = "rgba(0,0,0,0.7)";
-      del.style.color = "#fff";
+      del.className = "social-del";
       del.addEventListener("click", async (e)=>{
         e.preventDefault(); e.stopPropagation();
         if (!confirm("¿Eliminar esta red social?")) return;
