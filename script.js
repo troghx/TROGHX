@@ -44,7 +44,6 @@ async function apiGet(id) {
   return r.json();
 }
 
-
 // ---- SOCIALS
 async function socialsList(){
   const r = await fetch(API_SOC, { cache: "no-store" });
@@ -175,7 +174,7 @@ function platformIconSVG(plat){
     case "drive": return `<svg ${common} fill="currentColor"><path d="M10 4h4l6 10-2 4H6l-2-4 6-10zm1 2-5 8h12l-5-8h-2z"/></svg>`;
     case "dropbox": return `<svg ${common} fill="currentColor"><path d="m6 3 6 4-4 3-6-4 4-3Zm6 4 6-4 4 3-6 4-4-3Zm-10 6 6 4 4-3-6-4-4 3Zm10 1 4 3 6-4-4-3-6 4Z"/></svg>`;
     case "onedrive": return `<svg ${common} fill="currentColor"><path d="M7 17h10a4 4 0 0 0 0-8 5 5 0 0 0-9-2 5 5 0 0 0-1 10Z"/></svg>`;
-    case "youtube": return `<svg ${common} fill="currentColor"><path d="M10 15l5-3-5-3v6zm12-3c0-2.2-.2-3.7-.6-4.7-.3-.8-1-1.5-1.8-1.8C18.6 4 12 4 12 4s-6.6 0-7.6.5c-.8.3-1.5 1-1.8 1.8C2.2 8.3 2 9.8 2 12s.2 3.7.6 4.7c.3.8 1 1.5 1.8 1.8C5.4 19.9 12 20 12 20s6.6 0 7.6-.5c.8-.3 1.5-1 1.8-1.8.4-1 .6-2.5.6-4.7z"/></svg>`;
+    case "youtube": return `<svg ${common} fill="currentColor"><path d="M10 15l5-3-5-3v6zm12-3c0-2.2-.2-3.7-.6-4.7-.3-.8-1-1.5-1.8-1.8C18.6 4 12 4 12 4s-6.6 0-7.6.5c-.8-.3-1.5-1-1.8-1.8C2.2 8.3 2 9.8 2 12s.2 3.7.6 4.7c.3.8 1 1.5 1.8 1.8C5.4 19.9 12 20 12 20s6.6 0 7.6-.5c.8-.3 1.5-1 1.8-1.8.4-1 .6-2.5.6-4.7z"/></svg>`;
     case "torrent": return `<svg ${common} fill="currentColor"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2Zm1 5v6h3l-4 4-4-4h3V7h2z"/></svg>`;
     case "gofile": return `<svg ${common} fill="currentColor"><circle cx="12" cy="12" r="9"/></svg>`;
     case "pixeldrain": return `<svg ${common} fill="currentColor"><path d="M4 4h16v16H4z"/></svg>`;
@@ -263,61 +262,65 @@ function renderRow(){
     preload(g.image);
     title.textContent = g.title || "";
 
-    // ---- Trailer hover (URL o DataURL)—acepta previewVideo o preview_video
-    const pv = g.previewVideo || g.preview_video || "";
-    if (vid && pv) {
-      const isPlayableURL  = /\.(mp4|webm)(\?.*)?$/i.test(pv);
-      const isPlayableDATA = /^data:video\/(mp4|webm)/i.test(pv);
-      if (isPlayableURL || isPlayableDATA) {
-        let loaded = false;
-        vid.poster = g.image;
-        vid.muted = true;
-        vid.loop = true;
-        vid.playsInline = true;
-        vid.setAttribute("muted","");
-        vid.setAttribute("playsinline","");
-        vid.preload = "metadata";
-const sourceEl = vid.querySelector("source");
+    // ---- Trailer hover (URL o DataURL)—lite: lo pedimos bajo demanda
+    if (vid) {
+      let loaded = false;
+      vid.poster = g.image;
+      vid.muted = true;
+      vid.loop = true;
+      vid.playsInline = true;
+      vid.setAttribute("muted","");
+      vid.setAttribute("playsinline","");
+      vid.preload = "metadata";
 
-const ensureSrc = async () => {
-  if (loaded) return;
-  let pv = g.previewVideo || g.preview_video || "";
+      const sourceEl = vid.querySelector("source");
 
-  // si el listado es "lite", quizá no vino el trailer; lo pedimos por ID
-  if (!pv && g.id) {
-    try {
-      const full = await apiGet(g.id);
-      pv = full.previewVideo || full.preview_video || "";
-      // guarda en el objeto para siguientes hovers
-      if (pv) { g.previewVideo = pv; }
-    } catch {}
-  }
-  if (!pv) return;
+      const ensureSrc = async () => {
+        if (loaded) return true;
 
-  if (sourceEl) { sourceEl.src = pv; vid.load(); } else { vid.src = pv; }
-  loaded = true;
-};
+        let pv = g.previewVideo || g.preview_video || "";
+        // si el listado vino "lite", quizá no tenemos pv aún: pedir detalle por ID
+        if (!pv && g.id) {
+          try {
+            const full = await apiGet(g.id);
+            pv = full.previewVideo || full.preview_video || "";
+            if (pv) g.previewVideo = pv; // cachearlo en el objeto
+          } catch { /* ignore */ }
+        }
+        if (!pv) return false;
 
-        const start = ()=>{ ensureSrc(); vid.currentTime = 0; const p = vid.play(); if(p && p.catch) p.catch(()=>{}); };
-        const stop  = ()=>{ vid.pause(); vid.currentTime = 0; };
-        const show  = ()=>vid.classList.add("playing");
-        const hide  = ()=>vid.classList.remove("playing");
-        vid.addEventListener("playing", show);
-        vid.addEventListener("pause", hide);
-        vid.addEventListener("ended", hide);
-        vid.addEventListener("error", ()=>{ console.warn("Error trailer:", pv); vid.remove(); });
-        tile.addEventListener("pointerenter", start);
-        tile.addEventListener("pointerleave", stop);
-        tile.addEventListener("focus", start);
-        tile.addEventListener("blur", stop);
-      }
+        if (sourceEl) { sourceEl.src = pv; vid.load(); }
+        else { vid.src = pv; }
+        loaded = true;
+        return true;
+      };
+
+      const start = async ()=>{
+        const ok = await ensureSrc();
+        if (!ok) return;
+        vid.currentTime = 0;
+        const p = vid.play(); if(p && p.catch) p.catch(()=>{});
+      };
+      const stop  = ()=>{ vid.pause(); vid.currentTime = 0; };
+      const show  = ()=>vid.classList.add("playing");
+      const hide  = ()=>vid.classList.remove("playing");
+
+      vid.addEventListener("playing", show);
+      vid.addEventListener("pause", hide);
+      vid.addEventListener("ended", hide);
+      vid.addEventListener("error", ()=>{ console.warn("Error trailer:", g.id); vid.remove(); });
+
+      tile.addEventListener("pointerenter", start);
+      tile.addEventListener("pointerleave", stop);
+      tile.addEventListener("focus", start);
+      tile.addEventListener("blur", stop);
     }
 
     tile.tabIndex = 0;
     tile.addEventListener("click", ()=>openGame(g));
     container.appendChild(node);
 
-    // Estado del enlace (pill)
+    // Estado del enlace (badge)
     applyLinkStatusBadge(tile, g);
   });
 
