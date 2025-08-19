@@ -96,6 +96,16 @@ function trapFocus(modalNode){
   return () => modalNode.removeEventListener("keydown", onKey);
 }
 
+// ---- Normaliza rutas de video (acepta absolutas y relativas del sitio)
+function normalizeVideoUrl(u){
+  if(!u) return "";
+  u = u.trim();
+  if (/^https?:\/\//i.test(u) || /^\/\//.test(u)) return u; // absoluta
+  if (u.startsWith('/')) return u;                           // /assets/...
+  if (u.startsWith('assets/')) return '/' + u;               // assets/... -> /assets/...
+  return u;
+}
+
 // ===================== RICH EDITOR (WYSIWYG MIN) =====================
 function initRichEditor(editorRoot){
   const editorArea = editorRoot.querySelector(".editor-area");
@@ -141,6 +151,7 @@ function renderRow(){
         console.warn("previewVideo no es un .mp4/.webm directo:", g.previewVideo);
       } else {
         let loaded = false;
+        vid.poster = g.image;
         vid.muted = true;
         vid.loop = true;
         vid.playsInline = true;
@@ -327,7 +338,8 @@ function openNewGameModal(){
     const title = (titleInput.value||"").trim();
     const descHTML = editorAPI.getHTML();
     const imageFile = imageInput?.files?.[0];
-    const trailerUrl = (trailerUrlInput?.value||"").trim();
+    const rawTrailer = (trailerUrlInput?.value||"").trim();
+    const trailerUrl = normalizeVideoUrl(rawTrailer);
     const downloadUrl = (downloadInput?.value||"").trim() || null;
 
     if(!title){ alert("Título es obligatorio."); titleInput.focus(); return; }
