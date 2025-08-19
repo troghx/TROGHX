@@ -417,3 +417,118 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   background:rgba(0,0,0,0.7); color:#fff; font-weight:800; line-height:1;
 }
 
+/* ===== Hero más pequeño ===== */
+.hero-art{
+  /* ahora escala con el viewport, más chico que antes */
+  height: clamp(220px, 28vw, 420px);
+  background-size: cover;
+  background-position: center;
+  border-radius: 1.25rem;
+  overflow: hidden;
+}
+
+/* ===== Tarjetas: cover recortado y video encima ===== */
+.tile{ position:relative; overflow:hidden; border-radius:1rem; }
+.tile .cover{
+  width:100%; height:100%;
+  background-size:cover; background-position:center;
+  border-radius:inherit; overflow:hidden;
+}
+.tile .tile-video{
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:cover; border-radius:inherit; display:block;
+}
+.tile .tile-video:not(.playing){ opacity:0; pointer-events:none; }
+
+/* ===== Estado (pill) sobre la tarjeta ===== */
+.status-pill{
+  position:absolute; right:10px; bottom:10px;
+  display:inline-flex; align-items:center; gap:.4rem;
+  padding:.25rem .6rem; border-radius:999px;
+  font-size:.74rem; font-weight:700; line-height:1;
+  backdrop-filter: blur(6px);
+  border:1.5px solid transparent;
+  background: rgba(15, 23, 42, .55);
+  color:#e2e8f0;
+}
+.status-pill .pill-icon { display:inline-flex; align-items:center; }
+.status-ok{ border-color: #22c55e; color:#dcfce7; }
+.status-warn{ border-color: #f59e0b; color:#fff7ed; }
+.status-down{ border-color: #ef4444; color:#fee2e2; }
+.status-checking{ border-color:#94a3b8; color:#e2e8f0; }
+.pill-mega{ --pill-color:#ef4444; }
+.pill-mediafire{ --pill-color:#0ea5e9; }
+.pill-torrent{ --pill-color:#22c55e; }
+.pill-drive{ --pill-color:#34a853; }
+.pill-dropbox{ --pill-color:#2563eb; }
+.pill-onedrive{ --pill-color:#1e40af; }
+.pill-youtube{ --pill-color:#ef4444; }
+.pill-gofile{ --pill-color:#f59e0b; }
+.pill-pixeldrain{ --pill-color:#8b5cf6; }
+
+/* ===== Chips de enlaces (fondo opaco + contorno de color) ===== */
+.link-chip{
+  --chip-color: #94a3b8;
+  display:inline-flex; align-items:center; gap:.45rem;
+  padding:.42rem .72rem; border-radius:999px; font-weight:800;
+  text-decoration:none; color:#e5e7eb;
+  background: rgba(255,255,255,.06);
+  border:2px solid var(--chip-color);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.045), 0 6px 18px rgba(0,0,0,.18);
+  transition: transform .12s ease, filter .12s ease, box-shadow .12s ease;
+}
+.link-chip:hover{ transform:translateY(-1px); filter:brightness(1.03); }
+.link-chip:active{ transform:translateY(0); }
+.link-chip .chip-dot{
+  width:.55rem; height:.55rem; border-radius:999px; background: var(--chip-color);
+  box-shadow: 0 0 0 2px rgba(255,255,255,.14);
+}
+
+/* Colores por plataforma (contorno) */
+.chip-mediafire{ --chip-color:#0ea5e9; }
+.chip-mega{ --chip-color:#ef4444; }
+.chip-youtube{ --chip-color:#ef4444; }
+.chip-torrent{ --chip-color:#22c55e; }
+.chip-dropbox{ --chip-color:#2563eb; }
+.chip-onedrive{ --chip-color:#1e40af; }
+.chip-gofile{ --chip-color:#f59e0b; }
+.chip-pixeldrain{ --chip-color:#8b5cf6; }
+/* Borde degradado para Drive */
+.chip-drive{
+  border-color: transparent;
+  background:
+    linear-gradient(rgba(15,23,42,.65), rgba(15,23,42,.65)) padding-box,
+    linear-gradient(90deg,#34a853 0%, #fbbc05 100%) border-box;
+}
+
+/* ===== Menú admin "⋮" en modal ===== */
+.tw-modal-menu{
+  position:absolute; top:10px; right:44px;
+  border:none; border-radius:10px; cursor:pointer;
+  background:rgba(255,255,255,.1); color:#e2e8f0;
+  padding:.25rem .5rem; font-size:1.25rem; line-height:1;
+}
+.tw-kebab-panel{
+  position:absolute; top:44px; right:16px;
+  background:#0b1220; color:#e2e8f0; border:1px solid rgba(148,163,184,.25);
+  border-radius:.75rem; padding:.25rem; min-width:160px;
+  box-shadow:0 12px 30px rgba(0,0,0,.35);
+  display:none; z-index:50;
+}
+.tw-kebab-panel.show{ display:block; }
+.tw-kebab-item{
+  width:100%; text-align:left; background:transparent; border:none; color:#e2e8f0;
+  padding:.6rem .75rem; border-radius:.5rem; cursor:pointer; font-weight:700;
+}
+.tw-kebab-item:hover{ background:rgba(148,163,184,.12); }
+.tw-kebab-item.danger{ color:#fecaca; }
+.tw-kebab-item.danger:hover{ background:rgba(239,68,68,.18); }
+
+/* Botón eliminar red (estético) */
+.social-del{
+  position:absolute; top:4px; right:4px; width:24px; height:24px;
+  border:none; border-radius:999px; cursor:pointer;
+  background:rgba(0,0,0,0.7); color:#fff; font-weight:800; line-height:1;
+}
+
+
