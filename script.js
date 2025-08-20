@@ -378,27 +378,35 @@ function renderRow(){
 
 // ===================== HERO =====================
 function renderHeroCarousel(){
-  const heroCarousel = document.querySelector(".hero-carousel");
-  const heroArt = document.querySelector(".hero-art");
-  if(!heroCarousel || !heroArt || !recientes.length) return;
+    const heroCarousel = document.querySelector(".hero-carousel");
+    const heroArt = document.querySelector(".hero-art");
+    if(!heroCarousel || !heroArt || !recientes.length) return;
 
-  heroCarousel.innerHTML = "";
-  const max = Math.min(5, recientes.length);
-  for(let i=0;i<max;i++){
-    const img = document.createElement("img");
-    img.src = recientes[i].image;
-    if(i===0) img.classList.add("active");
-    heroCarousel.appendChild(img);
-  }
-  const setActive = (i)=>{
-    const imgs = heroCarousel.querySelectorAll("img");
-    imgs.forEach((im,idx)=>im.classList.toggle("active", idx===i));
-    heroArt.style.backgroundImage = `url(${recientes[i]?.image||""})`;
-  };
-  setActive(0);
-  const getActiveIndex = ()=> Array.from(heroCarousel.querySelectorAll("img")).findIndex(im=>im.classList.contains("active"));
-  heroArt.addEventListener("click", ()=>{ const i=getActiveIndex(); openGame(recientes[i>=0?i:0]); });
-  heroArt.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); const i=getActiveIndex(); openGame(recientes[i>=0?i:0]); }});
+    heroCarousel.innerHTML = "";
+    const max = Math.min(5, recientes.length);
+    for(let i=0;i<max;i++){
+        const img = document.createElement("img");
+        img.src = recientes[i].image;
+        if(i===0) img.classList.add("active");
+        heroCarousel.appendChild(img);
+    }
+    const setActive = (i)=>{
+        const imgs = heroCarousel.querySelectorAll("img");
+        imgs.forEach((im,idx)=>im.classList.toggle("active", idx===i));
+        heroArt.style.backgroundImage = `url(${recientes[i]?.image||""})`;
+    };
+    setActive(0);
+    const getActiveIndex = ()=> Array.from(heroCarousel.querySelectorAll("img")).findIndex(im=>im.classList.contains("active"));
+    heroArt.addEventListener("click", ()=>{ const i=getActiveIndex(); openGame(recientes[i>=0?i:0]); });
+    heroArt.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); const i=getActiveIndex(); openGame(recientes[i>=0?i:0]); }});
+    // Asegura la etiqueta 'Destacados'
+    let tag = heroArt.querySelector(".hero-label");
+    if (!tag) {
+        tag = document.createElement("span");
+        tag.className = "hero-label";
+        tag.textContent = "Destacados";
+        heroArt.appendChild(tag);
+    }
 }
 
 // ===================== MODAL VER (con ⋮ admin) =====================
