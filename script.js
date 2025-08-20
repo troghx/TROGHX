@@ -18,10 +18,22 @@ const API_POSTS = "/.netlify/functions/posts";
 const API_SOC   = "/.netlify/functions/socials";
 const API_LINK  = "/.netlify/functions/linkcheck";
 
+/* === CATEGORÍAS === */
+let currentCategory = "game"; // "game" | "app" | "movie"
+
 /* === API POSTS === */
-async function apiList() {
-  const r = await fetch(`${API_POSTS}?lite=1&limit=100`, { cache: "no-store" });
+async function apiList(category = currentCategory) {
+  const qs = new URLSearchParams({ lite: "1", limit: "100" });
+  if (category) qs.set("category", category);
+  const r = await fetch(`${API_POSTS}?${qs.toString()}`, { cache: "no-store" });
   if (!r.ok) throw new Error("No se pudo listar posts");
+  return r.json();
+}
+async function apiListFeatured(category = currentCategory) {
+  const qs = new URLSearchParams({ featured: "1", limit: "10" });
+  if (category) qs.set("category", category);
+  const r = await fetch(`${API_POSTS}?${qs.toString()}`, { cache: "no-store" });
+  if (!r.ok) return [];
   return r.json();
 }
 async function apiCreate(game, token) {
@@ -53,6 +65,14 @@ async function apiUpdate(id, data, token){
     body: JSON.stringify(data)
   });
   if(!r.ok){ const t = await r.text().catch(()=> ""); throw new Error(`Update falló: ${t}`); }
+  return r.json();
+}
+async function apiClearFeatured(token){
+  const r = await fetch(`${API_POSTS}?action=clear_featured`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token||""}` }
+  });
+  if(!r.ok){ const t = await r.text().catch(()=> ""); throw new Error(`Clear featured falló: ${t}`); }
   return r.json();
 }
 
@@ -225,13 +245,14 @@ function initRichEditor(editorRoot){
   const editorArea = editorRoot.querySelector(".editor-area");
   const toolbar = editorRoot.querySelector(".rich-toolbar");
 
+  // Alineación
   if (!toolbar.querySelector(".rtb-align")) {
     const group = document.createElement("div");
     group.className = "rtb-group";
     group.innerHTML = `
-      <button type="button" class="rtb-btn rtb-align" data-align="left"   title="Alinear a la izquierda">⟸</button>
+      <button type="button" class="rtb-btn rtb-align" data-align="left"   title="Alinear izquierda">⟸</button>
       <button type="button" class="rtb-btn rtb-align" data-align="center" title="Centrar">⟺</button>
-      <button type="button" class="rtb-btn rtb-align" data-align="right"  title="Alinear a la derecha">⟹</button>
+      <button type="button" class="rtb-btn rtb-align" data-align="right"  title="Alinear derecha">⟹</button>
     `;
     toolbar.appendChild(group);
   }
@@ -368,15 +389,23 @@ function getFeatured(list){
     .sort((a,b)=> (a.featured_rank||99) - (b.featured_rank||99));
 }
 
-function renderHeroCarousel(){
+async function renderHeroCarousel(){
+  const hero = document.querySelector(".hero");
   const heroCarousel = document.querySelector(".hero-carousel");
   const heroArt = document.querySelector(".hero-art");
-  if(!heroCarousel || !heroArt) return;
+  if(!hero || !heroCarousel || !heroArt) return;
 
   const featured = getFeatured(recientes);
-  const source = featured.length ? featured : recientes;
-
   heroCarousel.innerHTML = "";
+
+  // Si NO hay destacados, ocultamos hero
+  if (!featured.length) {
+    hero.style.display = "none";
+    return;
+  }
+  hero.style.display = ""; // visible
+
+  const source = featured;
   const max = Math.min(5, source.length);
   for(let i=0;i<max;i++){
     const img = document.createElement("img");
@@ -384,9 +413,27 @@ function renderHeroCarousel(){
     if(i===0) img.classList.add("active");
     heroCarousel.appendChild(img);
   }
-  // etiqueta "Destacados"
+
+  // etiqueta y botón limpiar
   let tag = heroArt.querySelector(".hero-label");
   if (!tag) { tag = document.createElement("span"); tag.className = "hero-label"; tag.textContent = "Destacados"; heroArt.appendChild(tag); }
+
+  let actions = heroArt.querySelector(".hero-actions");
+  if (!actions) { actions = document.createElement("div"); actions.className = "hero-actions"; heroArt.appendChild(actions); }
+  actions.innerHTML = "";
+  if (isAdmin) {
+    const btnClear = document.createElement("button");
+    btnClear.className = "btn-clear-featured";
+    btnClear.textContent = "Limpiar destacados";
+    btnClear.addEventListener("click", async (e)=>{
+      e.stopPropagation();
+      if (!confirm("¿Quitar TODOS los destacados?")) return;
+      const token = localStorage.getItem("tgx_admin_token") || "";
+      try { await apiClearFeatured(token); await reloadData(); alert("Destacados limpiados."); }
+      catch(err){ console.error(err); alert("No se pudo limpiar."); }
+    });
+    actions.appendChild(btnClear);
+  }
 
   const setActive = (i)=>{
     const imgs = heroCarousel.querySelectorAll("img");
@@ -449,35 +496,34 @@ function deleteGame(game, currentModalNode){
   const token = localStorage.getItem("tgx_admin_token") || "";
   if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
   apiDelete(game.id, token)
-    .then(()=>apiList())
-    .then(data=>{
-      recientes = Array.isArray(data)?data:[];
-      renderRow(); renderHeroCarousel();
-      if(currentModalNode) closeModal(currentModalNode);
-      alert("Publicación eliminada.");
-    })
+    .then(()=>reloadData())
+    .then(()=>{ if(currentModalNode) closeModal(currentModalNode); alert("Publicación eliminada."); })
     .catch(e=>{ console.error(e); alert("Error al borrar."); });
 }
 
-/* Helper para selector Destacado (1..5) */
-function makeFeaturedSelect(currentValue=null){
+function makeFeatureToggle(initialOn=false){
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "feature-toggle";
+  btn.innerHTML = `<span class="star"></span><span>Destacado</span>`;
+  if (initialOn) btn.classList.add("active");
+  btn.addEventListener("click", ()=> btn.classList.toggle("active"));
+  return btn;
+}
+
+function makeCategorySelect(current="game"){
   const wrap = document.createElement("label");
-  wrap.className = "featured-field";
   wrap.style.display = "block";
   wrap.style.marginTop = ".6rem";
   wrap.innerHTML = `
-    <span style="display:block;font-size:.85rem;opacity:.8;margin-bottom:.25rem">Destacado (opcional)</span>
-    <select class="featured-rank-select" style="width:100%;background:#11161b;border:1px solid #2a323a;border-radius:10px;padding:.6rem .7rem;color:#cfe3ff">
-      <option value="">Ninguno</option>
-      <option value="1">1 (más arriba)</option>
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="5">5</option>
+    <span style="display:block;font-size:.85rem;opacity:.8;margin-bottom:.25rem">Tipo</span>
+    <select class="cat-select" style="width:100%;background:#11161b;border:1px solid #2a323a;border-radius:10px;padding:.6rem .7rem;color:#cfe3ff">
+      <option value="game">Juego</option>
+      <option value="app">App</option>
+      <option value="movie">Película</option>
     </select>
   `;
-  const sel = wrap.querySelector("select");
-  if (currentValue != null) sel.value = String(currentValue);
+  wrap.querySelector("select").value = current || "game";
   return wrap;
 }
 
@@ -500,9 +546,13 @@ function openEditGame(original){
 
   if (imageInput) imageInput.required = false;
 
-  // Selector de Destacado
-  const featuredSel = makeFeaturedSelect(original.featured_rank ?? null);
-  form.querySelector(".new-game-title")?.parentElement?.appendChild(featuredSel);
+  // Estrellita (solo edición)
+  const featureBtn = makeFeatureToggle(Number.isFinite(original.featured_rank));
+  form.querySelector(".new-game-title")?.parentElement?.appendChild(featureBtn);
+
+  // Selector de categoría
+  const catSel = makeCategorySelect(original.category || "game");
+  form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
 
   let clearTrailerCb = null;
   if (trailerUrlInput) {
@@ -527,11 +577,13 @@ function openEditGame(original){
     const rawTrailer = (trailerUrlInput?.value||"").trim();
     const trailerUrl = normalizeVideoUrl(rawTrailer);
     const trailerFile = trailerFileInput?.files?.[0] || null;
+    const wantFeatured = featureBtn.classList.contains("active");
+    const cat = catSel.querySelector(".cat-select")?.value || "game";
 
     if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
-    const patch = { title, description: descHTML };
+    const patch = { title, description: descHTML, category: cat };
 
     if (imageFile) {
       try { patch.image = await compressImage(imageFile); }
@@ -550,24 +602,32 @@ function openEditGame(original){
       catch { alert("No se pudo leer el trailer."); return; }
     }
 
-    // featured_rank
-    const sel = form.querySelector(".featured-rank-select");
-    if (sel && sel.value !== "") patch.featured_rank = parseInt(sel.value, 10);
-    else patch.featured_rank = null;
+    // featured_rank a partir de estrellita
+    const wasFeatured = Number.isFinite(original.featured_rank);
+    if (wantFeatured && !wasFeatured) {
+      const maxRank = getFeatured(recientes).reduce((m,p)=>Math.max(m, p.featured_rank||0), 0);
+      patch.featured_rank = maxRank + 1;
+    } else if (!wantFeatured && wasFeatured) {
+      patch.featured_rank = null;
+    } // si estaba y sigue, no tocamos
 
     const token = localStorage.getItem("tgx_admin_token") || "";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
     try{
       await apiUpdate(original.id, patch, token);
-      const data = await apiList();
+      const data = await apiList(); // recarga lista
       recientes = Array.isArray(data)?data:[];
+      // Mover editado al principio (UI)
+      const idx = recientes.findIndex(p=>p.id===original.id);
+      if (idx > 0) { const [item] = recientes.splice(idx,1); recientes.unshift(item); }
       closeModal(node, removeTrap, onEscape);
       renderRow(); renderHeroCarousel();
       alert("¡Publicación actualizada!");
     }catch(err){ console.error(err); alert("Error al actualizar. Revisa consola."); }
   });
 
+  const modalClose = modal.querySelector(".tw-modal-close");
   modalClose.addEventListener("click",()=> closeModal(node, removeTrap, onEscape));
   openModalFragment(node);
 }
@@ -585,9 +645,9 @@ function openNewGameModal(){
   const editorRoot = modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
 
-  // Selector de Destacado
-  const featuredSel = makeFeaturedSelect(null);
-  form.querySelector(".new-game-title")?.parentElement?.appendChild(featuredSel);
+  // Selector de categoría (en crear)
+  const catSel = makeCategorySelect("game");
+  form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
 
   const removeTrap = trapFocus(modalNode);
   const onEscape = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
@@ -601,6 +661,7 @@ function openNewGameModal(){
     const rawTrailer = (trailerUrlInput?.value||"").trim();
     const trailerUrl = normalizeVideoUrl(rawTrailer);
     const trailerFile = trailerFileInput?.files?.[0] || null;
+    const cat = catSel.querySelector(".cat-select")?.value || "game";
 
     if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return; }
     if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return; }
@@ -630,27 +691,23 @@ function openNewGameModal(){
     const token = localStorage.getItem("tgx_admin_token") || "";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
-    const sel = form.querySelector(".featured-rank-select");
-    const featured_rank = sel && sel.value !== "" ? parseInt(sel.value, 10) : null;
-
     const newGame = {
       title,
       image: coverDataUrl,
       description: descHTML,
       previewVideo: previewSrc || null,
-      featured_rank
+      featured_rank: null,
+      category: cat
     };
 
     try{
       await apiCreate(newGame, token);
-      const data = await apiList();
-      recientes = Array.isArray(data)?data:[];
+      await reloadData();
       closeModal(modalNode, removeTrap, onEscape);
-      renderRow(); renderHeroCarousel();
-      alert("¡Juego añadido!");
+      alert("¡Añadido!");
     }catch(err){
       console.error("[create error]", err);
-      alert("Error al guardar. Revisa consola (el backend devuelve 'hint').");
+      alert("Error al guardar. Revisa consola (hint en backend).");
     }
   });
 
@@ -916,9 +973,35 @@ function ensureSidebarChannelBadge(){
   }
 }
 
-/* === INIT === */
+/* === NAV: Games / Apps / Movies === */
+function setupCategoryNav(){
+  const btnGames = document.querySelector('[data-nav="games"], .nav-games');
+  const btnApps  = document.querySelector('[data-nav="apps"], .nav-apps');
+  const btnMovies= document.querySelector('[data-nav="movies"], .nav-movies');
+
+  function setActive(cat){
+    currentCategory = cat;
+    [btnGames, btnApps, btnMovies].forEach(b=>{
+      if(!b) return;
+      b.classList.toggle("active", (b===btnGames && cat==="game") || (b===btnApps && cat==="app") || (b===btnMovies && cat==="movie"));
+    });
+    reloadData();
+  }
+
+  if(btnGames) btnGames.addEventListener("click", ()=> setActive("game"));
+  if(btnApps)  btnApps .addEventListener("click", ()=> setActive("app"));
+  if(btnMovies)btnMovies.addEventListener("click", ()=> setActive("movie"));
+}
+
+/* === INIT / RELOAD === */
+async function reloadData(){
+  try{ const data = await apiList(currentCategory); recientes = Array.isArray(data)?data:[]; }
+  catch(e){ console.error("[reload posts]", e); recientes = []; }
+  renderRow(); setupArrows(); renderHeroCarousel();
+}
+
 async function initData(){
-  try{ const data = await apiList(); recientes = Array.isArray(data)?data:[]; }
+  try{ const data = await apiList(currentCategory); recientes = Array.isArray(data)?data:[]; }
   catch(e){ console.error("[initData posts]", e); recientes = []; }
 
   try{ socials = await socialsList(); }
@@ -932,5 +1015,6 @@ async function initData(){
   renderHeroCarousel();
   renderSocialBar();
   ensureSidebarChannelBadge();
+  setupCategoryNav();
 }
 initData();
