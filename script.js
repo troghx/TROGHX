@@ -137,7 +137,7 @@ function readAsDataURL(file){
   });
 }
 
-// ====== Plataformas / chips ======
+// ====== Plataformas (chips/link + iconos + badge) ======
 function platformFromUrl(u){
   const s = (u||"").toLowerCase();
   if (s.startsWith("magnet:") || s.endsWith(".torrent") || s.includes("utorrent")) return "torrent";
@@ -170,7 +170,7 @@ function extractFirstLink(html){
   const a = tmp.querySelector("a[href]");
   return a ? a.getAttribute("href") : "";
 }
-const linkCache = new Map();
+const linkCache = new Map(); // url -> {ok, status}
 async function checkLink(url){
   if(!url) return { ok:false, status:null };
   if(linkCache.has(url)) return linkCache.get(url);
@@ -191,7 +191,7 @@ function platformIconSVG(plat){
     case "drive": return `<svg ${common} fill="currentColor"><path d="M10 4h4l6 10-2 4H6l-2-4 6-10zm1 2-5 8h12l-5-8h-2z"/></svg>`;
     case "dropbox": return `<svg ${common} fill="currentColor"><path d="m6 3 6 4-4 3-6-4 4-3Zm6 4 6-4 4 3-6 4-4-3Zm-10 6 6 4 4-3-6-4-4 3Zm10 1 4 3 6-4-4-3-6 4Z"/></svg>`;
     case "onedrive": return `<svg ${common} fill="currentColor"><path d="M7 17h10a4 4 0 0 0 0-8 5 5 0 0 0-9-2 5 5 0 0 0-1 10Z"/></svg>`;
-    case "youtube": return `<svg ${common} fill="currentColor"><path d="M10 15l5-3-5-3v6zm12-3c0-2.2-.2-3.7-.6-4.7-.3-.8-1-1.5-1.8-1.8C18.6 4 12 4 12 4s-6.6 0-7.6.5c-.8-.3-1.5-1-1.8-1.8C2.2 8.3 2 9.8 2 12s.2 3.7.6 4.7c.3.8 1 1.5 1.8 1.8C5.4 19.9 12 20 12 20s6.6 0 7.6-.5c.8-.3 1.5-1 1.8-1.8.4-1 .6-2.5.6-4.7z"/></svg>`;
+    case "youtube": return `<svg ${common} fill="currentColor"><path d="M10 15l5-3-5-3v6zm12-3c0-2.2-.2-3.7-.6-4.7-.3-.8-1-1.5-1.8-1.8C18.6 4 12 4 12 4s6.6 0 7.6.5c.8-.3 1.5-1 1.8-1.8.4-1 .6-2.5.6-4.7z"/></svg>`;
     case "torrent": return `<svg ${common} fill="currentColor"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2Zm1 5v6h3l-4 4-4-4h3V7h2z"/></svg>`;
     case "gofile": return `<svg ${common} fill="currentColor"><circle cx="12" cy="12" r="9"/></svg>`;
     case "pixeldrain": return `<svg ${common} fill="currentColor"><path d="M4 4h16v16H4z"/></svg>`;
@@ -199,11 +199,12 @@ function platformIconSVG(plat){
   }
 }
 
-// ===================== RICH EDITOR (incluye alineación) =====================
+// ===================== RICH EDITOR (añade alineación) =====================
 function initRichEditor(editorRoot){
   const editorArea = editorRoot.querySelector(".editor-area");
   const toolbar = editorRoot.querySelector(".rich-toolbar");
 
+  // botones de alineación si no existen
   if (!toolbar.querySelector(".rtb-align")) {
     const group = document.createElement("div");
     group.className = "rtb-group";
@@ -292,6 +293,7 @@ function renderRow(){
     preload(g.image);
     title.textContent = g.title || "";
 
+    // Hover video (carga on demand)
     if (vid) {
       let loaded = false;
       vid.poster = g.image;
@@ -441,27 +443,32 @@ function openEditGame(original){
   const imageInput = modal.querySelector(".new-game-image-file");
   const trailerFileInput = modal.querySelector(".new-game-trailer-file");
   const trailerUrlInput = modal.querySelector(".new-game-trailer-url");
-  const downloadInput = modal.querySelector(".new-game-download");
+  const downloadInput  = modal.querySelector(".new-game-download"); // puede no existir
   const modalClose = modal.querySelector(".tw-modal-close");
 
+  // Editor enriquecido
   const editorRoot = modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
 
-  // Prellenar
-  titleInput.value = original.title || "";
+  // Prellenar (con checks por si el input no existe en tu template)
+  if (titleInput) titleInput.value = original.title || "";
   editorAPI.setHTML(original.description || "");
-  trailerUrlInput.value = original.previewVideo || original.preview_video || "";
-  downloadInput.value = original.downloadUrl || "";
-  imageInput.required = false;
+  if (trailerUrlInput) trailerUrlInput.value = original.previewVideo || original.preview_video || "";
+  if (downloadInput)   downloadInput.value   = original.downloadUrl || "";
 
-  // Quitar trailer
-  const trailerGroup = trailerUrlInput.closest("label")?.parentElement || form;
-  const clearWrap = document.createElement("label");
-  clearWrap.style.display = "inline-flex"; clearWrap.style.alignItems = "center";
-  clearWrap.style.gap = ".4rem"; clearWrap.style.margin = ".4rem 0 0";
-  clearWrap.innerHTML = `<input type="checkbox" class="clear-trailer"> Quitar trailer`;
-  trailerGroup.appendChild(clearWrap);
-  const clearTrailerCb = clearWrap.querySelector(".clear-trailer");
+  if (imageInput) imageInput.required = false;
+
+  // Checkbox "quitar trailer" (solo si existe el grupo de trailer URL)
+  let clearTrailerCb = null;
+  if (trailerUrlInput) {
+    const trailerGroup = trailerUrlInput.closest("label")?.parentElement || form;
+    const clearWrap = document.createElement("label");
+    clearWrap.style.display = "inline-flex"; clearWrap.style.alignItems = "center";
+    clearWrap.style.gap = ".4rem"; clearWrap.style.margin = ".4rem 0 0";
+    clearWrap.innerHTML = `<input type="checkbox" class="clear-trailer"> Quitar trailer`;
+    trailerGroup.appendChild(clearWrap);
+    clearTrailerCb = clearWrap.querySelector(".clear-trailer");
+  }
 
   const removeTrap = trapFocus(node);
   const onEscape = (e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
@@ -469,26 +476,25 @@ function openEditGame(original){
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
 
-    const title = (titleInput.value||"").trim();
+    const title = (titleInput?.value||"").trim();
     const descHTML = editorAPI.getHTML();
     const imageFile = imageInput?.files?.[0] || null;
 
     const rawTrailer = (trailerUrlInput?.value||"").trim();
     const trailerUrl = normalizeVideoUrl(rawTrailer);
     const trailerFile = trailerFileInput?.files?.[0] || null;
-    const downloadUrl = (downloadInput?.value||"").trim();
 
-    if(!title){ alert("Título es obligatorio."); titleInput.focus(); return; }
+    if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
-    const patch = { title, description: descHTML, downloadUrl };
+    const patch = { title, description: descHTML };
 
     if (imageFile) {
       try { patch.image = await readAsDataURL(imageFile); }
       catch { alert("No se pudo leer la portada."); return; }
     }
 
-    if (clearTrailerCb.checked) {
+    if (clearTrailerCb?.checked) {
       patch.previewVideo = null;
     } else if (trailerUrl) {
       if (!/\.(mp4|webm)(\?.*)?$/i.test(trailerUrl)) { alert("URL del trailer debe ser .mp4/.webm directo."); return; }
@@ -525,9 +531,9 @@ function openNewGameModal(){
   const imageInput = modal.querySelector(".new-game-image-file");
   const trailerFileInput = modal.querySelector(".new-game-trailer-file");
   const trailerUrlInput = modal.querySelector(".new-game-trailer-url");
-  const downloadInput = modal.querySelector(".new-game-download");
   const modalClose = modal.querySelector(".tw-modal-close");
 
+  // WYSIWYG
   const editorRoot = modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
 
@@ -537,16 +543,15 @@ function openNewGameModal(){
 
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
-    const title = (titleInput.value||"").trim();
+    const title = (titleInput?.value||"").trim();
     const descHTML = editorAPI.getHTML();
     const imageFile = imageInput?.files?.[0];
     const rawTrailer = (trailerUrlInput?.value||"").trim();
     const trailerUrl = normalizeVideoUrl(rawTrailer);
     const trailerFile = trailerFileInput?.files?.[0] || null;
-    const downloadUrl = (downloadInput?.value||"").trim() || null;
 
-    if(!title){ alert("Título es obligatorio."); titleInput.focus(); return; }
-    if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput.focus(); return; }
+    if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return; }
+    if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
     let previewSrc = null;
@@ -570,8 +575,7 @@ function openNewGameModal(){
       title,
       image: coverDataUrl,
       description: descHTML,
-      previewVideo: previewSrc || null,
-      downloadUrl
+      previewVideo: previewSrc || null
     };
 
     try{
