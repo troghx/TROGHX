@@ -51,12 +51,17 @@ function parseFeaturedRank(input) {
   if (input === undefined || input === null || input === "") return null;
   const n = parseInt(input, 10);
   if (!Number.isFinite(n)) return null;
-  // acota de 1 a 5 (o sube si quieres más)
-  if (n < 1 || n > 5) return null;
+  if (n < 1 || n > 99) return null;
   return n;
+}
+function parseCategory(input) {
+  const v = String(input || "").toLowerCase();
+  if (v === "game" || v === "app" || v === "movie") return v;
+  return "game";
 }
 
 export async function handler(event) {
+  // CORS
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 204,
@@ -72,43 +77,51 @@ export async function handler(event) {
   try {
     if (!sql) return json(500, { error: "DB not configured" });
 
+    const qp = event.queryStringParameters || {};
+
     // ---------- GET /posts ó /posts/:id
     if (event.httpMethod === "GET") {
       const id = getIdFromPath(event.path);
       if (id) {
         const rows =
-          await sql`SELECT id, title, image, description, preview_video, featured_rank, created_at
-                    FROM posts WHERE id = ${id} LIMIT 1`;
+          await sql`SELECT id, title, image, description, preview_video, featured_rank,
+                           COALESCE(category,'game') AS category, created_at
+                    FROM posts
+                    WHERE id = ${id}
+                    LIMIT 1`;
         if (!rows.length) return json(404, { error: "Not found" });
         return json(200, rows[0]);
       }
 
-      const qp = event.queryStringParameters || {};
-      const lite = qp.lite === "1" || qp.lite === "true";
+      const lite         = qp.lite === "1" || qp.lite === "true";
       const featuredOnly = qp.featured === "1" || qp.featured === "true";
-      const limit = Math.min(Math.max(parseInt(qp.limit || "24", 10) || 24, 1), 100);
+      const category     = qp.category ? parseCategory(qp.category) : null;
+      const limit        = Math.min(Math.max(parseInt(qp.limit || "100", 10) || 100, 1), 200);
 
-      if (featuredOnly) {
-        const rows =
-          await sql`SELECT id, title, image, description, preview_video, featured_rank, created_at
-                    FROM posts
-                    WHERE featured_rank IS NOT NULL
-                    ORDER BY featured_rank ASC, created_at DESC
-                    LIMIT ${limit}`;
-        return json(200, rows);
+      // base query
+      let where = sql``;
+      if (featuredOnly) where = sql`WHERE featured_rank IS NOT NULL`;
+      if (category) {
+        where = featuredOnly
+          ? sql`WHERE featured_rank IS NOT NULL AND COALESCE(category,'game') = ${category}`
+          : sql`WHERE COALESCE(category,'game') = ${category}`;
       }
 
       if (lite) {
         const rows =
-          await sql`SELECT id, title, image, description, featured_rank, created_at
+          await sql`SELECT id, title, image, description, featured_rank,
+                           COALESCE(category,'game') AS category, created_at
                     FROM posts
+                    ${where}
                     ORDER BY created_at DESC
                     LIMIT ${limit}`;
         return json(200, rows);
       } else {
         const rows =
-          await sql`SELECT id, title, image, description, preview_video, featured_rank, created_at
+          await sql`SELECT id, title, image, description, preview_video, featured_rank,
+                           COALESCE(category,'game') AS category, created_at
                     FROM posts
+                    ${where}
                     ORDER BY created_at DESC
                     LIMIT ${limit}`;
         return json(200, rows);
@@ -123,20 +136,27 @@ export async function handler(event) {
       return json(401, { error: "Unauthorized" });
     }
 
+    // ---------- POST /posts?action=clear_featured
+    if (event.httpMethod === "POST" && (qp.action === "clear_featured")) {
+      await sql`UPDATE posts SET featured_rank = NULL WHERE featured_rank IS NOT NULL`;
+      return json(200, { ok: true, cleared: true });
+    }
+
     // ---------- POST /posts (crear)
     if (event.httpMethod === "POST") {
       const body = JSON.parse(event.body || "{}");
-      const { title, image, description, previewVideo, preview_video, featured_rank } = body;
+      const { title, image, description, previewVideo, preview_video, featured_rank, category } = body;
       if (!title || !image || !description) {
         return json(400, { error: "Missing fields" });
       }
       const pv = previewVideo ?? preview_video ?? null;
       const fr = parseFeaturedRank(featured_rank);
+      const cat = parseCategory(category);
 
       try {
         const rows =
-          await sql`INSERT INTO posts (title, image, description, preview_video, featured_rank)
-                    VALUES (${title}, ${image}, ${description}, ${pv}, ${fr})
+          await sql`INSERT INTO posts (title, image, description, preview_video, featured_rank, category)
+                    VALUES (${title}, ${image}, ${description}, ${pv}, ${fr}, ${cat})
                     RETURNING id`;
         return json(200, { ok: true, id: rows[0].id });
       } catch (e) {
@@ -147,8 +167,8 @@ export async function handler(event) {
             if (idType.kind === "uuid") {
               const newId = randomUUID();
               const rows2 =
-                await sql`INSERT INTO posts (id, title, image, description, preview_video, featured_rank)
-                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv}, ${fr})
+                await sql`INSERT INTO posts (id, title, image, description, preview_video, featured_rank, category)
+                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv}, ${fr}, ${cat})
                           RETURNING id`;
               return json(200, { ok: true, id: rows2[0].id });
             } else {
@@ -156,8 +176,8 @@ export async function handler(event) {
                 await sql`SELECT COALESCE(MAX(id),0)+1 AS next_id FROM posts`;
               const newId = seq?.[0]?.next_id || 1;
               const rows2 =
-                await sql`INSERT INTO posts (id, title, image, description, preview_video, featured_rank)
-                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv}, ${fr})
+                await sql`INSERT INTO posts (id, title, image, description, preview_video, featured_rank, category)
+                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv}, ${fr}, ${cat})
                           RETURNING id`;
               return json(200, { ok: true, id: rows2[0].id });
             }
@@ -177,7 +197,7 @@ export async function handler(event) {
       const body = JSON.parse(event.body || "{}");
 
       const curRows =
-        await sql`SELECT id, title, image, description, preview_video, featured_rank
+        await sql`SELECT id, title, image, description, preview_video, featured_rank, COALESCE(category,'game') AS category
                   FROM posts WHERE id = ${id} LIMIT 1`;
       if (!curRows.length) return json(404, { error: "Not found" });
       const cur = curRows[0];
@@ -192,6 +212,9 @@ export async function handler(event) {
         featured_rank: Object.prototype.hasOwnProperty.call(body, "featured_rank")
                         ? parseFeaturedRank(body.featured_rank)
                         : cur.featured_rank,
+        category:      Object.prototype.hasOwnProperty.call(body, "category")
+                        ? parseCategory(body.category)
+                        : cur.category,
       };
 
       try {
@@ -200,7 +223,8 @@ export async function handler(event) {
                       image=${merged.image},
                       description=${merged.description},
                       preview_video=${merged.preview_video},
-                      featured_rank=${merged.featured_rank}
+                      featured_rank=${merged.featured_rank},
+                      category=${merged.category}
                   WHERE id=${id}`;
         return json(200, { ok: true, id });
       } catch (e) {
