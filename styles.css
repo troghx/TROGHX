@@ -599,3 +599,55 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   opacity: .95;
   font-weight: 600;
 }
+
+/* Etiqueta DESTACADOS con degradado magenta→azul y botón limpiar */
+.hero-art .hero-label {
+  position: absolute;
+  top: 10px; left: 12px;
+  padding: 6px 12px;
+  font-size: 12px; letter-spacing: .08em; font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff37c7, #38bdf8);
+  color: #091015;
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 8px 22px rgba(0,0,0,.35);
+  user-select: none; pointer-events: none;
+}
+.hero-art .hero-actions {
+  position: absolute; top: 10px; right: 12px; display: flex; gap: 8px;
+}
+.hero-actions .btn-clear-featured {
+  pointer-events: auto;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(15,18,22,.55);
+  color: #d9e7ff;
+  padding: 6px 10px; border-radius: 10px;
+  font-size: 12px; font-weight: 600;
+  backdrop-filter: blur(6px);
+}
+
+/* Estrellita en modal de edición */
+.feature-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid #2a323a; border-radius: 10px;
+  background: #0f1317; color: #c7d7ee;
+  padding: 6px 10px; cursor: pointer;
+}
+.feature-toggle .star {
+  width: 16px; height: 16px; display: inline-block; border-radius: 4px;
+  background: #3a424c; mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M12 17.27 18.18 21 16.54 13.97 22 9.24 14.81 8.63 12 2 9.19 8.63 2 9.24 7.46 13.97 5.82 21z"/></svg>') center/contain no-repeat;
+}
+.feature-toggle.active { border-color: #7c4d00; background: #1c150a; color: #ffd369; }
+.feature-toggle.active .star { background: #ffd369; }
+
+/* Botón “+” de redes más limpio */
+.add-social-tile {
+  display: inline-grid; place-items: center;
+  width: 42px; height: 42px; border-radius: 12px;
+  background: linear-gradient(135deg, #ff37c7, #38bdf8);
+  color: #091015; font-weight: 800; font-size: 18px;
+  border: 0; box-shadow: 0 8px 20px rgba(0,0,0,.35);
+}
+.add-social-tile:hover { transform: translateY(-1px); }
+
