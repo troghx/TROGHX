@@ -30,12 +30,15 @@ async function apiCreate(game, token) {
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token||""}` },
     body: JSON.stringify(game)
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) {
+    const t = await r.text().catch(()=> "");
+    throw new Error(`Crear falló: ${r.status} ${r.statusText} :: ${t}`);
+  }
   return r.json();
 }
 async function apiDelete(id, token) {
   const r = await fetch(`${API_POSTS}/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token||""}` } });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) { const t = await r.text().catch(()=> ""); throw new Error(`Delete falló: ${t}`); }
   return r.json();
 }
 async function apiGet(id) {
@@ -49,7 +52,7 @@ async function apiUpdate(id, data, token){
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token||""}` },
     body: JSON.stringify(data)
   });
-  if(!r.ok) throw new Error(await r.text());
+  if(!r.ok){ const t = await r.text().catch(()=> ""); throw new Error(`Update falló: ${t}`); }
   return r.json();
 }
 
@@ -65,12 +68,12 @@ async function socialsCreate(s, token){
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token||""}` },
     body: JSON.stringify(s)
   });
-  if(!r.ok) throw new Error(await r.text());
+  if(!r.ok) { const t = await r.text().catch(()=> ""); throw new Error(`Social crear falló: ${t}`); }
   return r.json();
 }
 async function socialsDelete(id, token){
   const r = await fetch(`${API_SOC}/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token||""}` } });
-  if(!r.ok) throw new Error(await r.text());
+  if(!r.ok) { const t = await r.text().catch(()=> ""); throw new Error(`Social delete falló: ${t}`); }
   return r.json();
 }
 
@@ -85,6 +88,11 @@ function rehydrate() {
   try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES)||"[]"); if(Array.isArray(saved)) recientes = saved; } catch {}
   try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS)||"[]"); if(Array.isArray(savedS)) socials = savedS; } catch {}
   isAdmin = localStorage.getItem(LS_ADMIN) === "1";
+  // Fallback: si hay token, consideramos admin para mostrar UI
+  try {
+    const tok = localStorage.getItem("tgx_admin_token");
+    if (!isAdmin && tok && tok.trim()) isAdmin = true;
+  } catch {}
 }
 function persistAdmin(flag){ try{ localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); }catch{} }
 function preload(src){ const img = new Image(); img.src = src; }
@@ -129,7 +137,7 @@ function readAsDataURL(file){
   });
 }
 
-// ====== Plataformas (chips/link + iconos + badge) ======
+// ====== Plataformas / chips ======
 function platformFromUrl(u){
   const s = (u||"").toLowerCase();
   if (s.startsWith("magnet:") || s.endsWith(".torrent") || s.includes("utorrent")) return "torrent";
@@ -162,7 +170,7 @@ function extractFirstLink(html){
   const a = tmp.querySelector("a[href]");
   return a ? a.getAttribute("href") : "";
 }
-const linkCache = new Map(); // url -> {ok, status}
+const linkCache = new Map();
 async function checkLink(url){
   if(!url) return { ok:false, status:null };
   if(linkCache.has(url)) return linkCache.get(url);
@@ -191,12 +199,11 @@ function platformIconSVG(plat){
   }
 }
 
-// ===================== RICH EDITOR =====================
+// ===================== RICH EDITOR (incluye alineación) =====================
 function initRichEditor(editorRoot){
   const editorArea = editorRoot.querySelector(".editor-area");
   const toolbar = editorRoot.querySelector(".rich-toolbar");
 
-  // Añadimos botones de alineación si no existen
   if (!toolbar.querySelector(".rtb-align")) {
     const group = document.createElement("div");
     group.className = "rtb-group";
@@ -229,7 +236,7 @@ function initRichEditor(editorRoot){
   return { getHTML: ()=>editorArea.innerHTML.trim(), setHTML: (h)=>{ editorArea.innerHTML = h||""; } };
 }
 
-// ===================== RENDER: BADGE DE ESTADO =====================
+// ===================== BADGE DE ESTADO =====================
 async function applyLinkStatusBadge(tile, game){
   let badge = tile.querySelector(".tile-info .badge");
   if(!badge){
@@ -268,7 +275,7 @@ async function applyLinkStatusBadge(tile, game){
   }
 }
 
-// ===================== RENDER: CARDS/ROW =====================
+// ===================== CARDS/ROW =====================
 function renderRow(){
   const container = document.querySelector(`.carousel[data-row="recientes"]`);
   if(!container) return;
@@ -285,15 +292,11 @@ function renderRow(){
     preload(g.image);
     title.textContent = g.title || "";
 
-    // Trailer hover (carga perezosa desde GET /posts/:id)
     if (vid) {
       let loaded = false;
       vid.poster = g.image;
-      vid.muted = true;
-      vid.loop = true;
-      vid.playsInline = true;
-      vid.setAttribute("muted","");
-      vid.setAttribute("playsinline","");
+      vid.muted = true; vid.loop = true; vid.playsInline = true;
+      vid.setAttribute("muted",""); vid.setAttribute("playsinline","");
       vid.preload = "metadata";
       const sourceEl = vid.querySelector("source");
 
@@ -345,7 +348,7 @@ function renderRow(){
   }
 }
 
-// ===================== RENDER: HERO =====================
+// ===================== HERO =====================
 function renderHeroCarousel(){
   const heroCarousel = document.querySelector(".hero-carousel");
   const heroArt = document.querySelector(".hero-art");
@@ -370,7 +373,7 @@ function renderHeroCarousel(){
   heroArt.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); const i=getActiveIndex(); openGame(recientes[i>=0?i:0]); }});
 }
 
-// ===================== MODAL: VER JUEGO (con menú admin “⋮”) =====================
+// ===================== MODAL VER (con ⋮ admin) =====================
 function openGame(game){
   const modal = modalTemplate.content.cloneNode(true);
   const modalNode = modal.querySelector(".tw-modal");
@@ -384,7 +387,6 @@ function openGame(game){
   modalTitle.textContent = game.title || "Sin título";
   modalDescription.innerHTML = game.description || "Sin descripción";
 
-  // Menú admin "⋮"
   if(isAdmin){
     const kebabBtn = document.createElement("button");
     kebabBtn.className = "tw-modal-menu";
@@ -415,7 +417,7 @@ function openGame(game){
   openModalFragment(modalNode);
 }
 
-// ===================== CRUD POSTS =====================
+// ===================== CRUD =====================
 function deleteGame(game, currentModalNode){
   if(!game.id){ alert("No se encontró ID."); return; }
   const token = localStorage.getItem("tgx_admin_token") || "";
@@ -442,7 +444,6 @@ function openEditGame(original){
   const downloadInput = modal.querySelector(".new-game-download");
   const modalClose = modal.querySelector(".tw-modal-close");
 
-  // Editor enriquecido con alineación y chips
   const editorRoot = modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
 
@@ -451,17 +452,13 @@ function openEditGame(original){
   editorAPI.setHTML(original.description || "");
   trailerUrlInput.value = original.previewVideo || original.preview_video || "";
   downloadInput.value = original.downloadUrl || "";
-
-  // Portada no obligatoria al editar
   imageInput.required = false;
 
-  // Checkbox "quitar trailer"
+  // Quitar trailer
   const trailerGroup = trailerUrlInput.closest("label")?.parentElement || form;
   const clearWrap = document.createElement("label");
-  clearWrap.style.display = "inline-flex";
-  clearWrap.style.alignItems = "center";
-  clearWrap.style.gap = ".4rem";
-  clearWrap.style.margin = ".4rem 0 0";
+  clearWrap.style.display = "inline-flex"; clearWrap.style.alignItems = "center";
+  clearWrap.style.gap = ".4rem"; clearWrap.style.margin = ".4rem 0 0";
   clearWrap.innerHTML = `<input type="checkbox" class="clear-trailer"> Quitar trailer`;
   trailerGroup.appendChild(clearWrap);
   const clearTrailerCb = clearWrap.querySelector(".clear-trailer");
@@ -484,32 +481,25 @@ function openEditGame(original){
     if(!title){ alert("Título es obligatorio."); titleInput.focus(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
-    const patch = {
-      title,
-      description: descHTML,
-      downloadUrl
-    };
+    const patch = { title, description: descHTML, downloadUrl };
 
-    // portada (opcional)
     if (imageFile) {
       try { patch.image = await readAsDataURL(imageFile); }
       catch { alert("No se pudo leer la portada."); return; }
     }
 
-    // trailer (url/file/limpiar)
     if (clearTrailerCb.checked) {
       patch.previewVideo = null;
     } else if (trailerUrl) {
-      if (!/\.(mp4|webm)(\?.*)?$/i.test(trailerUrl)) {
-        alert("El trailer por URL debe ser .mp4/.webm directo."); return;
-      }
+      if (!/\.(mp4|webm)(\?.*)?$/i.test(trailerUrl)) { alert("URL del trailer debe ser .mp4/.webm directo."); return; }
       patch.previewVideo = trailerUrl;
     } else if (trailerFile) {
-      if (!/^video\/(mp4|webm)$/i.test(trailerFile.type)) { alert("El archivo de trailer debe ser MP4 o WEBM."); return; }
-      if (trailerFile.size > 6 * 1024 * 1024) { alert("El trailer es muy pesado (>6MB). Usa URL o comprímelo."); return; }
+      if (!/^video\/(mp4|webm)$/i.test(trailerFile.type)) { alert("Archivo del trailer debe ser MP4/WEBM."); return; }
+      if (trailerFile.size > 6 * 1024 * 1024) { alert("Trailer >6MB. Usa URL o comprímelo."); return; }
       try { patch.previewVideo = await readAsDataURL(trailerFile); }
       catch { alert("No se pudo leer el trailer."); return; }
     }
+
     const token = localStorage.getItem("tgx_admin_token") || "";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
@@ -538,7 +528,6 @@ function openNewGameModal(){
   const downloadInput = modal.querySelector(".new-game-download");
   const modalClose = modal.querySelector(".tw-modal-close");
 
-  // WYSIWYG
   const editorRoot = modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
 
@@ -582,8 +571,7 @@ function openNewGameModal(){
       image: coverDataUrl,
       description: descHTML,
       previewVideo: previewSrc || null,
-      downloadUrl,
-      detailsUrl: "#"
+      downloadUrl
     };
 
     try{
@@ -593,7 +581,10 @@ function openNewGameModal(){
       closeModal(modalNode, removeTrap, onEscape);
       renderRow(); renderHeroCarousel();
       alert("¡Juego añadido!");
-    }catch(err){ console.error(err); alert("Error al guardar. Revisa consola."); }
+    }catch(err){
+      console.error("[create error]", err);
+      alert("Error al guardar. Revisa consola.");
+    }
   });
 
   openModalFragment(modalNode);
@@ -761,11 +752,6 @@ function openAdminLoginModal(){
     if(!user || !pin){ alert("Completa usuario y PIN."); return; }
     if(!/^[0-9]{4,6}$/.test(pin)){ alert("PIN debe ser 4 a 6 dígitos."); return; }
 
-    const savedHash = localStorage.getItem(LS_ADMIN_HASH);
-    const savedSalt = localStorage.getItem(LS_ADMIN_SALT);
-    const savedUser = localStorage.getItem(LS_ADMIN_USER);
-    const isFirstRun = !(savedHash && savedSalt && savedUser);
-
     if(isFirstRun){
       const pin2 = node.querySelector(".admin-pin2")?.value?.trim();
       if(pin!==pin2){ alert("Los PIN no coinciden."); return; }
@@ -795,7 +781,7 @@ function openAdminLoginModal(){
 function ensureAuthTokenPrompt(){
   try{
     const k="tgx_admin_token"; let t=localStorage.getItem(k);
-    if(!t){ t = prompt("Pega tu AUTH_TOKEN de Netlify para crear/borrar/editar publicaciones y redes:"); if(t) localStorage.setItem(k, t.trim()); }
+    if(!t){ t = prompt("Pega tu AUTH_TOKEN de Netlify para crear/editar/borrar:"); if(t) localStorage.setItem(k, t.trim()); }
   }catch{}
 }
 function setupAdminButton(){
@@ -817,8 +803,8 @@ function setupAdminButton(){
 
 // ===================== INIT =====================
 async function initData(){
-  try{ const data = await apiList(); recientes = Array.isArray(data)?data:[];
-  } catch(e){ console.error("[initData posts]", e); recientes = []; }
+  try{ const data = await apiList(); recientes = Array.isArray(data)?data:[]; }
+  catch(e){ console.error("[initData posts]", e); recientes = []; }
 
   try{ socials = await socialsList(); }
   catch(e){ console.error("[initData socials]", e); socials = []; }
