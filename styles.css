@@ -542,3 +542,46 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   .tw-modal-content { max-width: 95%; padding: 16px; }
   .tw-modal-image { height: 180px; }
 }
+
+/* Carrusel por defecto: varias filas */
+.carousel {
+  --tile-w: 280px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  overflow-x: hidden;
+  align-content: flex-start;
+  padding-bottom: 8px;
+}
+.carousel .tile,
+.carousel .add-game-tile { flex: 0 0 var(--tile-w); width: var(--tile-w); }
+
+/* Modo desplazable (una fila con scroll horizontal) */
+.carousel.scrollable {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+.carousel.scrollable .tile,
+.carousel.scrollable .add-game-tile {
+  scroll-snap-align: start;
+}
+
+/* “+ Añadir” siempre visible (admin) */
+.add-game-tile {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  min-height: 148px;
+  border-radius: 14px;
+  border: 1px dashed var(--border-color, #364049);
+  background: color-mix(in srgb, var(--panel, #12161a) 85%, #000 15%);
+  box-shadow: 0 6px 20px rgba(0,0,0,.25) inset;
+}
+
+/* Las flechas solo se muestran cuando JS lo decide */
+.arrow.prev, .arrow.next { display: none; }
+
