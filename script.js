@@ -731,19 +731,29 @@ function setupSearch(){
 function setupArrows(){
   const prev = document.querySelector(".arrow.prev");
   const next = document.querySelector(".arrow.next");
-  const row = document.querySelector(`.carousel[data-row="recientes"]`);
+  const row  = document.querySelector(`.carousel[data-row="recientes"]`);
   if(!prev || !next || !row) return;
+
+  const recalc = ()=>{
+    // si hay overflow horizontal (por si en móviles no cabe ni con wrap)
+    const hasOverflow = row.scrollWidth > row.clientWidth + 2;
+    prev.style.display = hasOverflow ? "" : "none";
+    next.style.display = hasOverflow ? "" : "none";
+    if (!hasOverflow) row.scrollLeft = 0; // asegura que el “+” quede a la vista
+  };
+
   prev.addEventListener("click", ()=> row.scrollBy({ left: -400, behavior: "smooth" }));
-  next.addEventListener("click", ()=> row.scrollBy({ left: 400, behavior: "smooth" }));
+  next.addEventListener("click", ()=> row.scrollBy({ left:  400, behavior: "smooth" }));
+
+  // Recalcular en cambios de tamaño o cuando cambie el contenido
+  window.addEventListener("resize", recalc);
+  const ro = new ResizeObserver(recalc);
+  ro.observe(row);
+  new MutationObserver(recalc).observe(row, { childList: true });
+
+  recalc();
 }
-function setupKeyboardNav(){
-  const row = document.querySelector(`.carousel[data-row="recientes"]`);
-  if(!row) return;
-  row.addEventListener("keydown",(e)=>{
-    if(e.key==="ArrowRight") row.scrollBy({ left: 200, behavior: "smooth" });
-    if(e.key==="ArrowLeft")  row.scrollBy({ left: -200, behavior: "smooth" });
-  });
-}
+
 
 // ===================== ADMIN LOGIN =====================
 function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
@@ -877,6 +887,33 @@ function setupKeyboardNav(){
   });
 }
 
+function ensureSidebarChannelBadge(){
+  // intenta localizar el aside de la barra lateral
+  const rail = document.querySelector(".sidebar, .side-rail, aside[aria-label='Sidebar'], aside") || null;
+  if(!rail) return;
+
+  // Asegura que el aside sea posicionable para ubicar el badge abajo-izq
+  const cs = getComputedStyle(rail);
+  if (cs.position === "static") rail.style.position = "relative";
+
+  // Si no existe aún, lo creamos
+  let badge = rail.querySelector(".yt-channel-badge");
+  if(!badge){
+    badge = document.createElement("a");
+    badge.className = "yt-channel-badge";
+    badge.href = "https://youtube.com/@troghx?si=OPHs2OXddhMZwydR";     // <-- cámbialo
+    badge.target = "_blank";
+    badge.rel = "noopener";
+    badge.ariaLabel = "YouTube channel";
+    const img = document.createElement("img");
+    img.src = "assets/images/youtube-channel.png";     // <-- cámbialo
+    img.alt = "YouTube channel";
+    badge.appendChild(img);
+    rail.appendChild(badge);
+  }
+}
+
+
 // ===================== INIT =====================
 async function initData(){
   try{ const data = await apiList(); recientes = Array.isArray(data)?data:[]; }
@@ -893,4 +930,5 @@ async function initData(){
   renderHeroCarousel();
   renderSocialBar();
 }
+ensureSidebarChannelBadge();
 initData();
