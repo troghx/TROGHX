@@ -1,5 +1,6 @@
 // netlify/functions/posts.js
 import { neon } from "@neondatabase/serverless";
+import { randomUUID } from "node:crypto";
 
 const DB_URL =
   process.env.DATABASE_URL ||
@@ -26,6 +27,25 @@ const getIdFromPath = (path) => {
   const last = parts[parts.length - 1];
   return last && last !== "posts" ? last : null;
 };
+
+async function inferIdType() {
+  try {
+    const rows = await sql`
+      SELECT data_type, udt_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'posts' AND column_name = 'id'
+      LIMIT 1
+    `;
+    if (!rows.length) return { kind: "unknown" };
+    const { data_type, udt_name } = rows[0];
+    if (data_type === "uuid" || udt_name === "uuid") return { kind: "uuid" };
+    const numTypes = new Set(["integer", "bigint", "smallint", "numeric"]);
+    if (numTypes.has(data_type) || numTypes.has(udt_name)) return { kind: "number" };
+    return { kind: "unknown" };
+  } catch {
+    return { kind: "unknown" };
+  }
+}
 
 export async function handler(event) {
   // CORS preflight
@@ -94,17 +114,40 @@ export async function handler(event) {
       const pv = previewVideo ?? preview_video ?? null;
 
       try {
+        // Intento normal (si id tiene default/identity)
         const rows =
           await sql`INSERT INTO posts (title, image, description, preview_video)
                     VALUES (${title}, ${image}, ${description}, ${pv})
                     RETURNING id`;
         return json(200, { ok: true, id: rows[0].id });
       } catch (e) {
-        console.error("[posts/POST] insert error:", e);
-        return json(500, {
-          error: "Insert failed",
-          hint: String(e?.message || e),
-        });
+        const msg = String(e?.message || e || "");
+        // Si falla por "id NOT NULL", reintentar generando id
+        if (/null value in column "id".*violates not-null constraint/i.test(msg)) {
+          try {
+            const idType = await inferIdType();
+            if (idType.kind === "uuid") {
+              const newId = randomUUID();
+              const rows2 =
+                await sql`INSERT INTO posts (id, title, image, description, preview_video)
+                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv})
+                          RETURNING id`;
+              return json(200, { ok: true, id: rows2[0].id });
+            } else {
+              const seq =
+                await sql`SELECT COALESCE(MAX(id),0)+1 AS next_id FROM posts`;
+              const newId = seq?.[0]?.next_id || 1;
+              const rows2 =
+                await sql`INSERT INTO posts (id, title, image, description, preview_video)
+                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv})
+                          RETURNING id`;
+              return json(200, { ok: true, id: rows2[0].id });
+            }
+          } catch (e2) {
+            return json(500, { error: "Insert retry failed", hint: String(e2?.message || e2) });
+          }
+        }
+        return json(500, { error: "Insert failed", hint: msg });
       }
     }
 
@@ -139,11 +182,7 @@ export async function handler(event) {
                   WHERE id=${id}`;
         return json(200, { ok: true, id });
       } catch (e) {
-        console.error("[posts/PUT] update error:", e);
-        return json(500, {
-          error: "Update failed",
-          hint: String(e?.message || e),
-        });
+        return json(500, { error: "Update failed", hint: String(e?.message || e) });
       }
     }
 
@@ -155,14 +194,12 @@ export async function handler(event) {
         await sql`DELETE FROM posts WHERE id = ${id}`;
         return json(200, { ok: true });
       } catch (e) {
-        console.error("[posts/DELETE] delete error:", e);
         return json(500, { error: "Delete failed", hint: String(e?.message || e) });
       }
     }
 
     return json(405, { error: "Method not allowed" });
   } catch (err) {
-    console.error("[posts] error", err);
     return json(500, { error: "Internal Server Error", hint: String(err?.message || err) });
   }
 }
