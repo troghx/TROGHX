@@ -47,8 +47,16 @@ async function inferIdType() {
   }
 }
 
+function parseFeaturedRank(input) {
+  if (input === undefined || input === null || input === "") return null;
+  const n = parseInt(input, 10);
+  if (!Number.isFinite(n)) return null;
+  // acota de 1 a 5 (o sube si quieres más)
+  if (n < 1 || n > 5) return null;
+  return n;
+}
+
 export async function handler(event) {
-  // CORS preflight
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 204,
@@ -69,7 +77,7 @@ export async function handler(event) {
       const id = getIdFromPath(event.path);
       if (id) {
         const rows =
-          await sql`SELECT id, title, image, description, preview_video, created_at
+          await sql`SELECT id, title, image, description, preview_video, featured_rank, created_at
                     FROM posts WHERE id = ${id} LIMIT 1`;
         if (!rows.length) return json(404, { error: "Not found" });
         return json(200, rows[0]);
@@ -77,18 +85,29 @@ export async function handler(event) {
 
       const qp = event.queryStringParameters || {};
       const lite = qp.lite === "1" || qp.lite === "true";
+      const featuredOnly = qp.featured === "1" || qp.featured === "true";
       const limit = Math.min(Math.max(parseInt(qp.limit || "24", 10) || 24, 1), 100);
+
+      if (featuredOnly) {
+        const rows =
+          await sql`SELECT id, title, image, description, preview_video, featured_rank, created_at
+                    FROM posts
+                    WHERE featured_rank IS NOT NULL
+                    ORDER BY featured_rank ASC, created_at DESC
+                    LIMIT ${limit}`;
+        return json(200, rows);
+      }
 
       if (lite) {
         const rows =
-          await sql`SELECT id, title, image, description, created_at
+          await sql`SELECT id, title, image, description, featured_rank, created_at
                     FROM posts
                     ORDER BY created_at DESC
                     LIMIT ${limit}`;
         return json(200, rows);
       } else {
         const rows =
-          await sql`SELECT id, title, image, description, preview_video, created_at
+          await sql`SELECT id, title, image, description, preview_video, featured_rank, created_at
                     FROM posts
                     ORDER BY created_at DESC
                     LIMIT ${limit}`;
@@ -96,7 +115,7 @@ export async function handler(event) {
       }
     }
 
-    // ---------- Auth requerida para escritura
+    // ---------- Auth
     const auth = event.headers?.authorization || "";
     const token = auth.replace(/^Bearer\s+/i, "").trim();
     const envToken = process.env.AUTH_TOKEN || "";
@@ -107,30 +126,29 @@ export async function handler(event) {
     // ---------- POST /posts (crear)
     if (event.httpMethod === "POST") {
       const body = JSON.parse(event.body || "{}");
-      const { title, image, description, previewVideo, preview_video } = body;
+      const { title, image, description, previewVideo, preview_video, featured_rank } = body;
       if (!title || !image || !description) {
         return json(400, { error: "Missing fields" });
       }
       const pv = previewVideo ?? preview_video ?? null;
+      const fr = parseFeaturedRank(featured_rank);
 
       try {
-        // Intento normal (si id tiene default/identity)
         const rows =
-          await sql`INSERT INTO posts (title, image, description, preview_video)
-                    VALUES (${title}, ${image}, ${description}, ${pv})
+          await sql`INSERT INTO posts (title, image, description, preview_video, featured_rank)
+                    VALUES (${title}, ${image}, ${description}, ${pv}, ${fr})
                     RETURNING id`;
         return json(200, { ok: true, id: rows[0].id });
       } catch (e) {
         const msg = String(e?.message || e || "");
-        // Si falla por "id NOT NULL", reintentar generando id
         if (/null value in column "id".*violates not-null constraint/i.test(msg)) {
           try {
             const idType = await inferIdType();
             if (idType.kind === "uuid") {
               const newId = randomUUID();
               const rows2 =
-                await sql`INSERT INTO posts (id, title, image, description, preview_video)
-                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv})
+                await sql`INSERT INTO posts (id, title, image, description, preview_video, featured_rank)
+                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv}, ${fr})
                           RETURNING id`;
               return json(200, { ok: true, id: rows2[0].id });
             } else {
@@ -138,8 +156,8 @@ export async function handler(event) {
                 await sql`SELECT COALESCE(MAX(id),0)+1 AS next_id FROM posts`;
               const newId = seq?.[0]?.next_id || 1;
               const rows2 =
-                await sql`INSERT INTO posts (id, title, image, description, preview_video)
-                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv})
+                await sql`INSERT INTO posts (id, title, image, description, preview_video, featured_rank)
+                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv}, ${fr})
                           RETURNING id`;
               return json(200, { ok: true, id: rows2[0].id });
             }
@@ -159,7 +177,7 @@ export async function handler(event) {
       const body = JSON.parse(event.body || "{}");
 
       const curRows =
-        await sql`SELECT id, title, image, description, preview_video
+        await sql`SELECT id, title, image, description, preview_video, featured_rank
                   FROM posts WHERE id = ${id} LIMIT 1`;
       if (!curRows.length) return json(404, { error: "Not found" });
       const cur = curRows[0];
@@ -171,6 +189,9 @@ export async function handler(event) {
         preview_video: Object.prototype.hasOwnProperty.call(body, "previewVideo")
                         ? body.previewVideo
                         : (Object.prototype.hasOwnProperty.call(body, "preview_video") ? body.preview_video : cur.preview_video),
+        featured_rank: Object.prototype.hasOwnProperty.call(body, "featured_rank")
+                        ? parseFeaturedRank(body.featured_rank)
+                        : cur.featured_rank,
       };
 
       try {
@@ -178,7 +199,8 @@ export async function handler(event) {
                   SET title=${merged.title},
                       image=${merged.image},
                       description=${merged.description},
-                      preview_video=${merged.preview_video}
+                      preview_video=${merged.preview_video},
+                      featured_rank=${merged.featured_rank}
                   WHERE id=${id}`;
         return json(200, { ok: true, id });
       } catch (e) {
