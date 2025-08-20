@@ -729,31 +729,48 @@ function setupSearch(){
   });
 }
 function setupArrows(){
+  const row  = document.querySelector(`.carousel[data-row="recientes"]`);
   const prev = document.querySelector(".arrow.prev");
   const next = document.querySelector(".arrow.next");
-  const row  = document.querySelector(`.carousel[data-row="recientes"]`);
-  if(!prev || !next || !row) return;
+  if(!row || !prev || !next) return;
+
+  const SCROLL_THRESHOLD = 18;  // ← flechas si hay 18+ juegos
 
   const recalc = ()=>{
-    // si hay overflow horizontal (por si en móviles no cabe ni con wrap)
+    // ¿Cuántas tarjetas hay (excluyendo el "+ Añadir")?
+    const tiles = row.querySelectorAll(".tile");
+    const addTile = row.querySelector(".add-game-tile");
+    const count = tiles.length + (addTile ? 1 : 0);
+
+    // ¿Hay overflow horizontal real?
     const hasOverflow = row.scrollWidth > row.clientWidth + 2;
-    prev.style.display = hasOverflow ? "" : "none";
-    next.style.display = hasOverflow ? "" : "none";
-    if (!hasOverflow) row.scrollLeft = 0; // asegura que el “+” quede a la vista
+
+    // Si excede el umbral, activamos modo desplazable (una fila con scroll)
+    if (count >= SCROLL_THRESHOLD) {
+      row.classList.add("scrollable");
+    } else {
+      row.classList.remove("scrollable");
+    }
+
+    // Mostrar flechas si hay overflow real O si superamos el umbral
+    const showArrows = hasOverflow || count >= SCROLL_THRESHOLD;
+    prev.style.display = showArrows ? "" : "none";
+    next.style.display = showArrows ? "" : "none";
+
+    // Si no hay overflow y quitamos scrollable, nos aseguramos de ver el "+"
+    if (!showArrows) row.scrollLeft = 0;
   };
 
-  prev.addEventListener("click", ()=> row.scrollBy({ left: -400, behavior: "smooth" }));
-  next.addEventListener("click", ()=> row.scrollBy({ left:  400, behavior: "smooth" }));
+  prev.addEventListener("click", ()=> row.scrollBy({ left: -Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
+  next.addEventListener("click", ()=> row.scrollBy({ left:  Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
 
-  // Recalcular en cambios de tamaño o cuando cambie el contenido
+  // Recalcular cuando cambie el tamaño o el contenido
   window.addEventListener("resize", recalc);
-  const ro = new ResizeObserver(recalc);
-  ro.observe(row);
+  new ResizeObserver(recalc).observe(row);
   new MutationObserver(recalc).observe(row, { childList: true });
 
   recalc();
 }
-
 
 // ===================== ADMIN LOGIN =====================
 function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
