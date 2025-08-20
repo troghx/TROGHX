@@ -119,7 +119,7 @@ function trapFocus(modalNode){
   return () => modalNode.removeEventListener("keydown", onKey);
 }
 
-// Helpers
+// ====== Helpers de imagen y video ======
 function normalizeVideoUrl(u){
   if(!u) return "";
   u = u.trim();
@@ -135,6 +135,33 @@ function readAsDataURL(file){
     fr.onerror = ()=> reject(new Error("No se pudo leer el archivo"));
     fr.readAsDataURL(file);
   });
+}
+function dataUrlBytes(dataUrl){
+  // estima tamaño de base64 en bytes
+  const i = dataUrl.indexOf(","); if(i === -1) return dataUrl.length;
+  const b64 = dataUrl.slice(i+1);
+  return Math.floor((b64.length * 3) / 4);
+}
+async function compressImage(file, {maxW=1280, maxH=1280, quality=0.82} = {}){
+  const blobUrl = URL.createObjectURL(file);
+  const img = await new Promise((res, rej)=>{
+    const im = new Image();
+    im.onload = ()=> res(im);
+    im.onerror = ()=> rej(new Error("No se pudo cargar la imagen"));
+    im.src = blobUrl;
+  });
+  let { width: w, height: h } = img;
+  const ratio = Math.min(maxW / w, maxH / h, 1);
+  const nw = Math.round(w * ratio);
+  const nh = Math.round(h * ratio);
+  const canvas = document.createElement("canvas");
+  canvas.width = nw; canvas.height = nh;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, nw, nh);
+  // exporta como JPEG para reducir más; si necesitas transparencia, cambia a image/webp (siempre pierde alfa en jpeg)
+  const out = canvas.toDataURL("image/jpeg", quality);
+  URL.revokeObjectURL(blobUrl);
+  return out;
 }
 
 // ====== Plataformas (chips/link + iconos + badge) ======
@@ -199,12 +226,11 @@ function platformIconSVG(plat){
   }
 }
 
-// ===================== RICH EDITOR (añade alineación) =====================
+// ===================== RICH EDITOR (alineación) =====================
 function initRichEditor(editorRoot){
   const editorArea = editorRoot.querySelector(".editor-area");
   const toolbar = editorRoot.querySelector(".rich-toolbar");
 
-  // botones de alineación si no existen
   if (!toolbar.querySelector(".rtb-align")) {
     const group = document.createElement("div");
     group.className = "rtb-group";
@@ -293,7 +319,7 @@ function renderRow(){
     preload(g.image);
     title.textContent = g.title || "";
 
-    // Hover video (carga on demand)
+    // Hover video
     if (vid) {
       let loaded = false;
       vid.poster = g.image;
@@ -443,22 +469,17 @@ function openEditGame(original){
   const imageInput = modal.querySelector(".new-game-image-file");
   const trailerFileInput = modal.querySelector(".new-game-trailer-file");
   const trailerUrlInput = modal.querySelector(".new-game-trailer-url");
-  const downloadInput  = modal.querySelector(".new-game-download"); // puede no existir
   const modalClose = modal.querySelector(".tw-modal-close");
 
-  // Editor enriquecido
   const editorRoot = modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
 
-  // Prellenar (con checks por si el input no existe en tu template)
   if (titleInput) titleInput.value = original.title || "";
   editorAPI.setHTML(original.description || "");
   if (trailerUrlInput) trailerUrlInput.value = original.previewVideo || original.preview_video || "";
-  if (downloadInput)   downloadInput.value   = original.downloadUrl || "";
 
   if (imageInput) imageInput.required = false;
 
-  // Checkbox "quitar trailer" (solo si existe el grupo de trailer URL)
   let clearTrailerCb = null;
   if (trailerUrlInput) {
     const trailerGroup = trailerUrlInput.closest("label")?.parentElement || form;
@@ -490,8 +511,8 @@ function openEditGame(original){
     const patch = { title, description: descHTML };
 
     if (imageFile) {
-      try { patch.image = await readAsDataURL(imageFile); }
-      catch { alert("No se pudo leer la portada."); return; }
+      try { patch.image = await compressImage(imageFile); }
+      catch { alert("No se pudo leer/compactar la portada."); return; }
     }
 
     if (clearTrailerCb?.checked) {
@@ -533,7 +554,6 @@ function openNewGameModal(){
   const trailerUrlInput = modal.querySelector(".new-game-trailer-url");
   const modalClose = modal.querySelector(".tw-modal-close");
 
-  // WYSIWYG
   const editorRoot = modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
 
@@ -554,6 +574,12 @@ function openNewGameModal(){
     if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
+    // 1) Comprimir portada
+    let coverDataUrl;
+    try { coverDataUrl = await compressImage(imageFile, { maxW: 1280, maxH: 1280, quality: 0.82 }); }
+    catch { alert("No se pudo leer/compactar la portada."); return; }
+
+    // 2) Trailer (opcional)
     let previewSrc = null;
     if (trailerUrl) {
       if (!/\.(mp4|webm)(\?.*)?$/i.test(trailerUrl)) { alert("El trailer por URL debe ser .mp4/.webm directo."); return; }
@@ -564,9 +590,13 @@ function openNewGameModal(){
       try { previewSrc = await readAsDataURL(trailerFile); } catch { alert("No se pudo leer el trailer."); return; }
     }
 
-    let coverDataUrl = null;
-    try { coverDataUrl = await readAsDataURL(imageFile); }
-    catch { alert("No se pudo leer la portada."); return; }
+    // (Opcional) avisa si el dataURL de portada sigue muy grande (>5.5MB)
+    const approxBytes = dataUrlBytes(coverDataUrl);
+    if (approxBytes > 5.5 * 1024 * 1024) {
+      if (!confirm("La portada sigue pesando bastante (~" + (approxBytes/1024/1024).toFixed(2) + " MB). ¿Enviar de todos modos?")) {
+        return;
+      }
+    }
 
     const token = localStorage.getItem("tgx_admin_token") || "";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
@@ -587,7 +617,7 @@ function openNewGameModal(){
       alert("¡Juego añadido!");
     }catch(err){
       console.error("[create error]", err);
-      alert("Error al guardar. Revisa consola.");
+      alert("Error al guardar. Revisa consola (el backend ahora devuelve 'hint').");
     }
   });
 
@@ -802,6 +832,48 @@ function setupAdminButton(){
     } else {
       openAdminLoginModal();
     }
+  });
+}
+
+// ===================== SEARCH / ARROWS / KEYBOARD =====================
+function setupSearch(){
+  const input = document.getElementById("searchInput");
+  if(!input) return;
+  input.addEventListener("input", ()=>{
+    const q = input.value.toLowerCase();
+    const filtered = recientes.filter(g =>
+      (g.title||"").toLowerCase().includes(q) ||
+      (g.description||"").toLowerCase().includes(q)
+    );
+    const container = document.querySelector(`.carousel[data-row="recientes"]`);
+    if(!container) return;
+    container.innerHTML = "";
+    filtered.forEach((g)=>{
+      const node = template.content.cloneNode(true);
+      const tile = node.querySelector(".tile");
+      const cover = node.querySelector(".cover");
+      const title = node.querySelector(".title");
+      cover.style.backgroundImage = `url(${g.image})`;
+      title.textContent = g.title;
+      tile.addEventListener("click", ()=>openGame(g));
+      container.appendChild(node);
+    });
+  });
+}
+function setupArrows(){
+  const prev = document.querySelector(".arrow.prev");
+  const next = document.querySelector(".arrow.next");
+  const row = document.querySelector(`.carousel[data-row="recientes"]`);
+  if(!prev || !next || !row) return;
+  prev.addEventListener("click", ()=> row.scrollBy({ left: -400, behavior: "smooth" }));
+  next.addEventListener("click", ()=> row.scrollBy({ left: 400, behavior: "smooth" }));
+}
+function setupKeyboardNav(){
+  const row = document.querySelector(`.carousel[data-row="recientes"]`);
+  if(!row) return;
+  row.addEventListener("keydown",(e)=>{
+    if(e.key==="ArrowRight") row.scrollBy({ left: 200, behavior: "smooth" });
+    if(e.key==="ArrowLeft")  row.scrollBy({ left: -200, behavior: "smooth" });
   });
 }
 
