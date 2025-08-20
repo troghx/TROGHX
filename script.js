@@ -535,7 +535,7 @@ function openEditGame(original){
   const imageInput = modal.querySelector(".new-game-image-file");
   const trailerFileInput = modal.querySelector(".new-game-trailer-file");
   const trailerUrlInput = modal.querySelector(".new-game-trailer-url");
-  const modalClose = modal.querySelector(".tw-modal-close");
+  const modalClose = modal.querySelector(".tw-modal-close"); // ← se declara aquí UNA sola vez
 
   const editorRoot = modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
@@ -546,7 +546,7 @@ function openEditGame(original){
 
   if (imageInput) imageInput.required = false;
 
-  // Estrellita (solo edición)
+  // Estrellita (destacado)
   const featureBtn = makeFeatureToggle(Number.isFinite(original.featured_rank));
   form.querySelector(".new-game-title")?.parentElement?.appendChild(featureBtn);
 
@@ -554,12 +554,15 @@ function openEditGame(original){
   const catSel = makeCategorySelect(original.category || "game");
   form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
 
+  // Checkbox para quitar trailer
   let clearTrailerCb = null;
   if (trailerUrlInput) {
     const trailerGroup = trailerUrlInput.closest("label")?.parentElement || form;
     const clearWrap = document.createElement("label");
-    clearWrap.style.display = "inline-flex"; clearWrap.style.alignItems = "center";
-    clearWrap.style.gap = ".4rem"; clearWrap.style.margin = ".4rem 0 0";
+    clearWrap.style.display = "inline-flex";
+    clearWrap.style.alignItems = "center";
+    clearWrap.style.gap = ".4rem";
+    clearWrap.style.margin = ".4rem 0 0";
     clearWrap.innerHTML = `<input type="checkbox" class="clear-trailer"> Quitar trailer`;
     trailerGroup.appendChild(clearWrap);
     clearTrailerCb = clearWrap.querySelector(".clear-trailer");
@@ -602,23 +605,23 @@ function openEditGame(original){
       catch { alert("No se pudo leer el trailer."); return; }
     }
 
-    // featured_rank a partir de estrellita
+    // featured_rank con estrellita
     const wasFeatured = Number.isFinite(original.featured_rank);
     if (wantFeatured && !wasFeatured) {
       const maxRank = getFeatured(recientes).reduce((m,p)=>Math.max(m, p.featured_rank||0), 0);
       patch.featured_rank = maxRank + 1;
     } else if (!wantFeatured && wasFeatured) {
       patch.featured_rank = null;
-    } // si estaba y sigue, no tocamos
+    }
 
     const token = localStorage.getItem("tgx_admin_token") || "";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
     try{
       await apiUpdate(original.id, patch, token);
-      const data = await apiList(); // recarga lista
+      const data = await apiList(); // recarga
       recientes = Array.isArray(data)?data:[];
-      // Mover editado al principio (UI)
+      // Mover editado al principio
       const idx = recientes.findIndex(p=>p.id===original.id);
       if (idx > 0) { const [item] = recientes.splice(idx,1); recientes.unshift(item); }
       closeModal(node, removeTrap, onEscape);
@@ -627,7 +630,7 @@ function openEditGame(original){
     }catch(err){ console.error(err); alert("Error al actualizar. Revisa consola."); }
   });
 
-  const modalClose = modal.querySelector(".tw-modal-close");
+  // ⚠️ SOLO usar la variable existente (no volver a declararla)
   modalClose.addEventListener("click",()=> closeModal(node, removeTrap, onEscape));
   openModalFragment(node);
 }
