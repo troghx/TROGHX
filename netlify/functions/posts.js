@@ -28,28 +28,28 @@ const getIdFromPath = (path) => {
 };
 
 export async function handler(event) {
-  try {
-    // Preflight
-    if (event.httpMethod === "OPTIONS") {
-      return {
-        statusCode: 204,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-        },
-        body: "",
-      };
-    }
+  // CORS preflight
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+      },
+      body: "",
+    };
+  }
 
+  try {
     if (!sql) return json(500, { error: "DB not configured" });
 
-    // ---------- GET /posts or /posts/:id
+    // ---------- GET /posts ó /posts/:id
     if (event.httpMethod === "GET") {
       const id = getIdFromPath(event.path);
       if (id) {
         const rows =
-          await sql`SELECT id, title, image, description, preview_video, download_url, created_at
+          await sql`SELECT id, title, image, description, preview_video, created_at
                     FROM posts WHERE id = ${id} LIMIT 1`;
         if (!rows.length) return json(404, { error: "Not found" });
         return json(200, rows[0]);
@@ -60,16 +60,15 @@ export async function handler(event) {
       const limit = Math.min(Math.max(parseInt(qp.limit || "24", 10) || 24, 1), 100);
 
       if (lite) {
-        // Sin preview_video (ligero)
         const rows =
-          await sql`SELECT id, title, image, description, download_url, created_at
+          await sql`SELECT id, title, image, description, created_at
                     FROM posts
                     ORDER BY created_at DESC
                     LIMIT ${limit}`;
         return json(200, rows);
       } else {
         const rows =
-          await sql`SELECT id, title, image, description, preview_video, download_url, created_at
+          await sql`SELECT id, title, image, description, preview_video, created_at
                     FROM posts
                     ORDER BY created_at DESC
                     LIMIT ${limit}`;
@@ -77,7 +76,7 @@ export async function handler(event) {
       }
     }
 
-    // ---------- Auth para escritura
+    // ---------- Auth requerida para escritura
     const auth = event.headers?.authorization || "";
     const token = auth.replace(/^Bearer\s+/i, "").trim();
     const envToken = process.env.AUTH_TOKEN || "";
@@ -88,18 +87,25 @@ export async function handler(event) {
     // ---------- POST /posts (crear)
     if (event.httpMethod === "POST") {
       const body = JSON.parse(event.body || "{}");
-      const { title, image, description, previewVideo, preview_video, downloadUrl } = body;
+      const { title, image, description, previewVideo, preview_video } = body;
       if (!title || !image || !description) {
         return json(400, { error: "Missing fields" });
       }
       const pv = previewVideo ?? preview_video ?? null;
 
-      const rows =
-        await sql`INSERT INTO posts (title, image, description, preview_video, download_url)
-                  VALUES (${title}, ${image}, ${description}, ${pv}, ${downloadUrl || null})
-                  RETURNING id`;
-
-      return json(200, { ok: true, id: rows[0].id });
+      try {
+        const rows =
+          await sql`INSERT INTO posts (title, image, description, preview_video)
+                    VALUES (${title}, ${image}, ${description}, ${pv})
+                    RETURNING id`;
+        return json(200, { ok: true, id: rows[0].id });
+      } catch (e) {
+        console.error("[posts/POST] insert error:", e);
+        return json(500, {
+          error: "Insert failed",
+          hint: String(e?.message || e),
+        });
+      }
     }
 
     // ---------- PUT/PATCH /posts/:id (editar)
@@ -110,7 +116,7 @@ export async function handler(event) {
       const body = JSON.parse(event.body || "{}");
 
       const curRows =
-        await sql`SELECT id, title, image, description, preview_video, download_url
+        await sql`SELECT id, title, image, description, preview_video
                   FROM posts WHERE id = ${id} LIMIT 1`;
       if (!curRows.length) return json(404, { error: "Not found" });
       const cur = curRows[0];
@@ -122,31 +128,41 @@ export async function handler(event) {
         preview_video: Object.prototype.hasOwnProperty.call(body, "previewVideo")
                         ? body.previewVideo
                         : (Object.prototype.hasOwnProperty.call(body, "preview_video") ? body.preview_video : cur.preview_video),
-        download_url:  Object.prototype.hasOwnProperty.call(body, "downloadUrl")  ? body.downloadUrl  : cur.download_url,
       };
 
-      await sql`UPDATE posts
-                SET title=${merged.title},
-                    image=${merged.image},
-                    description=${merged.description},
-                    preview_video=${merged.preview_video},
-                    download_url=${merged.download_url}
-                WHERE id=${id}`;
-
-      return json(200, { ok: true, id });
+      try {
+        await sql`UPDATE posts
+                  SET title=${merged.title},
+                      image=${merged.image},
+                      description=${merged.description},
+                      preview_video=${merged.preview_video}
+                  WHERE id=${id}`;
+        return json(200, { ok: true, id });
+      } catch (e) {
+        console.error("[posts/PUT] update error:", e);
+        return json(500, {
+          error: "Update failed",
+          hint: String(e?.message || e),
+        });
+      }
     }
 
     // ---------- DELETE /posts/:id
     if (event.httpMethod === "DELETE") {
       const id = getIdFromPath(event.path);
       if (!id) return json(400, { error: "Missing id" });
-      await sql`DELETE FROM posts WHERE id = ${id}`;
-      return json(200, { ok: true });
+      try {
+        await sql`DELETE FROM posts WHERE id = ${id}`;
+        return json(200, { ok: true });
+      } catch (e) {
+        console.error("[posts/DELETE] delete error:", e);
+        return json(500, { error: "Delete failed", hint: String(e?.message || e) });
+      }
     }
 
     return json(405, { error: "Method not allowed" });
   } catch (err) {
     console.error("[posts] error", err);
-    return json(500, { error: "Internal Server Error" });
+    return json(500, { error: "Internal Server Error", hint: String(err?.message || err) });
   }
 }
