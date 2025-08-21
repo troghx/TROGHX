@@ -525,7 +525,7 @@ function openEditGame(original){
       const data = await apiList();
       recientes = Array.isArray(data)?data:[];
       const idx = recientes.findIndex(p=>p.id===original.id);
-      if (idx > 0) { const [item] = recientes.splice(idx,1); recientes.unshift(item); }
+      if (idx >= 0) { const [item] = recientes.splice(idx,1); recientes.unshift(item); }
       closeModal(node, removeTrap, onEscape);
       renderRow(); renderHeroCarousel();
       alert("¡Publicación actualizada!");
@@ -870,7 +870,10 @@ function setupAdminButton(){
   const adminBtn = document.querySelector(".user-pill");
   if(!adminBtn) return;
   adminBtn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
-  adminBtn.addEventListener("click", ()=>{
+  // Remove previous event listeners by cloning
+  const newBtn = adminBtn.cloneNode(true);
+  adminBtn.parentNode.replaceChild(newBtn, adminBtn);
+  newBtn.addEventListener("click", ()=>{
     if(isAdmin){
       if(confirm("¿Cerrar sesión de administrador?")){
         isAdmin = false; persistAdmin(false);
