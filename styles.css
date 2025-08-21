@@ -14,7 +14,13 @@
 }
 
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+html, body {
+  height: 100vh;
+  overflow: hidden;
+}
+@supports (height: 100dvh) {
+  body { height: 100dvh; }
+}
 
 body {
   margin: 0;
@@ -47,7 +53,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .main {
   margin-left: 76px;
   padding: 18px clamp(16px,4vw,28px);
-  display: flex; flex-direction: column; gap: 24px;
+  display: flex; flex-direction: column; gap: 24px; height: 100%;
 }
 
 /* ---------- Topbar ---------- */
@@ -133,7 +139,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 }
 .hero {
   position: relative; overflow: hidden; display: grid;
-  grid-template-columns: 1.1fr .9fr; gap: 10px; min-height: 240px;
+  grid-template-columns: 1.1fr .9fr; gap: 10px; min-height: 240px; flex: 0 0 auto;
 }
 .hero-copy { padding: 22px; }
 .hero-copy h1 { margin: 0 0 8px; font-size: 1.6rem; }
@@ -252,7 +258,8 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .new-game-form textarea { min-height: 100px; resize: vertical; }
 
 /* ---------- Filas y carruseles ---------- */
-.row { display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; overflow: hidden; }
+.section-recientes, .rows, .rows-wrap { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .row-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
 .row-head h2 { margin: 0; font-size: 1.1rem; }
 .row-controls { display: flex; gap: 8px; }
@@ -267,7 +274,8 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  overflow-x: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   align-content: flex-start;
   padding-bottom: 8px;
   scroll-snap-type: x mandatory;
@@ -536,38 +544,10 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   .tw-modal-image { height: 180px; }
 }
 
-/* Carrusel por defecto: varias filas */
-.carousel {
-  --tile-w: 280px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  overflow-x: hidden;
-  align-content: flex-start;
-}
-/* Carrusel por defecto: varias filas */
-/* (merged with main .carousel definition above) */
 .carousel.scrollable .tile,
 .carousel.scrollable .add-game-tile {
   scroll-snap-align: start;
 }
-
-/* “+ Añadir” siempre visible (admin) */
-.add-game-tile {
-  position: sticky;
-  left: 0;
-  z-index: 3;
-  display: grid;
-  place-content: center;
-  min-height: 148px;
-  border-radius: 14px;
-  border: 1px dashed var(--border-color, #364049);
-  background: color-mix(in srgb, var(--panel, #12161a) 85%, #000 15%);
-  box-shadow: 0 6px 20px rgba(0,0,0,.25) inset;
-}
-
-/* Las flechas solo se muestran cuando JS lo decide */
-.arrow.prev, .arrow.next { display: none; }
 
 /* Hero compacto */
 .hero { --hero-h: 260px; } /* ajusta a tu gusto */
@@ -637,66 +617,8 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   min-height: auto;
 }
 .hero.hero--simple .hero-art{ display:none; }
-.hero.hero--simple .hero-copy{
-  display:flex; flex-direction:column; align-items:center; text-align:center;
+.hero.hero--simple .hero-copy{ 
+  display:flex; flex-direction:column; align-items:center; text-align:center; 
 }
 .hero.hero--simple .hero-copy h1{ font-size:1.5rem; }
 .hero.hero--simple .socials{ margin-top:12px; }
-
-/* Bloquea el scroll de toda la página */
-html, body {
-  height: 100%;
-  overflow: hidden;         /* sin scroll vertical ni horizontal global */
-}
-
-/* Para que los contenedores se ajusten al alto de la ventana */
-@supports (height: 100dvh) {
-  body { height: 100dvh; }
-}
-
-/* Asegura que el “main” no intente crecer más que la ventana */
-main, .main, .page, .app, .content {
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* Hero arriba, carrusel ocupa el espacio restante */
-html, body {
-  height: 100%;
-  overflow: hidden;         /* sin scroll vertical ni horizontal global */
-}
-
-/* Para que los contenedores se ajusten al alto de la ventana */
-@supports (height: 100dvh) {
-  body { height: 100dvh; }
-}
-
-/* Asegura que el “main” no intente crecer más que la ventana */
-main, .main, .page, .app, .content {
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* Hero arriba, carrusel ocupa el espacio restante */
-.hero { flex: 0 0 auto; }
-.section-recientes, .rows, .rows-wrap {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* El carrusel sí puede desplazarse en horizontal */
-.carousel {
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
-}
-.carousel[data-row="recientes"] .tile-video{
-  height: 100%;
-}
