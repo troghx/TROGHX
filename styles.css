@@ -651,3 +651,16 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 }
 .add-social-tile:hover { transform: translateY(-1px); }
 
+/* --- Hero simple: solo leyenda + redes --- */
+.hero.hero--simple{
+  grid-template-columns: 1fr;
+  min-height: auto;
+}
+.hero.hero--simple .hero-art{ display:none; }
+.hero.hero--simple .hero-copy{
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+}
+.hero.hero--simple .hero-copy h1{ font-size:1.5rem; }
+.hero.hero--simple .socials{ margin-top:12px; }
+
+
