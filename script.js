@@ -431,8 +431,7 @@ async function renderHeroCarousel(){
   const getActiveIndex = ()=> Array.from(heroCarousel.querySelectorAll("img")).findIndex(im=>im.classList.contains("active"));
   setActive(0);
   heroArt.addEventListener("click", ()=>{ const i=getActiveIndex(); openGame(source[i>=0?i:0]); });
-  heroArt.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); const i=getActiveIndex(); openGame(source[i>=0?i:0]); }});
-}
+heroArt.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); const i=getActiveIndex(); openGame(source[i>=0?i:0]); }});
 
 /* === MODAL VER === */
 function openGame(game){
