@@ -755,6 +755,10 @@ function setupArrows(){
   prev.addEventListener("click", ()=> row.scrollBy({ left: -Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
   next.addEventListener("click", ()=> row.scrollBy({ left:  Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
 
+  ["wheel", "touchmove"].forEach(evt => {
+    row.addEventListener(evt, e => e.preventDefault(), { passive: false });
+  });
+
   window.addEventListener("resize", recalc);
   new ResizeObserver(recalc).observe(row);
   new MutationObserver(recalc).observe(row, { childList: true });
@@ -765,8 +769,8 @@ function setupKeyboardNav(){
   const row = document.querySelector(`.carousel[data-row="recientes"]`);
   if(!row) return;
   row.addEventListener("keydown",(e)=>{
-    if(e.key==="ArrowRight") row.scrollBy({ left: 200, behavior: "smooth" });
-    if(e.key==="ArrowLeft")  row.scrollBy({ left: -200, behavior: "smooth" });
+    if(e.key==="ArrowRight"){ e.preventDefault(); row.scrollBy({ left: 200, behavior: "smooth" }); }
+    if(e.key==="ArrowLeft") { e.preventDefault(); row.scrollBy({ left: -200, behavior: "smooth" }); }
   });
 }
 
