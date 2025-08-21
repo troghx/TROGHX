@@ -663,4 +663,39 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .hero.hero--simple .hero-copy h1{ font-size:1.5rem; }
 .hero.hero--simple .socials{ margin-top:12px; }
 
+/* Bloquea el scroll de toda la página */
+html, body {
+  height: 100%;
+  overflow: hidden;         /* sin scroll vertical ni horizontal global */
+}
+
+/* Para que los contenedores se ajusten al alto de la ventana */
+@supports (height: 100dvh) {
+  body { height: 100dvh; }
+}
+
+/* Asegura que el “main” no intente crecer más que la ventana */
+main, .main, .page, .app, .content {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Hero arriba, carrusel ocupa el espacio restante */
+.hero { flex: 0 0 auto; }
+.section-recientes, .rows, .rows-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* El carrusel sí puede desplazarse en horizontal */
+.carousel {
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+}
+
 
