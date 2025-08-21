@@ -580,26 +580,6 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   background-position: center;
 }
 
-/* Etiqueta 'Destacados' */
-.hero-art .hero-label {
-  position: absolute;
-  top: 10px;
-  left: 12px;
-  padding: 6px 10px;
-  font-size: 12px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  border-radius: 999px;
-  backdrop-filter: blur(6px);
-  background: rgba(15, 18, 22, .55);
-  border: 1px solid rgba(255,255,255,.08);
-  color: #e7eef7;
-  pointer-events: none;
-  user-select: none;
-  opacity: .95;
-  font-weight: 600;
-}
-
 /* Etiqueta DESTACADOS con degradado magenta→azul y botón limpiar */
 .hero-art .hero-label {
   position: absolute;
@@ -684,6 +664,26 @@ main, .main, .page, .app, .content {
 }
 
 /* Hero arriba, carrusel ocupa el espacio restante */
+html, body {
+  height: 100%;
+  overflow: hidden;         /* sin scroll vertical ni horizontal global */
+}
+
+/* Para que los contenedores se ajusten al alto de la ventana */
+@supports (height: 100dvh) {
+  body { height: 100dvh; }
+}
+
+/* Asegura que el “main” no intente crecer más que la ventana */
+main, .main, .page, .app, .content {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Hero arriba, carrusel ocupa el espacio restante */
 .hero { flex: 0 0 auto; }
 .section-recientes, .rows, .rows-wrap {
   flex: 1 1 auto;
@@ -697,50 +697,6 @@ main, .main, .page, .app, .content {
   overflow-y: hidden;
   white-space: nowrap;
 }
-
-/* La página sin scroll global (como ya lo pusimos) */
-html, body { height: 100%; overflow: hidden; }
-@supports (height: 100dvh) { body { height: 100dvh; } }
-
-main, .main, .page, .app, .content {
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* El hero no consume el alto entero; el bloque de filas ocupa el resto */
-.hero { flex: 0 0 auto; }
-.section-recientes { flex: 1 1 auto; min-height: 0; overflow: hidden; }
-
-/* El carrusel solo scrollea en horizontal */
-.carousel {
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
-}
-
-/* ------- Ajuste responsivo de tarjetas con variable --tile-h ------- */
-.carousel[data-row="recientes"]{
-  --tile-h: 180px;               /* valor por defecto; JS lo recalcula */
-  padding-bottom: 12px;
-}
-
-.carousel[data-row="recientes"] .tile,
-.carousel[data-row="recientes"] .add-game-tile{
-  height: var(--tile-h);
-  width: calc(var(--tile-h) * 16 / 9);  /* mantén 16:9 */
-  flex: 0 0 auto;
-}
-
-.carousel[data-row="recientes"] .cover{ 
-  height: 100%;
-  background-size: cover;
-  background-position: center;
-}
-
 .carousel[data-row="recientes"] .tile-video{
   height: 100%;
 }
-
