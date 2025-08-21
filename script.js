@@ -733,6 +733,7 @@ function setupArrows(){
   const SCROLL_THRESHOLD = 18;
 
   const recalc = ()=>{
+    fitRecientesRow();
     const tiles = row.querySelectorAll(".tile");
     const addTile = row.querySelector(".add-game-tile");
     const count = tiles.length + (addTile ? 1 : 0);
@@ -768,6 +769,29 @@ function setupKeyboardNav(){
     if(e.key==="ArrowLeft")  row.scrollBy({ left: -200, behavior: "smooth" });
   });
 }
+
+// Ajusta la altura de las tarjetas al alto visible (sin scroll global)
+function fitRecientesRow(){
+  const row = document.querySelector('.carousel[data-row="recientes"]');
+  if(!row) return;
+
+  const section = row.closest('.section-recientes') || row.parentElement;
+  const sectionTop = section ? section.getBoundingClientRect().top : 0;
+
+  // Si tienes un título de sección, resta su altura
+  const titleEl = section?.querySelector('.section-title') || document.querySelector('.recientes-title');
+  const titleH = titleEl ? titleEl.getBoundingClientRect().height : 0;
+
+  const bottomPad = 20;                 // margen inferior visual
+  const available = window.innerHeight - sectionTop - bottomPad;
+
+  // Altura final de tarjeta (clamp para que no se haga enorme/mini)
+  let tileH = Math.floor(available - titleH - 24);
+  tileH = Math.max(120, Math.min(tileH, 220));
+
+  row.style.setProperty('--tile-h', `${tileH}px`);
+}
+
 
 /* === ADMIN LOGIN === */
 function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
@@ -889,8 +913,13 @@ function setupCategoryNav(){
     currentCategory = cat;
     [btnGames, btnApps, btnMovies].forEach(b=>{
       if(!b) return;
-      b.classList.toggle("active", (b===btnGames && cat==="game") || (b===btnApps && cat==="app") || (b===btnMovies && cat==="movie"));
+      b.classList.toggle("active", 
+        (b === btnGames && cat === "game") ||
+        (b === btnApps && cat === "app") ||
+        (b === btnMovies && cat === "movie")
+      );
     });
+    // Await reloadData to ensure UI updates after data is loaded
     reloadData();
   }
 
@@ -899,11 +928,22 @@ function setupCategoryNav(){
   if(btnMovies)btnMovies.addEventListener("click", ()=> setActive("movie"));
 }
 
+// Evita scroll global; permite scroll horizontal en .carousel
+window.addEventListener('wheel', (e) => {
+  if (!e.target.closest('.carousel')) e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('keydown', (e) => {
+  const keys = ['ArrowDown','ArrowUp','PageDown','PageUp','Home','End',' '];
+  if (keys.includes(e.key) && !e.target.closest('.carousel')) e.preventDefault();
+}, { passive: false });
+
+
 /* === INIT / RELOAD === */
 async function reloadData(){
   try{ const data = await apiList(currentCategory); recientes = Array.isArray(data)?data:[]; }
   catch(e){ console.error("[reload posts]", e); recientes = []; }
-  renderRow(); setupArrows(); renderHeroCarousel();
+  renderRow(); fitRecientesRow(); setupArrows(); renderHeroCarousel();
 }
 
 async function initData(){
