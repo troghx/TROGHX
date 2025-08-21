@@ -698,4 +698,49 @@ main, .main, .page, .app, .content {
   white-space: nowrap;
 }
 
+/* La página sin scroll global (como ya lo pusimos) */
+html, body { height: 100%; overflow: hidden; }
+@supports (height: 100dvh) { body { height: 100dvh; } }
+
+main, .main, .page, .app, .content {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* El hero no consume el alto entero; el bloque de filas ocupa el resto */
+.hero { flex: 0 0 auto; }
+.section-recientes { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+
+/* El carrusel solo scrollea en horizontal */
+.carousel {
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+}
+
+/* ------- Ajuste responsivo de tarjetas con variable --tile-h ------- */
+.carousel[data-row="recientes"]{
+  --tile-h: 180px;               /* valor por defecto; JS lo recalcula */
+  padding-bottom: 12px;
+}
+
+.carousel[data-row="recientes"] .tile,
+.carousel[data-row="recientes"] .add-game-tile{
+  height: var(--tile-h);
+  width: calc(var(--tile-h) * 16 / 9);  /* mantén 16:9 */
+  flex: 0 0 auto;
+}
+
+.carousel[data-row="recientes"] .cover{ 
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+}
+
+.carousel[data-row="recientes"] .tile-video{
+  height: 100%;
+}
 
