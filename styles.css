@@ -46,3 +46,18 @@
   object-fit: cover;
   z-index: 0; /* overlay = 1; info = 2 */
 }
+
+/* === Cursor personalizado para tarjetas clicables === */
+:root{
+  /* Ajusta los hot-spots: el par de números son (x, y) del “pico” de la flecha */
+  --cursor-hand: url("/assets/cursor/hand.cur") 10 2, /* principal */
+                 url("/assets/cursor/hand.png") 10 2, /* fallback */
+                 pointer;                            /* último recurso */
+}
+
+/* Aplica a las publicaciones/covers */
+.game-card, .post-card, .tile, .grid .card,
+.game-card a, .post-card a, .tile a {
+  cursor: var(--cursor-hand);
+}
+
