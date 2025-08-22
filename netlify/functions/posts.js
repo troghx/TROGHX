@@ -1,4 +1,3 @@
-// netlify/functions/posts.js
 import { neon, neonConfig } from "@neondatabase/serverless";
 
 neonConfig.fetchConnectionCache = true;
@@ -30,20 +29,24 @@ function bearer(event) {
   if (!env || token !== env) return { ok: false, res: json(401, { error: "Unauthorized" }) };
   return { ok: true };
 }
-function getIdFromPath(path) {
-  const parts = String(path).split("/").filter(Boolean);
+
+/** Toma id del path /.netlify/functions/posts/:id o de ?id= */
+function getId(event) {
+  const p = String(event.path || "");
+  const parts = p.split("/").filter(Boolean);
   const i = parts.lastIndexOf("posts");
-  const s = i >= 0 ? parts[i + 1] : null;
-  if (!s) return null;
-  // BIGINT en Neon acepta string, pero validamos que sea numérico
-  if (!/^\d+$/.test(s)) return null;
-  return s;
+  let id = i >= 0 ? parts[i + 1] : null;
+  if (!id) id = qs(event).id || null;
+  if (!id) return null;
+  // Limpia trailing slash y fragmentos raros
+  id = String(id).replace(/\/+$/,"").trim();
+  // Permite numérico grande; Neon acepta string para BIGINT
+  if (!/^\d+$/.test(id)) return null;
+  return id;
 }
-const CATS = new Set(["game", "app", "movie"]);
-function normCat(x) {
-  const v = String(x || "game").toLowerCase().trim();
-  return CATS.has(v) ? v : "game";
-}
+
+const CATS = new Set(["game","app","movie"]);
+const normCat = v => (CATS.has(String(v||"").toLowerCase()) ? String(v).toLowerCase() : "game");
 
 async function ensureSchema() {
   await sql`CREATE TABLE IF NOT EXISTS posts (
@@ -61,20 +64,18 @@ async function ensureSchema() {
   await sql`CREATE INDEX IF NOT EXISTS idx_posts_cat_created ON posts (category, created_at DESC)`;
 }
 
-function cacheHeaders(sec=60){
-  return { "Cache-Control": `public, max-age=${sec}, stale-while-revalidate=30` };
-}
+const cacheHdr = (sec=60)=>({"Cache-Control":`public, max-age=${sec}, stale-while-revalidate=30`});
 
-export async function handler(event) {
-  try {
+export async function handler(event){
+  try{
     if (event.httpMethod === "OPTIONS") return json(204, {});
     if (!sql) return json(500, { error: "DB not configured" });
 
     await ensureSchema();
 
-    /* ---------- LIST ---------- */
+    // LIST
     if (event.httpMethod === "GET" && event.path.endsWith("/posts")) {
-      try {
+      try{
         const p = qs(event);
         const limit = Math.min(Math.max(parseInt(p.limit || "200", 10) || 200, 1), 200);
         const lite  = p.lite === "1";
@@ -95,7 +96,7 @@ export async function handler(event) {
             ORDER BY created_at DESC
             LIMIT ${limit}
           `;
-          return json(200, rows, cacheHeaders(60));
+          return json(200, rows, cacheHdr(60));
         } else {
           const rows = await sql`
             SELECT
@@ -106,65 +107,59 @@ export async function handler(event) {
             ORDER BY created_at DESC
             LIMIT ${limit}
           `;
-          return json(200, rows, cacheHeaders(20));
+          return json(200, rows, cacheHdr(20));
         }
-      } catch (err) {
+      }catch(err){
         console.error("[GET /posts]", err);
-        return json(500, { error: "List failed", detail: String(err.message || err) });
+        return json(500, { error:"List failed", detail:String(err.message||err) });
       }
     }
 
-    /* ---------- DETAIL / VIDEO ---------- */
+    // DETAIL / VIDEO
     if (event.httpMethod === "GET" && event.path.includes("/posts/")) {
-      const id = getIdFromPath(event.path);
-      if (!id) return json(400, { error: "invalid id" });
+      const id = getId(event);
+      if (!id) return json(400, { error:"invalid id" });
 
-      try {
+      try{
         const p = qs(event);
         if (p.video === "1") {
-          const rows = await sql`SELECT preview_video FROM posts WHERE id = ${id} LIMIT 1`;
-          if (!rows.length) return json(404, { error: "not found" });
-          return json(200, { previewVideo: rows[0].preview_video || null }, cacheHeaders(300));
+          const rows = await sql`SELECT preview_video FROM posts WHERE id=${id} LIMIT 1`;
+          if (!rows.length) return json(404, { error:"not found" });
+          return json(200, { previewVideo: rows[0].preview_video || null }, cacheHdr(300));
         }
         const rows = await sql`
           SELECT id, title, category, image, description, created_at, link_ok, first_link
-          FROM posts WHERE id = ${id} LIMIT 1
+          FROM posts WHERE id=${id} LIMIT 1
         `;
-        if (!rows.length) return json(404, { error: "not found" });
+        if (!rows.length) return json(404, { error:"not found" });
         const r = rows[0];
         return json(200, {
-          id: r.id,
-          title: r.title,
-          category: r.category,
-          image: r.image,
-          description: r.description,
-          created_at: r.created_at,
-          link_ok: r.link_ok,
-          first_link: r.first_link
-        }, cacheHeaders(60));
-      } catch (err) {
+          id:r.id, title:r.title, category:r.category,
+          image:r.image, description:r.description,
+          created_at:r.created_at, link_ok:r.link_ok, first_link:r.first_link
+        }, cacheHdr(60));
+      }catch(err){
         console.error("[GET /posts/:id]", err);
-        return json(500, { error: "Detail failed", detail: String(err.message || err) });
+        return json(500, { error:"Detail failed", detail:String(err.message||err) });
       }
     }
 
-    /* ---------- CREATE ---------- */
+    // CREATE
     if (event.httpMethod === "POST" && event.path.endsWith("/posts")) {
       const g = bearer(event); if (!g.ok) return g.res;
-      try {
-        const body = JSON.parse(event.body || "{}");
-
-        const title        = (body.title || "").trim();
-        const category     = normCat(body.category);
-        const image        = body.image || null;
-        const image_thumb  = body.image_thumb || null;
-        const description  = body.description || null;
-        const previewVideo = body.previewVideo || null;
-        const link_ok      = (typeof body.link_ok === "boolean") ? body.link_ok : null;
-        const first_link   = body.first_link || null;
+      try{
+        const b = JSON.parse(event.body || "{}");
+        const title        = (b.title||"").trim();
+        const category     = normCat(b.category);
+        const image        = b.image || null;
+        const image_thumb  = b.image_thumb || null;
+        const description  = b.description || null;
+        const previewVideo = b.previewVideo || null;
+        const link_ok      = (typeof b.link_ok === "boolean") ? b.link_ok : null;
+        const first_link   = b.first_link || null;
 
         if (!title || !image || !image_thumb || !description) {
-          return json(400, { error: "missing fields" });
+          return json(400, { error:"missing fields" });
         }
 
         const rows = await sql`
@@ -173,59 +168,57 @@ export async function handler(event) {
           RETURNING id
         `;
         return json(200, { id: rows[0].id });
-      } catch (err) {
+      }catch(err){
         console.error("[POST /posts]", err);
-        return json(500, { error: "Insert failed", detail: String(err.message || err) });
+        return json(500, { error:"Insert failed", detail:String(err.message||err) });
       }
     }
 
-    /* ---------- UPDATE ---------- */
+    // UPDATE
     if (event.httpMethod === "PUT" && event.path.includes("/posts/")) {
       const g = bearer(event); if (!g.ok) return g.res;
-      const id = getIdFromPath(event.path);
-      if (!id) return json(400, { error: "invalid id" });
+      const id = getId(event);
+      if (!id) return json(400, { error:"invalid id" });
 
-      try {
-        const body = JSON.parse(event.body || "{}");
-
+      try{
+        const b = JSON.parse(event.body || "{}");
         const sets = [];
-        if ("title"        in body) sets.push(sql`title = ${ (body.title||"").trim() }`);
-        if ("category"     in body) sets.push(sql`category = ${ normCat(body.category) }`);
-        if ("description"  in body) sets.push(sql`description = ${ body.description ?? null }`);
-        if ("image"        in body) sets.push(sql`image = ${ body.image ?? null }`);
-        if ("image_thumb"  in body) sets.push(sql`image_thumb = ${ body.image_thumb ?? null }`);
-        if ("previewVideo" in body) sets.push(sql`preview_video = ${ (body.previewVideo || null) }`);
-        if ("link_ok"      in body) sets.push(sql`link_ok = ${ (typeof body.link_ok === "boolean") ? body.link_ok : null }`);
-        if ("first_link"   in body) sets.push(sql`first_link = ${ body.first_link ?? null }`);
+        if ("title"        in b) sets.push(sql`title = ${(b.title||"").trim()}`);
+        if ("category"     in b) sets.push(sql`category = ${normCat(b.category)}`);
+        if ("description"  in b) sets.push(sql`description = ${b.description ?? null}`);
+        if ("image"        in b) sets.push(sql`image = ${b.image ?? null}`);
+        if ("image_thumb"  in b) sets.push(sql`image_thumb = ${b.image_thumb ?? null}`);
+        if ("previewVideo" in b) sets.push(sql`preview_video = ${b.previewVideo || null}`);
+        if ("link_ok"      in b) sets.push(sql`link_ok = ${(typeof b.link_ok === "boolean") ? b.link_ok : null}`);
+        if ("first_link"   in b) sets.push(sql`first_link = ${b.first_link ?? null}`);
+        if (!sets.length)   return json(400, { error:"no fields to update" });
 
-        if (!sets.length) return json(400, { error: "no fields to update" });
-
-        await sql`UPDATE posts SET ${sql.join(sets, sql`, `)} WHERE id = ${id}`;
-        return json(200, { ok: true });
-      } catch (err) {
+        await sql`UPDATE posts SET ${sql.join(sets, sql`, `)} WHERE id=${id}`;
+        return json(200, { ok:true });
+      }catch(err){
         console.error("[PUT /posts/:id]", err);
-        return json(500, { error: "Update failed", detail: String(err.message || err) });
+        return json(500, { error:"Update failed", detail:String(err.message||err) });
       }
     }
 
-    /* ---------- DELETE ---------- */
+    // DELETE
     if (event.httpMethod === "DELETE" && event.path.includes("/posts/")) {
       const g = bearer(event); if (!g.ok) return g.res;
-      const id = getIdFromPath(event.path);
-      if (!id) return json(400, { error: "invalid id" });
+      const id = getId(event);
+      if (!id) return json(400, { error:"invalid id" });
 
-      try {
-        await sql`DELETE FROM posts WHERE id = ${id}`;
-        return json(200, { ok: true });
-      } catch (err) {
+      try{
+        await sql`DELETE FROM posts WHERE id=${id}`;
+        return json(200, { ok:true });
+      }catch(err){
         console.error("[DELETE /posts/:id]", err);
-        return json(500, { error: "Delete failed", detail: String(err.message || err) });
+        return json(500, { error:"Delete failed", detail:String(err.message||err) });
       }
     }
 
-    return json(404, { error: "Not found" });
-  } catch (err) {
+    return json(404, { error:"Not found" });
+  }catch(err){
     console.error("[posts] fatal", err);
-    return json(500, { error: "Internal Server Error", detail: String(err.message || err) });
+    return json(500, { error:"Internal Server Error", detail:String(err.message||err) });
   }
 }
