@@ -1,251 +1,178 @@
 // netlify/functions/posts.js
 import { neon } from "@neondatabase/serverless";
-import { randomUUID } from "node:crypto";
+
+/**
+ * PERF-ORIENTED VERSION
+ * - ?lite=1 returns ONLY lightweight fields (no base64 blobs)
+ * - Adds short cache headers on GET
+ * - All writes/reads remain compatible with existing schema
+ */
 
 const DB_URL =
   process.env.DATABASE_URL ||
   process.env.NETLIFY_DATABASE_URL ||
   process.env.NETLIFY_DATABASE_URL_UNPOOLED;
 
+if (!DB_URL) {
+  console.warn("[posts] No DATABASE_URL found in env");
+}
+
 const sql = DB_URL ? neon(DB_URL) : null;
 
-const json = (status, data, extra = {}) => ({
+const json = (status, data, extraHeaders = {}) => ({
   statusCode: status,
   headers: {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization",
-    "Cache-Control": "no-store",
-    ...extra,
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    ...extraHeaders,
   },
   body: JSON.stringify(data),
 });
 
-const getIdFromPath = (path) => {
-  const parts = (path || "").split("/");
-  const last = parts[parts.length - 1];
-  return last && last !== "posts" ? last : null;
-};
-
-async function inferIdType() {
-  try {
-    const rows = await sql`
-      SELECT data_type, udt_name
-      FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = 'posts' AND column_name = 'id'
-      LIMIT 1
-    `;
-    if (!rows.length) return { kind: "unknown" };
-    const { data_type, udt_name } = rows[0];
-    if (data_type === "uuid" || udt_name === "uuid") return { kind: "uuid" };
-    const numTypes = new Set(["integer", "bigint", "smallint", "numeric"]);
-    if (numTypes.has(data_type) || numTypes.has(udt_name)) return { kind: "number" };
-    return { kind: "unknown" };
-  } catch {
-    return { kind: "unknown" };
-  }
-}
-
-function parseFeaturedRank(input) {
-  if (input === undefined || input === null || input === "") return null;
-  const n = parseInt(input, 10);
-  if (!Number.isFinite(n)) return null;
-  if (n < 1 || n > 99) return null;
-  return n;
-}
-function parseCategory(input) {
-  const v = String(input || "").toLowerCase();
-  if (v === "game" || v === "app" || v === "movie") return v;
-  return "game";
+function getIdFromPath(path = "") {
+  // path like: /.netlify/functions/posts/123
+  const parts = String(path).split("/").filter(Boolean);
+  const idx = parts.lastIndexOf("posts");
+  if (idx === -1) return null;
+  const id = parts[idx + 1];
+  return id || null;
 }
 
 export async function handler(event) {
-  // CORS
-  if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type,Authorization",
-      },
-      body: "",
-    };
-  }
-
   try {
+    if (event.httpMethod === "OPTIONS") {
+      return json(204, {}, { "Cache-Control": "public, max-age=0, s-maxage=600" });
+    }
+
     if (!sql) return json(500, { error: "DB not configured" });
 
-    const qp = event.queryStringParameters || {};
-
-    // ---------- GET /posts ó /posts/:id
+    // ---- GET /posts or /posts/:id
     if (event.httpMethod === "GET") {
       const id = getIdFromPath(event.path);
       if (id) {
+        // Full detail (includes image/preview_video)
         const rows =
-          await sql`SELECT id, title, image, description, preview_video, featured_rank,
-                           COALESCE(category,'game') AS category, created_at
-                    FROM posts
-                    WHERE id = ${id}
-                    LIMIT 1`;
+          await sql`SELECT id, title, image, description, preview_video, download_url, details_url, created_at
+                    FROM posts WHERE id = ${id} LIMIT 1`;
         if (!rows.length) return json(404, { error: "Not found" });
-        return json(200, rows[0]);
+        return json(200, rows[0], { "Cache-Control": "public, max-age=0, s-maxage=60" });
       }
 
-      const lite         = qp.lite === "1" || qp.lite === "true";
-      const featuredOnly = qp.featured === "1" || qp.featured === "true";
-      const category     = qp.category ? parseCategory(qp.category) : null;
-      const limit        = Math.min(Math.max(parseInt(qp.limit || "100", 10) || 100, 1), 200);
-
-      // base query
-      let where = sql``;
-      if (featuredOnly) where = sql`WHERE featured_rank IS NOT NULL`;
-      if (category) {
-        where = featuredOnly
-          ? sql`WHERE featured_rank IS NOT NULL AND COALESCE(category,'game') = ${category}`
-          : sql`WHERE COALESCE(category,'game') = ${category}`;
-      }
+      // List
+      const qp = event.queryStringParameters || {};
+      const lite  = qp.lite === "1" || qp.lite === "true";
+      const limit = Math.min(Math.max(parseInt(qp.limit || "100", 10) || 100, 1), 500);
 
       if (lite) {
+        // SUPER LIGERO: no imagenes ni preview
         const rows =
-          await sql`SELECT id, title, image, description, featured_rank,
-                           COALESCE(category,'game') AS category, created_at
+          await sql`SELECT id, title, created_at
                     FROM posts
-                    ${where}
                     ORDER BY created_at DESC
                     LIMIT ${limit}`;
-        return json(200, rows);
+        return json(200, rows, { "Cache-Control": "public, max-age=0, s-maxage=30" });
       } else {
+        // Full listing (evita usarlo en UI normal)
         const rows =
-          await sql`SELECT id, title, image, description, preview_video, featured_rank,
-                           COALESCE(category,'game') AS category, created_at
+          await sql`SELECT id, title, image, description, preview_video, download_url, details_url, created_at
                     FROM posts
-                    ${where}
                     ORDER BY created_at DESC
                     LIMIT ${limit}`;
-        return json(200, rows);
+        return json(200, rows, { "Cache-Control": "public, max-age=0, s-maxage=10" });
       }
     }
 
-    // ---------- Auth
-    const auth = event.headers?.authorization || "";
-    const token = auth.replace(/^Bearer\s+/i, "").trim();
-    const envToken = process.env.AUTH_TOKEN || "";
-    if (!envToken || token !== envToken) {
-      return json(401, { error: "Unauthorized" });
-    }
-
-    // ---------- POST /posts?action=clear_featured
-    if (event.httpMethod === "POST" && (qp.action === "clear_featured")) {
-      await sql`UPDATE posts SET featured_rank = NULL WHERE featured_rank IS NOT NULL`;
-      return json(200, { ok: true, cleared: true });
-    }
-
-    // ---------- POST /posts (crear)
+    // ---- POST /posts (create)
     if (event.httpMethod === "POST") {
+      const auth = event.headers?.authorization || "";
+      const token = auth.replace(/^Bearer\s+/i, "").trim();
+      const envToken = process.env.AUTH_TOKEN || "";
+      if (!envToken || token !== envToken) {
+        return json(401, { error: "Unauthorized" });
+      }
+
       const body = JSON.parse(event.body || "{}");
-      const { title, image, description, previewVideo, preview_video, featured_rank, category } = body;
+      const {
+        title,
+        image,                // base64 data URL (compressed client-side)
+        description,
+        previewVideo,         // optional base64 data URL
+        preview_video,        // legacy
+        downloadUrl = null,
+        detailsUrl  = null,
+      } = body || {};
+
       if (!title || !image || !description) {
         return json(400, { error: "Missing fields" });
       }
-      const pv = previewVideo ?? preview_video ?? null;
-      const fr = parseFeaturedRank(featured_rank);
-      const cat = parseCategory(category);
 
-      try {
-        const rows =
-          await sql`INSERT INTO posts (title, image, description, preview_video, featured_rank, category)
-                    VALUES (${title}, ${image}, ${description}, ${pv}, ${fr}, ${cat})
-                    RETURNING id`;
-        return json(200, { ok: true, id: rows[0].id });
-      } catch (e) {
-        const msg = String(e?.message || e || "");
-        if (/null value in column "id".*violates not-null constraint/i.test(msg)) {
-          try {
-            const idType = await inferIdType();
-            if (idType.kind === "uuid") {
-              const newId = randomUUID();
-              const rows2 =
-                await sql`INSERT INTO posts (id, title, image, description, preview_video, featured_rank, category)
-                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv}, ${fr}, ${cat})
-                          RETURNING id`;
-              return json(200, { ok: true, id: rows2[0].id });
-            } else {
-              const seq =
-                await sql`SELECT COALESCE(MAX(id),0)+1 AS next_id FROM posts`;
-              const newId = seq?.[0]?.next_id || 1;
-              const rows2 =
-                await sql`INSERT INTO posts (id, title, image, description, preview_video, featured_rank, category)
-                          VALUES (${newId}, ${title}, ${image}, ${description}, ${pv}, ${fr}, ${cat})
-                          RETURNING id`;
-              return json(200, { ok: true, id: rows2[0].id });
-            }
-          } catch (e2) {
-            return json(500, { error: "Insert retry failed", hint: String(e2?.message || e2) });
-          }
-        }
-        return json(500, { error: "Insert failed", hint: msg });
-      }
+      const pv = previewVideo ?? preview_video ?? null;
+
+      const rows =
+        await sql`INSERT INTO posts (title, image, description, preview_video, download_url, details_url)
+                  VALUES (${title}, ${image}, ${description}, ${pv}, ${downloadUrl}, ${detailsUrl})
+                  RETURNING id`;
+
+      return json(200, { ok: true, id: rows[0].id });
     }
 
-    // ---------- PUT/PATCH /posts/:id (editar)
-    if (event.httpMethod === "PUT" || event.httpMethod === "PATCH") {
+    // ---- PUT /posts/:id (update)
+    if (event.httpMethod === "PUT") {
+      const auth = event.headers?.authorization || "";
+      const token = auth.replace(/^Bearer\s+/i, "").trim();
+      const envToken = process.env.AUTH_TOKEN || "";
+      if (!envToken || token !== envToken) {
+        return json(401, { error: "Unauthorized" });
+      }
       const id = getIdFromPath(event.path);
       if (!id) return json(400, { error: "Missing id" });
 
       const body = JSON.parse(event.body || "{}");
+      const fields = {};
+      ["title", "image", "description", "previewVideo", "preview_video", "downloadUrl", "detailsUrl"].forEach((k) => {
+        if (k in body && body[k] !== undefined) fields[k] = body[k];
+      });
 
-      const curRows =
-        await sql`SELECT id, title, image, description, preview_video, featured_rank, COALESCE(category,'game') AS category
-                  FROM posts WHERE id = ${id} LIMIT 1`;
-      if (!curRows.length) return json(404, { error: "Not found" });
-      const cur = curRows[0];
-
-      const merged = {
-        title:         Object.prototype.hasOwnProperty.call(body, "title")        ? body.title        : cur.title,
-        image:         Object.prototype.hasOwnProperty.call(body, "image")        ? body.image        : cur.image,
-        description:   Object.prototype.hasOwnProperty.call(body, "description")  ? body.description  : cur.description,
-        preview_video: Object.prototype.hasOwnProperty.call(body, "previewVideo")
-                        ? body.previewVideo
-                        : (Object.prototype.hasOwnProperty.call(body, "preview_video") ? body.preview_video : cur.preview_video),
-        featured_rank: Object.prototype.hasOwnProperty.call(body, "featured_rank")
-                        ? parseFeaturedRank(body.featured_rank)
-                        : cur.featured_rank,
-        category:      Object.prototype.hasOwnProperty.call(body, "category")
-                        ? parseCategory(body.category)
-                        : cur.category,
-      };
-
-      try {
-        await sql`UPDATE posts
-                  SET title=${merged.title},
-                      image=${merged.image},
-                      description=${merged.description},
-                      preview_video=${merged.preview_video},
-                      featured_rank=${merged.featured_rank},
-                      category=${merged.category}
-                  WHERE id=${id}`;
-        return json(200, { ok: true, id });
-      } catch (e) {
-        return json(500, { error: "Update failed", hint: String(e?.message || e) });
+      if (Object.keys(fields).length === 0) {
+        return json(400, { error: "No fields to update" });
       }
+
+      const pv = fields.previewVideo ?? fields.preview_video;
+      const result =
+        await sql`UPDATE posts
+                  SET title = COALESCE(${fields.title}, title),
+                      image = COALESCE(${fields.image}, image),
+                      description = COALESCE(${fields.description}, description),
+                      preview_video = COALESCE(${pv}, preview_video),
+                      download_url = COALESCE(${fields.downloadUrl}, download_url),
+                      details_url  = COALESCE(${fields.detailsUrl}, details_url)
+                  WHERE id = ${id}
+                  RETURNING id`;
+
+      if (!result.length) return json(404, { error: "Not found" });
+      return json(200, { ok: true, id });
     }
 
-    // ---------- DELETE /posts/:id
+    // ---- DELETE /posts/:id
     if (event.httpMethod === "DELETE") {
+      const auth = event.headers?.authorization || "";
+      const token = auth.replace(/^Bearer\s+/i, "").trim();
+      const envToken = process.env.AUTH_TOKEN || "";
+      if (!envToken || token !== envToken) {
+        return json(401, { error: "Unauthorized" });
+      }
       const id = getIdFromPath(event.path);
       if (!id) return json(400, { error: "Missing id" });
-      try {
-        await sql`DELETE FROM posts WHERE id = ${id}`;
-        return json(200, { ok: true });
-      } catch (e) {
-        return json(500, { error: "Delete failed", hint: String(e?.message || e) });
-      }
+
+      await sql`DELETE FROM posts WHERE id = ${id}`;
+      return json(200, { ok: true });
     }
 
     return json(405, { error: "Method not allowed" });
   } catch (err) {
-    return json(500, { error: "Internal Server Error", hint: String(err?.message || err) });
+    console.error("[posts] error", err);
+    return json(500, { error: "Internal Server Error" });
   }
 }
