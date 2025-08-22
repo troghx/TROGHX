@@ -26,11 +26,11 @@ const cacheHdr = (sec = 60) => ({
   "Cache-Control": `public, max-age=${sec}, stale-while-revalidate=30`,
 });
 
+// categorías válidas (ES/EN)
 const CATS = new Set(["game", "app", "movie"]);
 function normCat(v) {
   const s = String(v || "").toLowerCase().trim();
   if (CATS.has(s)) return s;
-  // español → inglés
   if (s === "juego") return "game";
   if (s === "pelicula" || s === "película") return "movie";
   return "game";
@@ -46,7 +46,7 @@ function getId(event) {
   if (!id) id = qs(event).id || null;
   if (!id) return null;
   id = String(id).replace(/\/+$/, "").trim();
-  // UUID, alfanumérico con guiones >=10, o numérico
+  // acepta UUID, alfanumérico con guiones >=10, o numérico
   const ok =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
     /^[A-Za-z0-9-]{10,}$/.test(id) ||
@@ -70,7 +70,8 @@ function auth(event) {
 }
 
 async function ensureSchema() {
-  // Crea tabla si no existe (uuid); si ya existe, no la toca.
+  // Si ya tienes la tabla, esto NO la modifica;
+  // si no existe, la crea con columnas modernas.
   await sql`CREATE TABLE IF NOT EXISTS posts (
     id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     title          TEXT NOT NULL,
@@ -83,8 +84,6 @@ async function ensureSchema() {
     link_ok        BOOLEAN,
     created_at     TIMESTAMPTZ DEFAULT now()
   )`;
-
-  // Añade columnas que falten (seguras si ya existen)
   await sql`ALTER TABLE IF EXISTS posts
     ADD COLUMN IF NOT EXISTS image_thumb TEXT,
     ADD COLUMN IF NOT EXISTS preview_video TEXT,
@@ -92,7 +91,6 @@ async function ensureSchema() {
     ADD COLUMN IF NOT EXISTS link_ok BOOLEAN,
     ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'game',
     ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`;
-
   await sql`CREATE INDEX IF NOT EXISTS idx_posts_cat_created ON posts (category, created_at DESC)`;
 }
 
@@ -103,7 +101,7 @@ export async function handler(event) {
 
     await ensureSchema();
 
-    // LIST
+    // ---------- LIST ----------
     if (event.httpMethod === "GET" && event.path.endsWith("/posts")) {
       try {
         const p = qs(event);
@@ -139,7 +137,7 @@ export async function handler(event) {
       }
     }
 
-    // DETAIL o VIDEO
+    // ---------- DETAIL / VIDEO ----------
     if (event.httpMethod === "GET" && event.path.includes("/posts/")) {
       const id = getId(event);
       if (!id) return json(400, { error: "invalid id" });
@@ -163,7 +161,7 @@ export async function handler(event) {
       }
     }
 
-    // CREATE
+    // ---------- CREATE ----------
     if (event.httpMethod === "POST" && event.path.endsWith("/posts")) {
       const g = auth(event);
       if (!g.ok) return g.res;
@@ -195,7 +193,7 @@ export async function handler(event) {
       }
     }
 
-    // UPDATE
+    // ---------- UPDATE (COALESCE; sin sql.join) ----------
     if (event.httpMethod === "PUT" && event.path.includes("/posts/")) {
       const g = auth(event);
       if (!g.ok) return g.res;
@@ -205,28 +203,36 @@ export async function handler(event) {
 
       try {
         const b = JSON.parse(event.body || "{}");
-        const sets = [];
-        if ("title"        in b) sets.push(sql`title = ${(b.title || "").trim()}`);
-        if ("category"     in b) sets.push(sql`category = ${normCat(b.category)}`);
-        if ("description"  in b) {
-          sets.push(sql`description = ${b.description ?? null}`);
-          if (!("first_link" in b)) {
-            const fl = firstLinkFrom(b.description || "");
-            sets.push(sql`first_link = ${fl || null}`);
-          }
+
+        const vTitle   = ("title"        in b) ? String(b.title || "").trim() : null;
+        const vCat     = ("category"     in b) ? normCat(b.category) : null;
+        const vDesc    = ("description"  in b) ? (b.description ?? null) : null;
+        const vImage   = ("image"        in b) ? (b.image ?? null) : null;
+        const vThumb   = ("image_thumb"  in b || "imageThumb" in b) ? (b.image_thumb ?? b.imageThumb ?? null) : null;
+        const vPrev    = ("previewVideo" in b || "preview_video" in b) ? (b.previewVideo ?? b.preview_video ?? null) : null;
+        const vLinkOk  = ("link_ok"      in b) ? ((typeof b.link_ok === "boolean") ? b.link_ok : null) : null;
+
+        let vFirst;
+        if ("first_link" in b) {
+          vFirst = b.first_link ?? null;
+        } else if ("description" in b) {
+          vFirst = firstLinkFrom(b.description || "") || null;
+        } else {
+          vFirst = null; // no cambia
         }
-        if ("image"        in b) sets.push(sql`image = ${b.image ?? null}`);
-        if ("image_thumb"  in b || "imageThumb" in b)
-          sets.push(sql`image_thumb = ${b.image_thumb ?? b.imageThumb ?? null}`);
-        if ("previewVideo" in b || "preview_video" in b)
-          sets.push(sql`preview_video = ${b.previewVideo ?? b.preview_video ?? null}`);
-        if ("link_ok"      in b)
-          sets.push(sql`link_ok = ${(typeof b.link_ok === "boolean") ? b.link_ok : null}`);
-        if ("first_link"   in b) sets.push(sql`first_link = ${b.first_link ?? null}`);
 
-        if (!sets.length) return json(400, { error: "no fields to update" });
-
-        await sql`UPDATE posts SET ${sql.join(sets, sql`, `)} WHERE id=${id}`;
+        await sql`
+          UPDATE posts SET
+            title         = COALESCE(${vTitle}, title),
+            category      = COALESCE(${vCat}, category),
+            description   = COALESCE(${vDesc}, description),
+            image         = COALESCE(${vImage}, image),
+            image_thumb   = COALESCE(${vThumb}, image_thumb),
+            preview_video = COALESCE(${vPrev}, preview_video),
+            link_ok       = COALESCE(${vLinkOk}, link_ok),
+            first_link    = COALESCE(${vFirst}, first_link)
+          WHERE id = ${id}
+        `;
         return json(200, { ok: true });
       } catch (err) {
         console.error("[PUT /posts/:id]", err);
@@ -234,7 +240,7 @@ export async function handler(event) {
       }
     }
 
-    // DELETE
+    // ---------- DELETE ----------
     if (event.httpMethod === "DELETE" && event.path.includes("/posts/")) {
       const g = auth(event);
       if (!g.ok) return g.res;
