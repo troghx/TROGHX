@@ -784,3 +784,59 @@ body.modal-open { overflow: hidden; }
 .game-modal .rich-content li {
   line-height: 1.55;
 }
+
+/* ===== MODAL RESPONSIVE / COMPACTO (sin cover en el modal) ===== */
+.tw-modal .tw-modal-content{
+  width: min(920px, 96vw);
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.tw-modal .tw-modal-title{
+  font-size: clamp(20px, 2.6vw, 28px);
+  font-weight: 800;
+  margin: 8px 20px 4px 20px;
+}
+
+.tw-modal .tw-modal-description{
+  flex: 1 1 auto;
+  overflow: auto;              /* scroll interno sólo si hace falta */
+  padding: 8px 20px 20px 20px;
+  scrollbar-gutter: stable both-edges;
+}
+
+/* bloquea scroll de la página cuando hay modal (si tu JS añade .modal-open al body) */
+body.modal-open{ overflow:hidden; }
+
+/* ===== Degradado en covers para legibilidad ===== */
+.tile{ position:relative; overflow:hidden; border-radius: var(--radius,16px); }
+.tile::after{
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:1;
+  background: linear-gradient(to top,
+    rgba(0,0,0,.78) 0%,
+    rgba(0,0,0,.45) 40%,
+    rgba(0,0,0,0) 72%);
+}
+.tile-info{ position:absolute; left:12px; right:12px; bottom:10px; z-index:2; }
+.tile .title{ color:#fff; text-shadow:0 2px 12px rgba(0,0,0,.65); }
+
+/* Asegura que el video quede debajo del overlay */
+.tile-video{ position:absolute; inset:0; object-fit:cover; z-index:0; }
+
+/* ===== Cursor personalizado (opcional) - sube tus archivos a /assets/cursor/ ===== */
+.game-card, .post-card, .tile, .grid .card,
+.game-card a, .post-card a, .tile a { cursor:pointer; }
+
+.game-card, .post-card, .tile, .grid .card{
+  cursor: url("/assets/cursor/hand.cur") 10 2,
+          url("/assets/cursor/hand.png") 10 2,
+          pointer;
+}
+.tile-video{
+  cursor: url("/assets/cursor/hand.cur") 10 2,
+          url("/assets/cursor/hand.png") 10 2,
+          pointer;
+}
