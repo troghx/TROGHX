@@ -37,10 +37,10 @@ const fullCache = new Map();
    Utilidades base
    ========================= */
 function rehydrate() {
-  try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES)||"[]"); if(Array.isArray(saved)) recientes = saved; } catch {}
-  try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS)||"[]"); if(Array.isArray(savedS)) socials = savedS; } catch {}
+  try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES)||"[]"); if(Array.isArray(saved)) recientes = saved; } catch (err) {}
+  try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS)||"[]"); if(Array.isArray(savedS)) socials = savedS; } catch (err) {}
   isAdmin = localStorage.getItem(LS_ADMIN) === "1";
-  try { const t=localStorage.getItem("tgx_admin_token"); if(!isAdmin && t && t.trim()) isAdmin=true; } catch {}
+  try { const t=localStorage.getItem("tgx_admin_token"); if(!isAdmin && t && t.trim()) isAdmin=true; } catch (err) {}
 }
 rehydrate();
 
@@ -605,16 +605,36 @@ function openNewGameModal(){
     if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
-    let coverDataUrl;
-    try { coverDataUrl = await compressImage(imageFile, { maxW: 960, maxH: 960, quality: 0.8 });
-    catch { alert("No se pudo compactar la portada."); return; }
+     // --- dentro de openNewGameModal(), antes de procesar el trailer ---
+let coverDataUrl;
+try {
+  coverDataUrl = await compressImage(imageFile, { maxW: 960, maxH: 960, quality: 0.8 });
+} catch (err) {
+  console.error("[cover compress]", err);
+  alert("No se pudo compactar la portada.");
+  return;
+}
 
-    let previewSrc=null;
-    if(trailerFile){
-      if(!/^video\/(mp4|webm)$/i.test(trailerFile.type)){ alert("El trailer debe ser MP4 o WEBM."); return; }
-      if(trailerFile.size > 6*1024*1024){ alert("Trailer >6MB. Usa uno más ligero."); return; }
-      try{ previewSrc = await readAsDataURL(trailerFile); }catch{ alert("No se pudo leer el trailer."); return; }
-    }
+// --- trailer opcional (subido desde PC) ---
+let previewSrc = null;
+if (trailerFile) {
+  if (!/^video\/(mp4|webm)$/i.test(trailerFile.type)) {
+    alert("El trailer debe ser MP4 o WEBM.");
+    return;
+  }
+  if (trailerFile.size > 6 * 1024 * 1024) {
+    alert("Trailer >6MB. Usa uno más ligero.");
+    return;
+  }
+  try {
+    previewSrc = await readAsDataURL(trailerFile);
+  } catch (err) {
+    console.error("[trailer read]", err);
+    alert("No se pudo leer el trailer.");
+    return;
+  }
+}
+
 
     const token=localStorage.getItem("tgx_admin_token")||"";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
@@ -680,17 +700,36 @@ function openEditGame(original){
 
     const patch={ title, description: descHTML, category };
 
-    if(imageFile){
-      try{ patch.image = await compressImage(imageFile); }
-      catch{ alert("No se pudo compactar la portada."); return; }
-    }
-    if(clearTrailerCb?.checked){
-      patch.previewVideo=null;
-    }else if(trailerFile){
-      if(!/^video\/(mp4|webm)$/i.test(trailerFile.type)){ alert("Archivo del trailer debe ser MP4/WEBM."); return; }
-      if(trailerFile.size > 6*1024*1024){ alert("Trailer >6MB. Usa uno más ligero."); return; }
-      try{ patch.previewVideo = await readAsDataURL(trailerFile); }catch{ alert("No se pudo leer el trailer."); return; }
-    }
+    if (imageFile) {
+  try {
+    patch.image = await compressImage(imageFile);
+  } catch (err) {
+    console.error("[edit cover compress]", err);
+    alert("No se pudo compactar la portada.");
+    return;
+  }
+}
+
+// si cambia el trailer:
+if (clearTrailerCb?.checked) {
+  patch.previewVideo = null;
+} else if (trailerFile) {
+  if (!/^video\/(mp4|webm)$/i.test(trailerFile.type)) {
+    alert("Archivo del trailer debe ser MP4/WEBM.");
+    return;
+  }
+  if (trailerFile.size > 6 * 1024 * 1024) {
+    alert("Trailer >6MB. Usa uno más ligero.");
+    return;
+  }
+  try {
+    patch.previewVideo = await readAsDataURL(trailerFile);
+  } catch (err) {
+    console.error("[edit trailer read]", err);
+    alert("No se pudo leer el trailer.");
+    return;
+  }
+}
 
     const token=localStorage.getItem("tgx_admin_token")||"";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
@@ -1092,4 +1131,5 @@ async function initData(){
   setupSideNav();
 }
 initData();
+
 
