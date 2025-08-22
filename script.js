@@ -1,5 +1,7 @@
 /* =========================
-   TROGH — script.js (Grid + Paginación)
+   TROGH — script.js (Grid + Paginación, optimized egress)
+   - List endpoint uses ?lite=1 (no blobs)
+   - Per-tile lazy fetch of full post (image/desc/video) via GET /posts/:id when visible
    ========================= */
 
 /* === Templates === */
@@ -28,9 +30,12 @@ let recientes = [];
 let socials  = [];
 window.currentCategory = "game";
 
-let PAGE_SIZE = 12;     // tarjetas por página
-let page = 1;           // página actual (1..N)
-let searchQuery = "";   // filtro de búsqueda
+let PAGE_SIZE = 12;
+let page = 1;
+let searchQuery = "";
+
+/* Cache de detalles para no volver a pedirlos */
+const fullCache = new Map();
 
 /* =========================
    Utilidades básicas
@@ -39,23 +44,23 @@ function rehydrate() {
   try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES)||"[]"); if(Array.isArray(saved)) recientes = saved; } catch {}
   try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS)||"[]"); if(Array.isArray(savedS)) socials = savedS; } catch {}
   isAdmin = localStorage.getItem(LS_ADMIN) === "1";
-  try { const t = localStorage.getItem("tgx_admin_token"); if (!isAdmin && t && t.trim()) isAdmin = true; } catch {}
+  try { const t=localStorage.getItem("tgx_admin_token"); if(!isAdmin && t && t.trim()) isAdmin=true; } catch {}
 }
 rehydrate();
 
 function persistAdmin(flag){ try{ localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); }catch{} }
 function preload(src){ const img = new Image(); img.src = src; }
 
-/* === Crypto helpers (hash de admin) === */
+/* === Crypto helpers === */
 function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
 async function sha256(str){ const enc=new TextEncoder().encode(str); const digest=await crypto.subtle.digest("SHA-256",enc); return toHex(digest); }
 function genSaltHex(len=16){ const a=new Uint8Array(len); crypto.getRandomValues(a); return Array.from(a).map(b=>b.toString(16).padStart(2,"0")).join(""); }
-async function hashCreds(user,pin,salt){ return sha256(`${user}::${pin}::${salt}`); }
+async function hashCreds(user,pin,salt){ const key=`${user}::${pin}::${salt}`; return sha256(key); }
 
 /* === API POSTS === */
 async function apiList(category = window.currentCategory) {
-  const qs = new URLSearchParams({ lite: "1", limit: "100" });
-  if (category) qs.set("category", category);
+  const qs = new URLSearchParams({ lite: "1", limit: "200" });
+  // if(category) qs.set("category", category); // (aún no filtramos por categoría en el backend)
   const r = await fetch(`${API_POSTS}?${qs.toString()}`, { cache: "no-store" });
   if (!r.ok) throw new Error("No se pudo listar posts");
   return r.json();
@@ -70,9 +75,12 @@ async function apiCreate(data, token){
   return r.json();
 }
 async function apiGet(id){
+  if(fullCache.has(id)) return fullCache.get(id);
   const r = await fetch(`${API_POSTS}/${id}`, { cache:"no-store" });
   if(!r.ok) throw new Error("No se pudo obtener post");
-  return r.json();
+  const j = await r.json();
+  fullCache.set(id, j);
+  return j;
 }
 async function apiUpdate(id, patch, token){
   const r = await fetch(`${API_POSTS}/${id}`, {
@@ -81,11 +89,13 @@ async function apiUpdate(id, patch, token){
     body: JSON.stringify(patch)
   });
   if(!r.ok){ const t=await r.text().catch(()=> ""); throw new Error(`Update falló: ${t}`); }
+  fullCache.delete(id);
   return r.json();
 }
 async function apiDelete(id, token){
   const r = await fetch(`${API_POSTS}/${id}`, { method:"DELETE", headers:{ "Authorization":`Bearer ${token||""}` } });
   if(!r.ok){ const t=await r.text().catch(()=> ""); throw new Error(`Delete falló: ${t}`); }
+  fullCache.delete(id);
   return r.json();
 }
 
@@ -146,12 +156,7 @@ function readAsDataURL(file){
     fr.readAsDataURL(file);
   });
 }
-function dataUrlBytes(dataUrl){
-  const i=dataUrl.indexOf(","); if(i===-1) return dataUrl.length;
-  const b64=dataUrl.slice(i+1);
-  return Math.floor((b64.length*3)/4);
-}
-async function compressImage(file,{maxW=1280,maxH=1280,quality=0.82}={}){
+async function compressImage(file,{maxW=960,maxH=960,quality=0.8}={}){
   const blobUrl=URL.createObjectURL(file);
   const img=await new Promise((res,rej)=>{
     const im=new Image();
@@ -274,7 +279,7 @@ function initRichEditor(editorRoot){
 }
 
 /* =========================
-   Badges de estado de enlace
+   Badges de estado de enlace (se aplican cuando ya cargamos detalle)
    ========================= */
 async function applyLinkStatusBadge(tile, game){
   let badge = tile.querySelector(".tile-info .badge");
@@ -314,10 +319,7 @@ async function applyLinkStatusBadge(tile, game){
 function getFilteredList(){
   if(!searchQuery) return recientes;
   const q = searchQuery.toLowerCase();
-  return recientes.filter(g =>
-    (g.title||"").toLowerCase().includes(q) ||
-    (g.description||"").toLowerCase().includes(q)
-  );
+  return recientes.filter(g => (g.title||"").toLowerCase().includes(q));
 }
 
 function updatePager(totalPages){
@@ -335,6 +337,56 @@ function updatePager(totalPages){
   next.onclick = ()=>{ if(page<totalPages){ page++; renderRow(true); } };
 
   pager.style.display = (totalPages>1) ? "flex" : "none";
+}
+
+/* Lazy load de detalle por visibilidad de tarjeta */
+function observeTileForDetails(tile, g, coverEl, vidEl){
+  const placeholder = "assets/images/construction/en-proceso.svg";
+  coverEl.style.backgroundImage = `url(${placeholder})`;
+
+  const io = new IntersectionObserver(async (entries, obs)=>{
+    for(const e of entries){
+      if(!e.isIntersecting) continue;
+      obs.unobserve(e.target);
+      try{
+        const full = await apiGet(g.id);
+        g.image = full.image;
+        g.description = full.description;
+        g.previewVideo = full.previewVideo || full.preview_video || null;
+        coverEl.style.backgroundImage = `url(${g.image})`;
+        preload(g.image);
+        applyLinkStatusBadge(tile, g);
+
+        if(vidEl){
+          let loaded=false;
+          const ensureSrc = async ()=>{
+            if(loaded) return true;
+            let src = g.previewVideo || "";
+            if(!src) return false;
+            const sEl = vidEl.querySelector("source");
+            if(sEl){ sEl.src=src; vidEl.load(); } else { vidEl.src=src; }
+            loaded=true; return true;
+          };
+          const start = async()=>{ const ok=await ensureSrc(); if(!ok) return; vidEl.currentTime=0; const p=vidEl.play(); if(p&&p.catch) p.catch(()=>{}); };
+          const stop  = ()=>{ vidEl.pause(); vidEl.currentTime=0; };
+          const show  = ()=> vidEl.classList.add("playing");
+          const hide  = ()=> vidEl.classList.remove("playing");
+          vidEl.addEventListener("playing", show);
+          vidEl.addEventListener("pause", hide);
+          vidEl.addEventListener("ended", hide);
+          vidEl.addEventListener("error", ()=>{ vidEl.remove(); });
+          tile.addEventListener("pointerenter", start);
+          tile.addEventListener("pointerleave", stop);
+          tile.addEventListener("focus", start);
+          tile.addEventListener("blur", stop);
+        }
+      }catch(err){
+        console.error("[tile load]", err);
+      }
+    }
+  }, { root: document.getElementById("gridRecientes"), rootMargin: "200px", threshold: 0.1 });
+
+  io.observe(tile);
 }
 
 function renderRow(keepScroll=false){
@@ -365,44 +417,14 @@ function renderRow(keepScroll=false){
     const title= node.querySelector(".title");
     const vid  = node.querySelector(".tile-video");
 
-    cover.style.backgroundImage = `url(${g.image})`;
-    preload(g.image);
     title.textContent = g.title || "";
-
-    if(vid){
-      let loaded=false;
-      vid.poster = g.image;
-      vid.muted = true; vid.loop = true; vid.playsInline = true;
-      vid.setAttribute("muted",""); vid.setAttribute("playsinline","");
-      vid.preload="metadata";
-      const ensureSrc = async ()=>{
-        if(loaded) return true;
-        let src = g.previewVideo || g.preview_video || "";
-        if(!src && g.id){ try{ const full=await apiGet(g.id); src=full.previewVideo || full.preview_video || ""; if(src) g.previewVideo=src; }catch{} }
-        if(!src) return false;
-        const sEl = vid.querySelector("source");
-        if(sEl){ sEl.src=src; vid.load(); } else { vid.src=src; }
-        loaded=true; return true;
-      };
-      const start = async()=>{ const ok=await ensureSrc(); if(!ok) return; vid.currentTime=0; const p=vid.play(); if(p&&p.catch) p.catch(()=>{}); };
-      const stop  = ()=>{ vid.pause(); vid.currentTime=0; };
-      const show  = ()=> vid.classList.add("playing");
-      const hide  = ()=> vid.classList.remove("playing");
-      vid.addEventListener("playing", show);
-      vid.addEventListener("pause", hide);
-      vid.addEventListener("ended", hide);
-      vid.addEventListener("error", ()=>{ vid.remove(); });
-      tile.addEventListener("pointerenter", start);
-      tile.addEventListener("pointerleave", stop);
-      tile.addEventListener("focus", start);
-      tile.addEventListener("blur", stop);
-    }
-
     tile.tabIndex=0;
-    tile.addEventListener("click", ()=> openGame(g));
+    tile.addEventListener("click", ()=> openGameLazy(g));
+
     grid.appendChild(node);
 
-    applyLinkStatusBadge(tile, g);
+    // Lazy: cargamos detalle cuando la tarjeta sea visible
+    observeTileForDetails(tile, g, cover, vid);
   });
 
   updatePager(totalPages);
@@ -423,8 +445,18 @@ function renderHeroCarousel(){
 }
 
 /* =========================
-   Modal de ver publicación
+   Modal ver publicación (lazy si hace falta)
    ========================= */
+async function openGameLazy(game){
+  let g = game;
+  try{
+    if(!g.image || !g.description){
+      g = await apiGet(game.id);
+    }
+  }catch{}
+  openGame(g);
+}
+
 function openGame(game){
   const modal = modalTemplate.content.cloneNode(true);
   const modalNode     = modal.querySelector(".tw-modal");
@@ -485,26 +517,10 @@ function deleteGame(game){
 /* =========================
    Nuevo / Editar publicación
    ========================= */
-function makeCategorySelect(current="game"){
-  const wrap=document.createElement("label");
-  wrap.style.display="block";
-  wrap.style.marginTop=".6rem";
-  wrap.innerHTML=`
-    <span style="display:block;font-size:.85rem;opacity:.8;margin-bottom:.25rem">Tipo</span>
-    <select class="cat-select" style="width:100%;background:#11161b;border:1px solid #2a323a;border-radius:10px;padding:.6rem .7rem;color:#cfe3ff">
-      <option value="game">Juego</option>
-      <option value="app">App</option>
-      <option value="movie">Película</option>
-    </select>
-  `;
-  wrap.querySelector("select").value = current || "game";
-  return wrap;
-}
-
 function openNewGameModal(){
   const modal = newGameModalTemplate.content.cloneNode(true);
-  const modalNode = modal.querySelector(".tw-modal");
-  const form      = modal.querySelector(".new-game-form");
+  const node  = modal.querySelector(".tw-modal");
+  const form  = modal.querySelector(".new-game-form");
   const titleInput= modal.querySelector(".new-game-title");
   const imageInput= modal.querySelector(".new-game-image-file");
   const trailerFileInput = modal.querySelector(".new-game-trailer-file");
@@ -514,17 +530,15 @@ function openNewGameModal(){
   const editorRoot= modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
 
-  const catSel = makeCategorySelect("game");
-  form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
-
+  // Ocultamos el input de trailer URL (no lo usamos)
   if(trailerUrlInput){
     trailerUrlInput.value=""; trailerUrlInput.disabled=true;
     const label=trailerUrlInput.closest("label"); if(label) label.style.display="none";
   }
 
-  const removeTrap=trapFocus(modalNode);
-  const onEscape=(e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
-  modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
+  const removeTrap=trapFocus(node);
+  const onEscape=(e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
+  modalClose.addEventListener("click", ()=> closeModal(node, removeTrap, onEscape));
 
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
@@ -532,14 +546,13 @@ function openNewGameModal(){
     const descHTML=editorAPI.getHTML();
     const imageFile=imageInput?.files?.[0] || null;
     const trailerFile=trailerFileInput?.files?.[0] || null;
-    const cat=catSel.querySelector(".cat-select")?.value || "game";
 
     if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return; }
     if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
     let coverDataUrl;
-    try { coverDataUrl = await compressImage(imageFile, {maxW:1280,maxH:1280,quality:0.82}); }
+    try { coverDataUrl = await compressImage(imageFile, {maxW:960,maxH:960,quality:0.8}); }
     catch { alert("No se pudo compactar la portada."); return; }
 
     let previewSrc=null;
@@ -552,17 +565,17 @@ function openNewGameModal(){
     const token=localStorage.getItem("tgx_admin_token")||"";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
-    const newGame = { title, image: coverDataUrl, description: descHTML, previewVideo: previewSrc, category: cat };
+    const newGame = { title, image: coverDataUrl, description: descHTML, previewVideo: previewSrc };
 
     try{
       await apiCreate(newGame, token);
       await reloadData();
-      closeModal(modalNode, removeTrap, onEscape);
+      closeModal(node, removeTrap, onEscape);
       alert("¡Juego publicado!");
     }catch(err){ console.error("[create error]", err); alert("Error al crear. Revisa consola."); }
   });
 
-  openModalFragment(modalNode);
+  openModalFragment(node);
 }
 
 function openEditGame(original){
@@ -584,9 +597,6 @@ function openEditGame(original){
   if(trailerUrlInput){ trailerUrlInput.value=""; trailerUrlInput.disabled=true; const label=trailerUrlInput.closest("label"); if(label) label.style.display="none"; }
   if(imageInput) imageInput.required=false;
 
-  const catSel = makeCategorySelect(original.category || "game");
-  form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
-
   let clearTrailerCb=null;
   {
     const trailerGroup = trailerFileInput?.closest("label")?.parentElement || form;
@@ -607,12 +617,11 @@ function openEditGame(original){
     const descHTML=editorAPI.getHTML();
     const imageFile=imageInput?.files?.[0] || null;
     const trailerFile=trailerFileInput?.files?.[0] || null;
-    const cat=catSel.querySelector(".cat-select")?.value || "game";
 
     if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
-    const patch={ title, description: descHTML, category: cat };
+    const patch={ title, description: descHTML };
 
     if(imageFile){
       try{ patch.image = await compressImage(imageFile); }
@@ -636,7 +645,7 @@ function openEditGame(original){
       const idx = recientes.findIndex(p=>p.id===original.id);
       if(idx>0){ const [item]=recientes.splice(idx,1); recientes.unshift(item); }
       closeModal(node, removeTrap, onEscape);
-      page = 1;  // tras editar, vuelve a la primera página
+      page = 1;
       renderRow(); renderHeroCarousel();
       alert("¡Publicación actualizada!");
     }catch(err){ console.error(err); alert("Error al actualizar. Revisa consola."); }
@@ -848,7 +857,7 @@ function setupAdminButton(){
 }
 
 /* =========================
-   Badge lateral (opcional)
+   Badge lateral (YouTube)
    ========================= */
 function ensureSidebarChannelBadge(){
   const rail=document.querySelector(".side-nav");
