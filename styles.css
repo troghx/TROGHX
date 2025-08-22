@@ -259,12 +259,45 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 .admin-login-form .tw-btn-secondary.is-gradient{ 
   background: linear-gradient(45deg, #ff00ff, #00ffff);
-  color: #0b0d10; font-weight: 700; border:0; border-radius:12px; padding:.6rem .9rem;
-  box-shadow: 0 6px 16px rgba(51,105,255,.25), inset 0 0 0 1px rgba(255,255,255,.06);
+  color: #0b0d10; font-weight: 700;
+  padding: 12px 24px;
+    padding-top: 12px;
+    padding-right: 24px;
+    padding-bottom: 12px;
+    padding-left: 24px;
+    font-size: 1rem;
+    text-transform: uppercase;
+    border: none;
+    border-top-width: initial;
+    border-right-width: initial;
+    border-bottom-width: initial;
+    border-left-width: initial;
+    border-top-style: none;
+    border-right-style: none;
+    border-bottom-style: none;
+    border-left-style: none;
+    border-top-color: initial;
+    border-right-color: initial;
+    border-bottom-color: initial;
+    border-left-color: initial;
+    border-image-source: initial;
+    border-image-slice: initial;
+    border-image-width: initial;
+    border-image-outset: initial;
+    border-image-repeat: initial;
+    border-radius: 50px;
+    border-top-left-radius: 50px;
+    border-top-right-radius: 50px;
+    border-bottom-right-radius: 50px;
+    border-bottom-left-radius: 50px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    transition-behavior: normal, normal;
+    transition-duration: 0.2s, 0.2s;
+    transition-timing-function: ease, ease;
+    transition-delay: 0s, 0s;
+    transition-property: transform, box-shadow;
 }
-.admin-login-form .tw-btn-secondary.is-gradient:hover{ filter:brightness(1.06); transform:translateY(-1px); }
-.admin-login-form .tw-btn-secondary.is-gradient:active{ transform:translateY(0); filter:brightness(.98); }
-.admin-login-form .tw-btn-secondary.is-gradient:focus-visible{ outline:none; box-shadow:0 0 0 3px rgba(51,105,255,.35), 0 6px 16px rgba(51,105,255,.25), inset 0 0 0 1px rgba(255,255,255,.06); }
 
 
 /* ---------- Filas y carruseles ---------- */
