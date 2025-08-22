@@ -9,36 +9,37 @@
 </head>
 <body>
   <!-- Barra lateral tipo Xbox -->
-<aside class="side-nav" aria-label="Navegación principal">
-  <!-- Juegos -->
-  <button class="nav-btn active" aria-label="Juegos" data-cat="game">
-    <!-- Gamepad -->
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6 10h12a4 4 0 1 1 0 8h-2l-2-2H10l-2 2H6a4 4 0 1 1 0-8Zm3-6a1 1 0 0 0-1 1v3h8V5a1 1 0 1 0-2 0v1h-4V5a1 1 0 0 0-1-1Z"/>
-      <circle cx="8.5" cy="13.5" r="1"/><circle cx="11" cy="13.5" r="1"/>
-      <circle cx="14" cy="13.5" r="1"/><circle cx="16.5" cy="13.5" r="1"/>
-    </svg>
-  </button>
-  <!-- Aplicaciones -->
-  <button class="nav-btn" aria-label="Aplicaciones" data-cat="app">
-    <!-- Grid 2x2 -->
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>
-    </svg>
-  </button>
-  <!-- Películas -->
-  <button class="nav-btn" aria-label="Películas" data-cat="movie">
-    <!-- Claqueta -->
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 8h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Zm0-2 2.5-3H10L7.5 6H3Zm6.5 0L12 3h4.5L14 6H9.5Zm6 0L18 3h2.5L19 6h-3.5Z"/>
-    </svg>
-  </button>
+  <aside class="side-nav" aria-label="Navegación principal">
+    <!-- Juegos -->
+    <button class="nav-btn active" aria-label="Juegos" data-cat="game">
+      <!-- Gamepad -->
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 10h12a4 4 0 1 1 0 8h-2l-2-2H10l-2 2H6a4 4 0 1 1 0-8Zm3-6a1 1 0 0 0-1 1v3h8V5a1 1 0 1 0-2 0v1h-4V5a1 1 0 0 0-1-1Z"/>
+        <circle cx="8.5" cy="13.5" r="1"/><circle cx="11" cy="13.5" r="1"/>
+        <circle cx="14" cy="13.5" r="1"/><circle cx="16.5" cy="13.5" r="1"/>
+      </svg>
+    </button>
+    <!-- Aplicaciones -->
+    <button class="nav-btn" aria-label="Aplicaciones" data-cat="app">
+      <!-- Grid 2x2 -->
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>
+      </svg>
+    </button>
+    <!-- Películas -->
+    <button class="nav-btn" aria-label="Películas" data-cat="movie">
+      <!-- Claqueta -->
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 8h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Zm0-2 2.5-3H10L7.5 6H3Zm6.5 0L12 3h4.5L14 6H9.5Zm6 0L18 3h2.5L19 6h-3.5Z"/>
+      </svg>
+    </button>
+
     <!-- Badge del canal de YouTube (abajo-izquierda) -->
-  <a class="yt-channel-badge" href="https://youtube.com/@troghx?si=OPHs2OXddhMZwydR"
-     target="_blank" rel="noopener" aria-label="YouTube channel">
-    <img src="assets/images/youtube-channel.png" alt="YouTube channel">
-  </a>
-</aside>
+    <a class="yt-channel-badge" href="https://youtube.com/@troghx?si=OPHs2OXddhMZwydR"
+       target="_blank" rel="noopener" aria-label="YouTube channel">
+      <img src="assets/images/youtube-channel.png" alt="YouTube channel">
+    </a>
+  </aside>
 
   <main class="main">
     <!-- Topbar -->
@@ -57,36 +58,33 @@
 
     <!-- Hero -->
     <section id="hero" class="hero card" aria-label="Destacado">
-  <div class="hero-copy">
-    <h1>Descarga sin problemas y sin virus.</h1>
-    <p>
-      Contáctanos en nuestras redes sociales para sugerir juegos o reportar problemas.
-    </p>
-    <div class="socials">
-      <div class="social-bar" aria-label="Redes sociales"></div>
-    </div>
-  </div>
-  <div class="hero-art" aria-label="Juego destacado" role="button" tabindex="0">
-    <div class="hero-carousel"></div>
-  </div>
-</section>
-<!-- Carrusel de filas / Sección de juegos recientes -->
-<section class="row section-grid" id="recientes">
-  <div class="row-head">
-  <h3>Recientes</h3>
-  <div class="row-tools"></div>
-  </div>
+      <div class="hero-copy">
+        <h1>Descarga sin problemas y sin virus.</h1>
+        <p>Contáctanos en nuestras redes sociales para sugerir juegos o reportar problemas.</p>
+        <div class="socials">
+          <div class="social-bar" aria-label="Redes sociales"></div>
+        </div>
+      </div>
+      <div class="hero-art" aria-label="Juego destacado" role="button" tabindex="0">
+        <div class="hero-carousel"></div>
+      </div>
+    </section>
 
-  <!-- Cuadrícula de juegos recientes -->
-  <div class="grid" id="gridRecientes" data-grid="recientes"></div>
+    <!-- Recientes (grid + pager) -->
+    <section class="row section-grid" id="recientes">
+      <div class="row-head">
+        <h3>Recientes</h3>
+        <div class="row-tools"></div>
+      </div>
 
-  <!-- Controles de paginación -->
-  <nav class="pager" id="gridPager" aria-label="Paginación de recientes">
-  <button class="pg-btn prev" disabled aria-label="Página anterior">◀</button>
-  <span class="pg-status" aria-live="polite">Página 1 / 1</span>
-  <button class="pg-btn next" disabled aria-label="Página siguiente">▶</button>
-  </nav>
-</section>
+      <div class="grid" id="gridRecientes" data-grid="recientes"></div>
+
+      <nav class="pager" id="gridPager" aria-label="Paginación de recientes">
+        <button class="pg-btn prev" disabled aria-label="Página anterior">◀</button>
+        <span class="pg-status" aria-live="polite">Página 1 / 1</span>
+        <button class="pg-btn next" disabled aria-label="Página siguiente">▶</button>
+      </nav>
+    </section>
   </main>
 
   <!-- Template de tarjeta -->
@@ -97,7 +95,6 @@
       <!-- PREVIEW EN INDEX: el video ya vive en el template -->
       <video class="tile-video" muted playsinline preload="metadata">
         <source src="assets/video/grounded2/trailer.mp4" type="video/mp4">
-
       </video>
 
       <div class="tile-info">
@@ -108,43 +105,42 @@
   </template>
 
   <!-- Template para el modal de añadir red social -->
-<template id="new-social-modal-template">
-  <div class="tw-modal" role="dialog" aria-label="Añadir red social">
-    <div class="tw-modal-content">
-      <button class="tw-modal-close" aria-label="Cerrar">×</button>
-      <h2>Añadir red social</h2>
-      <form class="new-social-form">
-        <label>
-          Nombre (opcional)
-          <input type="text" class="new-social-name" placeholder="Instagram, X, TikTok…" />
-        </label>
-        <label>
-          Imagen de la red (icono o logo)
-          <input type="file" class="new-social-image-file" accept="image/*" required />
-          <small class="input-hint">Se recomienda imagen cuadrada. Se ajustará al cuadro con recorte.</small>
-        </label>
-        <label>
-          Enlace a la red
-          <input type="url" class="new-social-url" placeholder="https://..." required />
-        </label>
-        <button type="submit" class="tw-modal-download">Guardar</button>
-      </form>
+  <template id="new-social-modal-template">
+    <div class="tw-modal" role="dialog" aria-label="Añadir red social">
+      <div class="tw-modal-content">
+        <button class="tw-modal-close" aria-label="Cerrar">×</button>
+        <h2>Añadir red social</h2>
+        <form class="new-social-form">
+          <label>
+            Nombre (opcional)
+            <input type="text" class="new-social-name" placeholder="Instagram, X, TikTok…" />
+          </label>
+          <label>
+            Imagen de la red (icono o logo)
+            <input type="file" class="new-social-image-file" accept="image/*" required />
+            <small class="input-hint">Se recomienda imagen cuadrada. Se ajustará al cuadro con recorte.</small>
+          </label>
+          <label>
+            Enlace a la red
+            <input type="url" class="new-social-url" placeholder="https://..." required />
+          </label>
+          <button type="submit" class="tw-modal-download">Guardar</button>
+        </form>
+      </div>
     </div>
-  </div>
-</template>
+  </template>
 
-
-  <!-- Template para el modal de juego -->
-<template id="game-modal-template">
-  <div class="tw-modal" role="dialog" aria-label="Detalles del juego">
-    <div class="tw-modal-content">
-      <button class="tw-modal-close" aria-label="Cerrar">×</button>
-      <img class="tw-modal-image" alt="Cover del juego" />
-      <h2 class="tw-modal-title"></h2>
-      <div class="tw-modal-description"></div>
+  <!-- Template para el modal de juego (COMPACTO, sin imagen y con scroll interno) -->
+  <template id="game-modal-template">
+    <div class="tw-modal game-modal" role="dialog" aria-label="Detalles del juego">
+      <div class="tw-modal-content">
+        <button class="tw-modal-close" aria-label="Cerrar">×</button>
+        <h2 class="tw-modal-title"></h2>
+        <!-- el JS inyecta aquí la descripción -->
+        <div class="tw-modal-description" id="gameModalContent"></div>
+      </div>
     </div>
-  </div>
-</template>
+  </template>
 
   <!-- Template para el modal de añadir/editar juego -->
   <template id="new-game-modal-template">
@@ -157,62 +153,60 @@
             Título
             <input type="text" class="new-game-title" required />
           </label>
+
           <label>Descripción</label>
-<div class="rich-editor">
-  <div class="rich-toolbar" role="toolbar" aria-label="Editor de texto">
-    <button type="button" class="rtb-btn" data-cmd="bold" title="Negritas (Ctrl+B)"><b>B</b></button>
-    <button type="button" class="rtb-btn" data-cmd="italic" title="Itálica (Ctrl+I)"><i>I</i></button>
-    <button type="button" class="rtb-btn" data-cmd="underline" title="Subrayado (Ctrl+U)"><u>U</u></button>
-    <span class="rtb-sep"></span>
-    <button type="button" class="rtb-btn" data-block="h2" title="Encabezado H2">H2</button>
-    <button type="button" class="rtb-btn" data-block="p" title="Párrafo">P</button>
-    <span class="rtb-sep"></span>
-    <label class="rtb-inline">
-      Fuente
-      <select class="rtb-font">
-        <option value="">Sistema</option>
-        <option value="Segoe UI">Segoe UI</option>
-        <option value="Roboto">Roboto</option>
-        <option value="Arial">Arial</option>
-        <option value="Times New Roman">Times New Roman</option>
-        <option value="Courier New">Courier New</option>
-      </select>
-    </label>
-    <span class="rtb-sep"></span>
-    <button type="button" class="rtb-btn" data-list="ul" title="Lista con viñetas">• Lista</button>
-    <span class="rtb-sep"></span>
-    <button type="button" class="rtb-btn rtb-link" title="Insertar enlace">🔗 Enlace</button>
-  </div>
-  <div class="editor-area" contenteditable="true" aria-label="Descripción enriquecida"></div>
-</div>
+          <div class="rich-editor">
+            <div class="rich-toolbar" role="toolbar" aria-label="Editor de texto">
+              <button type="button" class="rtb-btn" data-cmd="bold" title="Negritas (Ctrl+B)"><b>B</b></button>
+              <button type="button" class="rtb-btn" data-cmd="italic" title="Itálica (Ctrl+I)"><i>I</i></button>
+              <button type="button" class="rtb-btn" data-cmd="underline" title="Subrayado (Ctrl+U)"><u>U</u></button>
+              <span class="rtb-sep"></span>
+              <button type="button" class="rtb-btn" data-block="h2" title="Encabezado H2">H2</button>
+              <button type="button" class="rtb-btn" data-block="p" title="Párrafo">P</button>
+              <span class="rtb-sep"></span>
+              <label class="rtb-inline">
+                Fuente
+                <select class="rtb-font">
+                  <option value="">Sistema</option>
+                  <option value="Segoe UI">Segoe UI</option>
+                  <option value="Roboto">Roboto</option>
+                  <option value="Arial">Arial</option>
+                  <option value="Times New Roman">Times New Roman</option>
+                  <option value="Courier New">Courier New</option>
+                </select>
+              </label>
+              <span class="rtb-sep"></span>
+              <button type="button" class="rtb-btn" data-list="ul" title="Lista con viñetas">• Lista</button>
+              <span class="rtb-sep"></span>
+              <button type="button" class="rtb-btn rtb-link" title="Insertar enlace">🔗 Enlace</button>
+            </div>
+            <div class="editor-area" contenteditable="true" aria-label="Descripción enriquecida"></div>
+          </div>
+
           <label>
             Imagen de portada
             <input type="file" class="new-game-image-file" accept="image/*" required />
           </label>
+
           <label>
             Trailer (archivo .mp4, opcional)
             <input type="file" accept="video/mp4" class="new-game-trailer-file" />
             <small class="input-hint">También puedes pegar un enlace abajo. Si subes un archivo, el trailer podría no conservarse tras recargar.</small>
           </label>
+
           <label>
             URL del trailer (opcional)
             <input type="text" class="new-game-trailer-url"
-             inputmode="url"
-             placeholder="https://... o /assets/video/astroneer/trailer.mp4" hidden >
+                   inputmode="url"
+                   placeholder="https://... o /assets/video/astroneer/trailer.mp4" hidden>
           </label>
-          <!-- Campo opcional
-          <label>
-            Enlace de descarga
-            <input type="url" class="new-game-download" placeholder="https://..." />
-          </label>
-          -->
+
           <button type="submit" class="tw-modal-download">Guardar juego</button>
         </form>
       </div>
     </div>
   </template>
 
-  
   <!-- Template para el login de administrador -->
   <template id="admin-login-modal-template">
     <div class="tw-modal" role="dialog" aria-label="Iniciar sesión administrador">
@@ -237,6 +231,7 @@
       </div>
     </div>
   </template>
-<script src="script.js"></script>
+
+  <script src="script.js"></script>
 </body>
 </html>
