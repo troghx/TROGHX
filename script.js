@@ -58,7 +58,7 @@ async function hashCreds(user,pin,salt){ const key=`${user}::${pin}::${salt}`; r
    ========================= */
 async function apiList(category = window.currentCategory) {
   const qs = new URLSearchParams({ lite: "1", limit: "200", category });
-  const r = await fetch(`${API_POSTS}?${qs.toString()}`); // deja caché del navegador (tenemos Cache-Control)
+  const r = await fetch(`${API_POSTS}?${qs.toString()}`);
   if (!r.ok) throw new Error("No se pudo listar posts");
   return r.json();
 }
@@ -307,51 +307,56 @@ function applyStatusBadge(tile, first_link, link_ok){
 }
 
 /* =========================
-   Editor enriquecido
+   Editor enriquecido (SIN duplicar botones)
    ========================= */
 function initRichEditor(editorRoot){
   const editorArea = editorRoot.querySelector(".editor-area");
   const toolbar    = editorRoot.querySelector(".rich-toolbar");
+  if (!editorArea || !toolbar) return { getHTML:()=>"", setHTML:()=>{} };
 
+  // Si faltan solo los botones de alineación, agrégalos (sin repetir B/I/U/etc.)
   if (!toolbar.querySelector(".rtb-align")) {
-    const group=document.createElement("div");
-    group.className="rtb-group";
-    group.innerHTML=`
-      <button type="button" class="rtb-btn rtb-bold" data-cmd="bold" title="Negrita">B</button>
-      <button type="button" class="rtb-btn rtb-italic" data-cmd="italic" title="Cursiva">/</button>
-      <button type="button" class="rtb-btn rtb-underline" data-cmd="underline" title="Subrayado">U</button>
-      <button type="button" class="rtb-btn" data-block="H2" title="H2">H2</button>
-      <button type="button" class="rtb-btn" data-block="P" title="Párrafo">P</button>
-      <select class="rtb-font" title="Fuente">
-        <option value="">Sistema</option>
-        <option>Arial</option><option>Inter</option><option>Roboto</option>
-      </select>
-      <button type="button" class="rtb-btn" data-list="ul" title="Lista">• Lista</button>
-      <button type="button" class="rtb-btn rtb-link" title="Insertar enlace">• Enlace</button>
+    const sep = document.createElement("span");
+    sep.className = "rtb-sep";
+    const wrap = document.createElement("span");
+    wrap.className = "rtb-align-wrap";
+    wrap.innerHTML = `
       <button type="button" class="rtb-btn rtb-align" data-align="left"   title="Alinear izquierda">⟸</button>
       <button type="button" class="rtb-btn rtb-align" data-align="center" title="Centrar">⟺</button>
       <button type="button" class="rtb-btn rtb-align" data-align="right"  title="Alinear derecha">⟹</button>
     `;
-    toolbar.appendChild(group);
+    toolbar.appendChild(sep);
+    toolbar.appendChild(wrap);
   }
 
+  const colorBtn  = toolbar.querySelector(".rtb-color");
+  const colorInput= toolbar.querySelector(".rtb-color-input");
+
   function exec(cmd,val=null){ document.execCommand(cmd,false,val); editorArea.focus(); }
+
   toolbar.addEventListener("click",(e)=>{
     const btn=e.target.closest(".rtb-btn"); if(!btn) return;
-    const {cmd, block, list, align} = btn.dataset;
-    if(cmd) exec(cmd);
-    if(block) exec("formatBlock", block);
-    if(list==="ul") exec("insertUnorderedList");
-    if(btn.classList.contains("rtb-link")) insertLinkChip(editorArea);
-    if(align){
-      if(align==="left")   exec("justifyLeft");
-      if(align==="center") exec("justifyCenter");
-      if(align==="right")  exec("justifyRight");
+    if (btn.classList.contains("rtb-link")) { insertLinkChip(editorArea); return; }
+    if (btn.classList.contains("rtb-align")) {
+      const a = btn.dataset.align;
+      if(a==="left")   exec("justifyLeft");
+      if(a==="center") exec("justifyCenter");
+      if(a==="right")  exec("justifyRight");
+      return;
     }
+    const {cmd, block, list} = btn.dataset;
+    if (cmd) exec(cmd);
+    if (block) exec("formatBlock", block.toUpperCase());
+    if (list==="ul") exec("insertUnorderedList");
   });
 
   const fontSel=toolbar.querySelector(".rtb-font");
   if(fontSel){ fontSel.addEventListener("change", ()=>{ const v=fontSel.value.trim(); if(v) exec("fontName", v); else editorArea.focus(); }); }
+
+  if (colorBtn && colorInput){
+    colorBtn.addEventListener("click", ()=> colorInput.click());
+    colorInput.addEventListener("input", ()=> exec("foreColor", colorInput.value));
+  }
 
   return { getHTML: ()=>editorArea.innerHTML.trim(), setHTML: (h)=>{ editorArea.innerHTML=h||""; } };
 }
@@ -381,7 +386,7 @@ function updatePager(totalPages){
   pager.style.display = (totalPages>1) ? "flex" : "none";
 }
 function attachHoverVideo(tile, g, vidEl){
-  // crea video si el template no lo tiene
+  // Crea video si el template no lo trae
   if (!vidEl) {
     vidEl = document.createElement("video");
     vidEl.className = "tile-video";
@@ -396,7 +401,6 @@ function attachHoverVideo(tile, g, vidEl){
     if (once) return true;
     const src = await apiGetVideo(g.id);
     if (!src) return false;
-    // asigna src
     vidEl.src = src;
     try { vidEl.load(); } catch {}
     once = true;
@@ -408,7 +412,7 @@ function attachHoverVideo(tile, g, vidEl){
     if (!ok) return;
     vidEl.currentTime = 0;
     const p = vidEl.play();
-    if (p && p.catch) p.catch(()=>{ /* autoplay blocked, ignore */ });
+    if (p && p.catch) p.catch(()=>{ /* autoplay blocked */ });
   };
   const stop  = () => { try{ vidEl.pause(); vidEl.currentTime=0; }catch{} };
   const show  = () => vidEl.classList.add("playing");
@@ -459,10 +463,10 @@ function renderRow(keepScroll=false){
     tile.tabIndex=0;
     tile.addEventListener("click", ()=> openGameLazy(g));
 
-    // Usamos la miniatura directamente (sin pedir detalle)
+    // Miniatura (sin pedir detalle)
     cover.style.backgroundImage = `url(${g.image_thumb || placeholder})`;
 
-    // Badge de estado usando campos lite (sin red)
+    // Badge de estado (usando first_link/link_ok del lite)
     applyStatusBadge(tile, g.first_link || "", g.link_ok);
 
     grid.appendChild(node);
@@ -487,10 +491,9 @@ function renderHeroCarousel(){
 }
 
 /* =========================
-   Modal ver juego (carga detalle al abrir)
+   Modal ver juego (carga detalle al abrir) — SIN imagen
    ========================= */
 async function openGameLazy(game){
-  // Usa los datos "lite" mientras llega el detalle
   let data = game;
   try{
     const full = await apiGet(game.id);
@@ -500,21 +503,17 @@ async function openGameLazy(game){
   }
   openGame(data);
 }
-
 function openGame(game){
-  // Clona el template del modal de juego
   const modal = modalTemplate.content.cloneNode(true);
-  const modalNode    = modal.querySelector(".tw-modal");              // contenedor
-  const modalContent = modal.querySelector(".tw-modal-content");      // cuerpo
-  const modalTitle   = modal.querySelector(".tw-modal-title");        // título
-  const modalDesc    = modal.querySelector(".tw-modal-description");  // descripción
-  const modalClose   = modal.querySelector(".tw-modal-close");        // botón cerrar
+  const modalNode    = modal.querySelector(".tw-modal");
+  const modalContent = modal.querySelector(".tw-modal-content");
+  const modalTitle   = modal.querySelector(".tw-modal-title");
+  const modalDesc    = modal.querySelector(".tw-modal-description");
+  const modalClose   = modal.querySelector(".tw-modal-close");
 
-  // ⚠️ Ya NO hay imagen/hero en el modal: no intentes setear .src
   if(modalTitle) modalTitle.textContent = game?.title || "Sin título";
   if(modalDesc)  modalDesc.innerHTML    = game?.description || "Sin descripción";
 
-  // Opciones de admin (kebab)
   if(isAdmin){
     const kebabBtn=document.createElement("button");
     kebabBtn.className="tw-modal-menu";
@@ -546,13 +545,19 @@ function openGame(game){
     }
   }
 
-  // Accesibilidad / cierre
   const removeTrap = trapFocus(modalNode);
   const onEscape   = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
   if(modalClose) modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
-
-  // Inserta/abre el modal (usa tu helper existente)
   openModalFragment(modalNode);
+}
+function deleteGame(game){
+  if(!game.id){ alert("No se encontró ID."); return; }
+  const token = localStorage.getItem("tgx_admin_token") || "";
+  if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
+  apiDelete(game.id, token)
+    .then(()=> reloadData())
+    .then(()=> alert("Publicación eliminada."))
+    .catch(e=>{ console.error(e); alert("Error al borrar."); });
 }
 
 /* =========================
@@ -624,7 +629,6 @@ function openNewGameModal(){
       return;
     }
 
-    // trailer opcional
     let previewSrc=null;
     if(trailerFile){
       if(!/^video\/(mp4|webm)$/i.test(trailerFile.type)){ alert("El trailer debe ser MP4 o WEBM."); return; }
@@ -726,7 +730,6 @@ function openEditGame(original){
       try{ patch.previewVideo = await readAsDataURL(trailerFile); }catch (err){ console.error("[edit trailer read]", err); alert("No se pudo leer el trailer."); return; }
     }
 
-    // recalcular link_ok y first_link
     const first_link = extractFirstLink(descHTML);
     patch.first_link = first_link || null;
     patch.link_ok = first_link ? await fetchLinkOk(first_link) : null;
@@ -981,6 +984,7 @@ function ensureSidebarChannelBadge(){
 
   let el = rail.querySelector(".yt-channel-badge");
 
+  // Si fuera <a>, lo convierto a <button> para Admin Center (sin romper estilos)
   if (el && el.tagName === "A") {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -1005,7 +1009,7 @@ function ensureSidebarChannelBadge(){
 }
 
 /* =========================
-   Admin Center (igual que antes)
+   Admin Center
    ========================= */
 function randomKey(len=28){
   const chars="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -1120,5 +1124,3 @@ async function initData(){
   setupSideNav();
 }
 initData();
-
-
