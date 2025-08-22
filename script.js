@@ -1,13 +1,15 @@
 /* =========================
-   TROGH — script.js (Grid + Paginación, con categorías)
+   TROGH — script.js (Grid + Paginación + Admin Keys + Categorías)
    ========================= */
 
+/* ------- Templates del HTML ------- */
 const template = document.getElementById("tile-template");
 const modalTemplate = document.getElementById("game-modal-template");
 const adminLoginModalTemplate = document.getElementById("admin-login-modal-template");
 const newGameModalTemplate = document.getElementById("new-game-modal-template");
 const newSocialModalTemplate = document.getElementById("new-social-modal-template");
 
+/* ------- LocalStorage keys ------- */
 const LS_RECENTES   = "tgx_recientes";
 const LS_ADMIN      = "tgx_is_admin";
 const LS_ADMIN_HASH = "tgx_admin_hash";
@@ -15,21 +17,25 @@ const LS_ADMIN_SALT = "tgx_admin_salt";
 const LS_ADMIN_USER = "tgx_admin_user";
 const LS_SOCIALS    = "tgx_socials";
 
+/* ------- Endpoints ------- */
 const API_POSTS = "/.netlify/functions/posts";
 const API_SOC   = "/.netlify/functions/socials";
 const API_LINK  = "/.netlify/functions/linkcheck";
+const API_ADM   = "/.netlify/functions/admins";
 
+/* ------- Estado ------- */
 let isAdmin = false;
 let recientes = [];
 let socials  = [];
 window.currentCategory = "game";
-
 let PAGE_SIZE = 12;
 let page = 1;
 let searchQuery = "";
-
 const fullCache = new Map();
 
+/* =========================
+   Utilidades base
+   ========================= */
 function rehydrate() {
   try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES)||"[]"); if(Array.isArray(saved)) recientes = saved; } catch {}
   try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS)||"[]"); if(Array.isArray(savedS)) socials = savedS; } catch {}
@@ -46,7 +52,9 @@ async function sha256(str){ const enc=new TextEncoder().encode(str); const diges
 function genSaltHex(len=16){ const a=new Uint8Array(len); crypto.getRandomValues(a); return Array.from(a).map(b=>b.toString(16).padStart(2,"0")).join(""); }
 async function hashCreds(user,pin,salt){ const key=`${user}::${pin}::${salt}`; return sha256(key); }
 
-/* ============ API POSTS ============ */
+/* =========================
+   API: Posts
+   ========================= */
 async function apiList(category = window.currentCategory) {
   const qs = new URLSearchParams({ lite: "1", limit: "200", category });
   const r = await fetch(`${API_POSTS}?${qs.toString()}`, { cache: "no-store" });
@@ -87,7 +95,9 @@ async function apiDelete(id, token){
   return r.json();
 }
 
-/* ============ API SOCIALS ============ */
+/* =========================
+   API: Socials
+   ========================= */
 async function socialsList(){
   const r = await fetch(API_SOC, { cache:"no-store" });
   if(!r.ok) throw new Error("No se pudo listar socials");
@@ -108,7 +118,41 @@ async function socialsDelete(id, token){
   return r.json();
 }
 
-/* ============ Modales ============ */
+/* =========================
+   API: Admin Keys
+   ========================= */
+async function adminLoginByKeyHash(keyHash) {
+  const r = await fetch(`${API_ADM}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ keyHash })
+  });
+  if (!r.ok) return { ok: false };
+  return r.json();
+}
+async function adminListKeys(token){
+  const r = await fetch(`${API_ADM}`, { headers:{ "Authorization":`Bearer ${token||""}` } });
+  if(!r.ok) throw new Error("No se pudo listar llaves");
+  return r.json();
+}
+async function adminCreateKey(name, keyHash, token){
+  const r = await fetch(`${API_ADM}`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${token||""}` },
+    body: JSON.stringify({ name, keyHash })
+  });
+  if(!r.ok){ const t=await r.text().catch(()=> ""); throw new Error(`Crear llave falló: ${t}`); }
+  return r.json();
+}
+async function adminRevokeKey(id, token){
+  const r = await fetch(`${API_ADM}/${id}`, { method:"DELETE", headers:{ "Authorization":`Bearer ${token||""}` } });
+  if(!r.ok){ const t=await r.text().catch(()=> ""); throw new Error(`Revocar falló: ${t}`); }
+  return r.json();
+}
+
+/* =========================
+   Helpers de modal / focus
+   ========================= */
 function openModalFragment(fragment){ document.body.appendChild(fragment); setTimeout(()=>fragment.classList.add("active"),0); }
 function closeModal(modalNode, removeTrap, onEscape){
   modalNode.classList.remove("active");
@@ -131,7 +175,9 @@ function trapFocus(modalNode){
   return () => modalNode.removeEventListener("keydown", onKey);
 }
 
-/* ============ Media helpers ============ */
+/* =========================
+   Media helpers
+   ========================= */
 function readAsDataURL(file){
   return new Promise((resolve,reject)=>{
     const fr=new FileReader();
@@ -159,7 +205,9 @@ async function compressImage(file,{maxW=960,maxH=960,quality=0.8}={}){
   return out;
 }
 
-/* ============ Enlaces/Chips ============ */
+/* =========================
+   Chips de enlace y estilos por plataforma
+   ========================= */
 function platformFromUrl(u){
   const s=(u||"").toLowerCase();
   if (s.startsWith("magnet:") || s.endsWith(".torrent") || s.includes("utorrent")) return "torrent";
@@ -191,7 +239,9 @@ function extractFirstLink(html){
   return a ? a.getAttribute("href") : "";
 }
 
-/* ============ Linkcheck ============ */
+/* =========================
+   Linkcheck + badge
+   ========================= */
 const linkCache = new Map();
 async function checkLink(url){
   if(!url) return { ok:false, status:null };
@@ -219,46 +269,6 @@ function platformIconSVG(plat){
     default:          return `<svg ${common} fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>`;
   }
 }
-
-/* ============ Editor enriquecido ============ */
-function initRichEditor(editorRoot){
-  const editorArea = editorRoot.querySelector(".editor-area");
-  const toolbar    = editorRoot.querySelector(".rich-toolbar");
-
-  if (!toolbar.querySelector(".rtb-align")) {
-    const group=document.createElement("div");
-    group.className="rtb-group";
-    group.innerHTML=`
-      <button type="button" class="rtb-btn rtb-align" data-align="left"   title="Alinear izquierda">⟸</button>
-      <button type="button" class="rtb-btn rtb-align" data-align="center" title="Centrar">⟺</button>
-      <button type="button" class="rtb-btn rtb-align" data-align="right"  title="Alinear derecha">⟹</button>
-      <button type="button" class="rtb-btn rtb-link" title="Insertar enlace">• Enlace</button>
-    `;
-    toolbar.appendChild(group);
-  }
-
-  function exec(cmd,val=null){ document.execCommand(cmd,false,val); editorArea.focus(); }
-  toolbar.addEventListener("click",(e)=>{
-    const btn=e.target.closest(".rtb-btn"); if(!btn) return;
-    const {cmd, block, list, align} = btn.dataset;
-    if(cmd) exec(cmd);
-    if(block) exec("formatBlock", block);
-    if(list==="ul") exec("insertUnorderedList");
-    if(btn.classList.contains("rtb-link")) insertLinkChip(editorArea);
-    if(align){
-      if(align==="left")   exec("justifyLeft");
-      if(align==="center") exec("justifyCenter");
-      if(align==="right")  exec("justifyRight");
-    }
-  });
-
-  const fontSel=toolbar.querySelector(".rtb-font");
-  if(fontSel){ fontSel.addEventListener("change", ()=>{ const v=fontSel.value.trim(); if(v) exec("fontName", v); else editorArea.focus(); }); }
-
-  return { getHTML: ()=>editorArea.innerHTML.trim(), setHTML: (h)=>{ editorArea.innerHTML=h||""; } };
-}
-
-/* ============ Badges ============ */
 async function applyLinkStatusBadge(tile, game){
   let badge = tile.querySelector(".tile-info .badge");
   if(!badge){
@@ -291,13 +301,64 @@ async function applyLinkStatusBadge(tile, game){
   }
 }
 
-/* ============ GRID + Paginación ============ */
+/* =========================
+   Editor enriquecido
+   ========================= */
+function initRichEditor(editorRoot){
+  const editorArea = editorRoot.querySelector(".editor-area");
+  const toolbar    = editorRoot.querySelector(".rich-toolbar");
+
+  if (!toolbar.querySelector(".rtb-align")) {
+    const group=document.createElement("div");
+    group.className="rtb-group";
+    group.innerHTML=`
+      <button type="button" class="rtb-btn rtb-bold" data-cmd="bold" title="Negrita">B</button>
+      <button type="button" class="rtb-btn rtb-italic" data-cmd="italic" title="Cursiva">/</button>
+      <button type="button" class="rtb-btn rtb-underline" data-cmd="underline" title="Subrayado">U</button>
+      <button type="button" class="rtb-btn" data-block="H2" title="H2">H2</button>
+      <button type="button" class="rtb-btn" data-block="P" title="Párrafo">P</button>
+      <select class="rtb-font" title="Fuente">
+        <option value="">Sistema</option>
+        <option>Arial</option><option>Inter</option><option>Roboto</option>
+      </select>
+      <button type="button" class="rtb-btn" data-list="ul" title="Lista">• Lista</button>
+      <button type="button" class="rtb-btn rtb-link" title="Insertar enlace">• Enlace</button>
+      <button type="button" class="rtb-btn rtb-align" data-align="left"   title="Alinear izquierda">⟸</button>
+      <button type="button" class="rtb-btn rtb-align" data-align="center" title="Centrar">⟺</button>
+      <button type="button" class="rtb-btn rtb-align" data-align="right"  title="Alinear derecha">⟹</button>
+    `;
+    toolbar.appendChild(group);
+  }
+
+  function exec(cmd,val=null){ document.execCommand(cmd,false,val); editorArea.focus(); }
+  toolbar.addEventListener("click",(e)=>{
+    const btn=e.target.closest(".rtb-btn"); if(!btn) return;
+    const {cmd, block, list, align} = btn.dataset;
+    if(cmd) exec(cmd);
+    if(block) exec("formatBlock", block);
+    if(list==="ul") exec("insertUnorderedList");
+    if(btn.classList.contains("rtb-link")) insertLinkChip(editorArea);
+    if(align){
+      if(align==="left")   exec("justifyLeft");
+      if(align==="center") exec("justifyCenter");
+      if(align==="right")  exec("justifyRight");
+    }
+  });
+
+  const fontSel=toolbar.querySelector(".rtb-font");
+  if(fontSel){ fontSel.addEventListener("change", ()=>{ const v=fontSel.value.trim(); if(v) exec("fontName", v); else editorArea.focus(); }); }
+
+  return { getHTML: ()=>editorArea.innerHTML.trim(), setHTML: (h)=>{ editorArea.innerHTML=h||""; } };
+}
+
+/* =========================
+   GRID + Paginación
+   ========================= */
 function getFilteredList(){
   if(!searchQuery) return recientes;
   const q = searchQuery.toLowerCase();
   return recientes.filter(g => (g.title||"").toLowerCase().includes(q));
 }
-
 function updatePager(totalPages){
   const pager  = document.getElementById("gridPager");
   if(!pager) return;
@@ -314,7 +375,6 @@ function updatePager(totalPages){
 
   pager.style.display = (totalPages>1) ? "flex" : "none";
 }
-
 function observeTileForDetails(tile, g, coverEl, vidEl){
   const placeholder = "assets/images/construction/en-proceso.svg";
   coverEl.style.backgroundImage = `url(${placeholder})`;
@@ -363,7 +423,6 @@ function observeTileForDetails(tile, g, coverEl, vidEl){
 
   io.observe(tile);
 }
-
 function renderRow(keepScroll=false){
   const grid = document.getElementById("gridRecientes");
   if(!grid) return;
@@ -405,7 +464,9 @@ function renderRow(keepScroll=false){
   if(!keepScroll) grid.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-/* ============ HERO simple ============ */
+/* =========================
+   HERO (versión simple)
+   ========================= */
 function renderHeroCarousel(){
   const hero = document.querySelector(".hero");
   if(!hero) return;
@@ -416,7 +477,9 @@ function renderHeroCarousel(){
   if(heroCarousel) heroCarousel.innerHTML="";
 }
 
-/* ============ Modal ver ============ */
+/* =========================
+   Modal: ver juego
+   ========================= */
 async function openGameLazy(game){
   let g = game;
   try{
@@ -426,7 +489,6 @@ async function openGameLazy(game){
   }catch{}
   openGame(g);
 }
-
 function openGame(game){
   const modal = modalTemplate.content.cloneNode(true);
   const modalNode     = modal.querySelector(".tw-modal");
@@ -464,6 +526,7 @@ function openGame(game){
         if(confirm("¿Eliminar esta publicación?")) deleteGame(game);
       }
     });
+
     modalContent.appendChild(kebabBtn);
     modalContent.appendChild(panel);
   }
@@ -473,7 +536,6 @@ function openGame(game){
   modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
   openModalFragment(modalNode);
 }
-
 function deleteGame(game){
   if(!game.id){ alert("No se encontró ID."); return; }
   const token = localStorage.getItem("tgx_admin_token") || "";
@@ -484,7 +546,9 @@ function deleteGame(game){
     .catch(e=>{ console.error(e); alert("Error al borrar."); });
 }
 
-/* ============ Category select helper ============ */
+/* =========================
+   Selector de categoría
+   ========================= */
 function makeCategorySelect(current="game"){
   const wrap=document.createElement("label");
   wrap.style.display="block";
@@ -501,7 +565,9 @@ function makeCategorySelect(current="game"){
   return wrap;
 }
 
-/* ============ Nuevo / Editar ============ */
+/* =========================
+   Nuevo / Editar
+   ========================= */
 function openNewGameModal(){
   const modal = newGameModalTemplate.content.cloneNode(true);
   const node  = modal.querySelector(".tw-modal");
@@ -515,11 +581,9 @@ function openNewGameModal(){
   const editorRoot= modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
 
-  // Selector de categoría
   const catSel = makeCategorySelect("game");
   form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
 
-  // Ocultamos URL de trailer (no se usa)
   if(trailerUrlInput){
     trailerUrlInput.value=""; trailerUrlInput.disabled=true;
     const label=trailerUrlInput.closest("label"); if(label) label.style.display="none";
@@ -567,7 +631,6 @@ function openNewGameModal(){
 
   openModalFragment(node);
 }
-
 function openEditGame(original){
   const modal = newGameModalTemplate.content.cloneNode(true);
   const node  = modal.querySelector(".tw-modal");
@@ -584,7 +647,6 @@ function openEditGame(original){
   if(titleInput) titleInput.value = original.title || "";
   editorAPI.setHTML(original.description || "");
 
-  // Selector de categoría
   const catSel = makeCategorySelect(original.category || "game");
   form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
 
@@ -650,7 +712,9 @@ function openEditGame(original){
   openModalFragment(node);
 }
 
-/* ============ Social bar ============ */
+/* =========================
+   Social bar
+   ========================= */
 function openNewSocialModal(){
   const modal = newSocialModalTemplate.content.cloneNode(true);
   const node  = modal.querySelector(".tw-modal");
@@ -719,7 +783,9 @@ function renderSocialBar(){
   }
 }
 
-/* ============ Búsqueda ============ */
+/* =========================
+   Búsqueda
+   ========================= */
 function setupSearch(){
   const input=document.getElementById("searchInput");
   if(!input) return;
@@ -730,7 +796,9 @@ function setupSearch(){
   });
 }
 
-/* ============ Side nav (categorías) ============ */
+/* =========================
+   Side nav (categorías)
+   ========================= */
 function setupSideNav(){
   const btns = Array.from(document.querySelectorAll('.side-nav .nav-btn'));
   if(!btns.length) return;
@@ -756,11 +824,13 @@ function setupSideNav(){
   setActive(window.currentCategory || "game");
 }
 
-/* ============ Admin ============ */
+/* =========================
+   Admin: Token y Login con llave
+   ========================= */
 function ensureAuthTokenPrompt(){
   try{
     const k="tgx_admin_token"; let t=localStorage.getItem(k);
-    if(!t){ t = prompt("Pega tu AUTH_TOKEN de Netlify para crear/editar/borrar:"); if(t) localStorage.setItem(k, t.trim()); }
+    if(!t){ t = prompt("Pega tu AUTH_TOKEN de Netlify (requerido para publicar/editar/borrar):"); if(t) localStorage.setItem(k, t.trim()); }
   }catch{}
 }
 function openAdminLoginModal(){
@@ -773,17 +843,25 @@ function openAdminLoginModal(){
   const submitBtn     = form.querySelector('button[type="submit"]');
   const modalClose    = modal.querySelector(".tw-modal-close");
 
+  const imgDecor = node.querySelector(".tw-modal-image"); // por si la plantilla la trae
+  if (imgDecor) imgDecor.style.display = "none";
+
+  const accessWrap = document.createElement("label");
+  accessWrap.innerHTML = `Llave de acceso <input type="password" class="admin-access" required>
+    <span class="input-hint">La llave puede revocarse desde Admin Center</span>`;
+  form.insertBefore(accessWrap, form.querySelector(".tw-modal-actions") || form.lastElementChild);
+
   const savedHash = localStorage.getItem(LS_ADMIN_HASH);
   const savedSalt = localStorage.getItem(LS_ADMIN_SALT);
   const savedUser = localStorage.getItem(LS_ADMIN_USER);
   const isFirstRun = !(savedHash && savedSalt && savedUser);
 
   if(isFirstRun){
-    if(h2) h2.textContent="Configurar administrador";
-    if(submitBtn) submitBtn.textContent="Crear y entrar";
+    if(h2) h2.textContent="Entrar como administrador";
+    if(submitBtn) submitBtn.textContent="Entrar";
     const confirmLabel=document.createElement("label");
     confirmLabel.innerHTML=`Confirmar PIN <input type="password" class="admin-pin2" required>
-      <span class="input-hint">Repite el PIN (4 a 6 dígitos).</span>`;
+      <span class="input-hint">Sólo para tu dispositivo (4 a 6 dígitos)</span>`;
     form.insertBefore(confirmLabel, form.querySelector(".tw-modal-actions") || form.lastElementChild);
   }
 
@@ -795,31 +873,36 @@ function openAdminLoginModal(){
     e.preventDefault();
     const user=(usernameInput.value||"").trim();
     const pin =(pinInput.value||"").trim();
-    if(!user || !pin){ alert("Completa usuario y PIN."); return; }
+    const accessPlain = node.querySelector(".admin-access")?.value?.trim();
+
+    if(!user || !pin || !accessPlain){ alert("Usuario, PIN y Llave son obligatorios."); return; }
     if(!/^[0-9]{4,6}$/.test(pin)){ alert("PIN debe ser 4 a 6 dígitos."); return; }
+
+    const accessHash = await sha256(accessPlain);
+    const res = await adminLoginByKeyHash(accessHash);
+    if(!res?.ok){ alert("Llave inválida o revocada."); return; }
 
     if(isFirstRun){
       const pin2 = node.querySelector(".admin-pin2")?.value?.trim();
       if(pin!==pin2){ alert("Los PIN no coinciden."); return; }
       const salt=genSaltHex(16);
       const hash=await hashCreds(user,pin,salt);
-      try{ localStorage.setItem(LS_ADMIN_HASH,hash); localStorage.setItem(LS_ADMIN_SALT,salt); localStorage.setItem(LS_ADMIN_USER,user); }catch{}
-      isAdmin=true; persistAdmin(true);
-      closeModal(node, removeTrap, onEscape);
-      renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
-      ensureAuthTokenPrompt();
-      alert("Administrador configurado e iniciado.");
+      try{
+        localStorage.setItem(LS_ADMIN_HASH,hash);
+        localStorage.setItem(LS_ADMIN_SALT,salt);
+        localStorage.setItem(LS_ADMIN_USER,user);
+      }catch{}
     } else {
       if(user!==savedUser){ alert("Usuario o PIN incorrectos."); return; }
       const hash=await hashCreds(user,pin,savedSalt);
-      if(hash===savedHash){
-        isAdmin=true; persistAdmin(true);
-        closeModal(node, removeTrap, onEscape);
-        renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
-        ensureAuthTokenPrompt();
-        alert("¡Sesión iniciada como admin!");
-      }else{ alert("Usuario o PIN incorrectos."); }
+      if(hash!==savedHash){ alert("Usuario o PIN incorrectos."); return; }
     }
+
+    isAdmin=true; persistAdmin(true);
+    closeModal(node, removeTrap, onEscape);
+    renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
+    ensureAuthTokenPrompt();
+    alert("¡Admin verificado!");
   });
 
   openModalFragment(node);
@@ -828,7 +911,7 @@ function setupAdminButton(){
   const btn=document.querySelector(".user-pill");
   if(!btn) return;
   btn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
-  btn.addEventListener("click", ()=>{
+  btn.onclick = ()=>{
     if(isAdmin){
       if(confirm("¿Cerrar sesión de administrador?")){
         isAdmin=false; persistAdmin(false);
@@ -838,26 +921,126 @@ function setupAdminButton(){
     } else {
       openAdminLoginModal();
     }
-  });
+  };
 }
 
-/* ============ Lateral YouTube ============ */
+/* =========================
+   Admin Center (gestión de llaves)
+   ========================= */
+function randomKey(len=28){
+  const chars="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  let s=""; const a=new Uint8Array(len); crypto.getRandomValues(a);
+  for(const n of a) s += chars[n % chars.length];
+  return s;
+}
+function openAdminCenter(){
+  if(!isAdmin){ return; }
+  const token=localStorage.getItem("tgx_admin_token")||"";
+  if(!token){ alert("Falta AUTH_TOKEN de Netlify para gestionar llaves."); return; }
+
+  const frag = document.createDocumentFragment();
+  const wrap = document.createElement("div");
+  wrap.className="tw-modal active";
+  wrap.innerHTML = `
+  <div class="tw-modal-backdrop"></div>
+  <div class="tw-modal-content" style="max-width:720px">
+    <button class="tw-modal-close" aria-label="Cerrar">×</button>
+    <h2 class="tw-modal-title">Admin Center · Llaves de acceso</h2>
+    <div class="tw-modal-body">
+      <div class="adm-actions" style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem;">
+        <input class="adm-new-name" placeholder="Nombre (opcional)" style="flex:1;min-width:120px;">
+        <button class="adm-new-btn">Crear nueva llave</button>
+      </div>
+      <div class="adm-note" style="font-size:.9rem;opacity:.85;margin:.25rem 0 .75rem">
+        La llave se muestra una sola vez al crearla. Comparte el texto de la llave con quien tendrá acceso.
+      </div>
+      <div class="adm-list" style="max-height:50vh;overflow:auto;border:1px solid #2a323a;border-radius:12px;padding:.5rem"></div>
+    </div>
+  </div>`;
+  frag.appendChild(wrap);
+  document.body.appendChild(frag);
+
+  const modalClose = wrap.querySelector(".tw-modal-close");
+  const removeTrap=trapFocus(wrap);
+  const onEscape=(e)=>{ if(e.key==="Escape") closeModal(wrap, removeTrap, onEscape); };
+  modalClose.addEventListener("click", ()=> closeModal(wrap, removeTrap, onEscape));
+
+  const listBox = wrap.querySelector(".adm-list");
+  const btnNew  = wrap.querySelector(".adm-new-btn");
+  const nameInp = wrap.querySelector(".adm-new-name");
+
+  function renderList(items){
+    listBox.innerHTML="";
+    if(!items.length){ listBox.innerHTML=`<div style="opacity:.7">No hay llaves creadas.</div>`; return; }
+    for(const it of items){
+      const row=document.createElement("div");
+      row.style.display="grid";
+      row.style.gridTemplateColumns="1fr auto auto";
+      row.style.alignItems="center";
+      row.style.gap=".5rem";
+      row.style.padding=".4rem .25rem";
+      row.style.borderBottom="1px dashed #2a323a";
+      const idShort = String(it.id).slice(-6).padStart(6,"·");
+      const status = it.revoked_at ? "Revocada" : "Activa";
+      row.innerHTML = `
+        <div>
+          <div style="font-weight:600">${it.name || "(sin nombre)"} <span style="opacity:.6">#${idShort}</span></div>
+          <div style="opacity:.65;font-size:.85rem">${new Date(it.created_at).toLocaleString()} · ${status}</div>
+        </div>
+        <button class="adm-revoke">${it.revoked_at ? "Revocada" : "Revocar"}</button>
+        <button class="adm-copy-hash" title="Copiar hash" disabled>Hash oculto</button>
+      `;
+      const revokeBtn = row.querySelector(".adm-revoke");
+      revokeBtn.addEventListener("click", async ()=>{
+        if(it.revoked_at){ alert("Ya está revocada."); return; }
+        if(!confirm("¿Revocar esta llave?")) return;
+        try{ await adminRevokeKey(it.id, token); await refresh(); }
+        catch(err){ console.error(err); alert("No se pudo revocar."); }
+      });
+      listBox.appendChild(row);
+    }
+  }
+  async function refresh(){
+    try{ const data=await adminListKeys(token); renderList(Array.isArray(data)?data:[]); }
+    catch(err){ console.error(err); listBox.innerHTML=`<div style="color:#ff9e9e">Error cargando llaves.</div>`; }
+  }
+  btnNew.addEventListener("click", async ()=>{
+    const name = (nameInp.value||"").trim();
+    const plain = randomKey(28);
+    const hash = await sha256(plain);
+    try{
+      await adminCreateKey(name, hash, token);
+      await refresh();
+      setTimeout(()=>{ alert(`Llave creada.\n\nEntregar al usuario:\n${plain}\n\n(Se valida por hash en servidor)`); }, 50);
+    }catch(err){ console.error(err); alert("No se pudo crear llave."); }
+  });
+  refresh();
+}
+
+/* =========================
+   Badge lateral → Admin Center
+   ========================= */
 function ensureSidebarChannelBadge(){
   const rail=document.querySelector(".side-nav");
   if(!rail) return;
   let badge=rail.querySelector(".yt-channel-badge");
   if(!badge){
-    badge=document.createElement("a");
+    badge=document.createElement("button");
+    badge.type="button";
     badge.className="yt-channel-badge";
-    badge.href="https://youtube.com/@TU_CANAL"; badge.target="_blank"; badge.rel="noopener";
+    badge.title="Admin Center";
     const img=document.createElement("img");
-    img.src="assets/images/youtube-channel.png"; img.alt="YouTube channel";
+    img.src="assets/images/youtube-channel.png";
+    img.alt="Admin Center";
     badge.appendChild(img);
     rail.appendChild(badge);
   }
+  badge.onclick = ()=> { if(isAdmin) openAdminCenter(); };
 }
 
-/* ============ Carga inicial ============ */
+/* =========================
+   Carga inicial
+   ========================= */
 async function reloadData(){
   try{ const data=await apiList(window.currentCategory); recientes=Array.isArray(data)?data:[]; }
   catch(e){ console.error("[reload posts]", e); recientes=[]; }
