@@ -1,5 +1,5 @@
 /* =========================
-   TROGH — script.js (completo)
+   TROGH — script.js (Grid + Paginación)
    ========================= */
 
 /* === Templates === */
@@ -27,6 +27,10 @@ let isAdmin = false;
 let recientes = [];
 let socials  = [];
 window.currentCategory = "game";
+
+let PAGE_SIZE = 12;     // tarjetas por página
+let page = 1;           // página actual (1..N)
+let searchQuery = "";   // filtro de búsqueda
 
 /* =========================
    Utilidades básicas
@@ -236,7 +240,6 @@ function initRichEditor(editorRoot){
   const editorArea = editorRoot.querySelector(".editor-area");
   const toolbar    = editorRoot.querySelector(".rich-toolbar");
 
-  // Botones de alineación + enlace
   if (!toolbar.querySelector(".rtb-align")) {
     const group=document.createElement("div");
     group.className="rtb-group";
@@ -306,14 +309,56 @@ async function applyLinkStatusBadge(tile, game){
 }
 
 /* =========================
-   Render fila (Recientes)
+   Render GRID + Paginación
    ========================= */
-function renderRow(){
-  const container = document.querySelector('.carousel[data-row="recientes"]') || document.querySelector('.carousel');
-  if(!container) return;
-  container.innerHTML="";
+function getFilteredList(){
+  if(!searchQuery) return recientes;
+  const q = searchQuery.toLowerCase();
+  return recientes.filter(g =>
+    (g.title||"").toLowerCase().includes(q) ||
+    (g.description||"").toLowerCase().includes(q)
+  );
+}
 
-  recientes.forEach((g)=>{
+function updatePager(totalPages){
+  const pager  = document.getElementById("gridPager");
+  if(!pager) return;
+  const status = pager.querySelector(".pg-status");
+  const prev   = pager.querySelector(".prev");
+  const next   = pager.querySelector(".next");
+
+  status.textContent = `Página ${page} / ${totalPages}`;
+  prev.disabled = page<=1;
+  next.disabled = page>=totalPages;
+
+  prev.onclick = ()=>{ if(page>1){ page--; renderRow(true); } };
+  next.onclick = ()=>{ if(page<totalPages){ page++; renderRow(true); } };
+
+  pager.style.display = (totalPages>1) ? "flex" : "none";
+}
+
+function renderRow(keepScroll=false){
+  const grid = document.getElementById("gridRecientes");
+  if(!grid) return;
+  const list = getFilteredList();
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  if(page > totalPages) page = totalPages;
+
+  const start = (page-1) * PAGE_SIZE;
+  const slice = list.slice(start, start + PAGE_SIZE);
+
+  grid.innerHTML = "";
+
+  if(isAdmin){
+    const addTile = document.createElement("div");
+    addTile.className = "add-game-tile";
+    addTile.tabIndex = 0;
+    addTile.innerHTML = "<span>+ Añadir juego</span>";
+    addTile.addEventListener("click", openNewGameModal);
+    grid.appendChild(addTile);
+  }
+
+  slice.forEach((g)=>{
     const node = template.content.cloneNode(true);
     const tile = node.querySelector(".tile");
     const cover= node.querySelector(".cover");
@@ -355,19 +400,13 @@ function renderRow(){
 
     tile.tabIndex=0;
     tile.addEventListener("click", ()=> openGame(g));
-    container.appendChild(node);
+    grid.appendChild(node);
 
     applyLinkStatusBadge(tile, g);
   });
 
-  if(isAdmin){
-    const addTile=document.createElement("div");
-    addTile.className="add-game-tile";
-    addTile.tabIndex=0;
-    addTile.innerHTML="<span>+ Añadir juego</span>";
-    addTile.addEventListener("click", openNewGameModal);
-    container.insertBefore(addTile, container.firstChild);
-  }
+  updatePager(totalPages);
+  if(!keepScroll) grid.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 /* =========================
@@ -478,7 +517,6 @@ function openNewGameModal(){
   const catSel = makeCategorySelect("game");
   form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
 
-  // Oculta/inhabilita el campo URL del trailer (solo archivo)
   if(trailerUrlInput){
     trailerUrlInput.value=""; trailerUrlInput.disabled=true;
     const label=trailerUrlInput.closest("label"); if(label) label.style.display="none";
@@ -549,7 +587,6 @@ function openEditGame(original){
   const catSel = makeCategorySelect(original.category || "game");
   form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
 
-  // Checkbox "Quitar trailer"
   let clearTrailerCb=null;
   {
     const trailerGroup = trailerFileInput?.closest("label")?.parentElement || form;
@@ -594,13 +631,13 @@ function openEditGame(original){
 
     try{
       await apiUpdate(original.id, patch, token);
-      const data = await apiList();
+      const data = await apiList(window.currentCategory);
       recientes = Array.isArray(data)?data:[];
-      // mover editado al inicio
       const idx = recientes.findIndex(p=>p.id===original.id);
       if(idx>0){ const [item]=recientes.splice(idx,1); recientes.unshift(item); }
       closeModal(node, removeTrap, onEscape);
-      renderRow(); renderHeroCarousel(); fitRecientesRow(); setupArrows();
+      page = 1;  // tras editar, vuelve a la primera página
+      renderRow(); renderHeroCarousel();
       alert("¡Publicación actualizada!");
     }catch(err){ console.error(err); alert("Error al actualizar. Revisa consola."); }
   });
@@ -687,13 +724,9 @@ function setupSearch(){
   const input=document.getElementById("searchInput");
   if(!input) return;
   input.addEventListener("input", ()=>{
-    const q=input.value.toLowerCase();
-    const row=document.querySelector('.carousel[data-row="recientes"]') || document.querySelector('.carousel');
-    if(!row) return;
-    row.querySelectorAll(".tile").forEach(tile=>{
-      const title=tile.querySelector(".title")?.textContent?.toLowerCase() || "";
-      tile.style.display = title.includes(q) ? "" : "none";
-    });
+    searchQuery = input.value.trim();
+    page = 1;
+    renderRow();
   });
 }
 
@@ -704,95 +737,26 @@ function setupSideNav(){
   const btns = Array.from(document.querySelectorAll('.side-nav .nav-btn'));
   if(!btns.length) return;
 
-  function inferCat(btn){
-    return btn.dataset.cat || ({
-      "Juegos":"game", "Aplicaciones":"app", "Apps":"app", "Películas":"movie", "Movies":"movie"
-    })[btn.getAttribute("aria-label")] || "game";
-  }
-  function setActive(cat){ btns.forEach(b=> b.classList.toggle("active", inferCat(b)===cat)); }
+  function setActive(cat){ btns.forEach(b=> b.classList.toggle("active", (b.dataset.cat||"game")===cat)); }
 
   btns.forEach(btn=>{
     btn.addEventListener("click", async ()=>{
-      const cat = inferCat(btn);
+      const cat = btn.dataset.cat || "game";
       if(window.currentCategory === cat) return;
       window.currentCategory = cat;
       setActive(cat);
       try{
         const data = await apiList(cat);
         recientes = Array.isArray(data)?data:[];
-        renderRow(); fitRecientesRow(); setupArrows(); renderHeroCarousel();
+        page = 1;
+        renderRow();
+        renderHeroCarousel();
       }catch(e){ console.error("[nav]", e); }
     });
   });
 
   setActive(window.currentCategory || "game");
 }
-
-/* =========================
-   Flechas + ajuste al viewport
-   ========================= */
-function fitRecientesRow(){
-  const row=document.querySelector('.carousel[data-row="recientes"]') || document.querySelector('.carousel');
-  if(!row) return;
-  const section=row.closest('.section-recientes') || row.parentElement;
-  const sectionRect = section ? section.getBoundingClientRect() : { top:0 };
-  const titleEl = section?.querySelector('.row-head') || null;
-  const titleH  = titleEl ? titleEl.getBoundingClientRect().height : 0;
-
-  const bottomPad=20;
-  const available=window.innerHeight - sectionRect.top - bottomPad;
-  let tileH=Math.floor(available - titleH - 16);
-  tileH=Math.max(120, Math.min(tileH, 220));
-  row.style.setProperty('--tile-h', `${tileH}px`);
-}
-
-function setupArrows(){
-  const row  = document.querySelector('.carousel[data-row="recientes"]') || document.querySelector('.carousel');
-  const prev = document.querySelector('.row .arrow.prev');
-  const next = document.querySelector('.row .arrow.next');
-  if(!row || !prev || !next) return;
-
-  const SCROLL_THRESHOLD = 18;
-
-  const recalc = ()=>{
-    fitRecientesRow();
-    const tiles = row.querySelectorAll('.tile');
-    const addTile = row.querySelector('.add-game-tile');
-    const count = tiles.length + (addTile ? 1 : 0);
-
-    const hasOverflow = row.scrollWidth > row.clientWidth + 2;
-    const showArrows  = hasOverflow || count >= SCROLL_THRESHOLD;
-
-    prev.style.display = showArrows ? '' : 'none';
-    next.style.display = showArrows ? '' : 'none';
-
-    if(!showArrows) row.scrollLeft = 0;
-  };
-
-  prev.onclick = ()=> row.scrollBy({ left: -Math.max(400, row.clientWidth*0.8), behavior:"smooth" });
-  next.onclick = ()=> row.scrollBy({ left:  Math.max(400, row.clientWidth*0.8), behavior:"smooth" });
-
-  window.addEventListener("resize", recalc);
-  new ResizeObserver(recalc).observe(row);
-  new MutationObserver(recalc).observe(row, { childList:true });
-
-  recalc();
-}
-
-/* === Evitar scroll global, pero dejar escribir en inputs/editor === */
-window.addEventListener('keydown', (e) => {
-  const el = e.target;
-  const isEditable = el.isContentEditable ||
-    /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) ||
-    el.getAttribute('role') === 'textbox';
-  if (isEditable) return;
-  const keys = ['ArrowDown','ArrowUp','PageDown','PageUp','Home','End',' '];
-  if (keys.includes(e.key) && !el.closest('.carousel')) e.preventDefault();
-}, { passive: false });
-
-window.addEventListener('wheel', (e) => {
-  if (!e.target.closest('.carousel')) e.preventDefault();
-}, { passive: false });
 
 /* =========================
    Admin / Login
@@ -884,7 +848,7 @@ function setupAdminButton(){
 }
 
 /* =========================
-   Badge lateral (imagen canal, opcional)
+   Badge lateral (opcional)
    ========================= */
 function ensureSidebarChannelBadge(){
   const rail=document.querySelector(".side-nav");
@@ -907,7 +871,8 @@ function ensureSidebarChannelBadge(){
 async function reloadData(){
   try{ const data=await apiList(window.currentCategory); recientes=Array.isArray(data)?data:[]; }
   catch(e){ console.error("[reload posts]", e); recientes=[]; }
-  renderRow(); fitRecientesRow(); setupArrows(); renderHeroCarousel();
+  renderRow();
+  renderHeroCarousel();
 }
 
 async function initData(){
@@ -917,8 +882,6 @@ async function initData(){
   catch(e){ console.error("[initData socials]", e); socials=[]; }
 
   renderRow();
-  fitRecientesRow();
-  setupArrows();
   setupSearch();
   setupAdminButton();
   renderHeroCarousel();

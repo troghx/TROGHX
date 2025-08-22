@@ -627,3 +627,64 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 }
 .hero.hero--simple .hero-copy h1{ font-size:1.5rem; }
 .hero.hero--simple .socials{ margin-top:12px; }
+
+/* Página sin scroll global; el grid es quien scrollea */
+html, body { height: 100%; overflow: hidden; }
+@supports (height: 100dvh) { body { height: 100dvh; } }
+
+main, .main, .page, .app, .content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Sección de grid ocupa todo el espacio restante */
+.section-grid { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* La cuadrícula scrollea en vertical, no la página completa */
+.grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+
+  /* Grid responsive */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  padding: 8px 6px 16px;
+}
+
+/* Tarjetas 16:9 (se adaptan al zoom/alto) */
+.grid .tile, .grid .add-game-tile {
+  aspect-ratio: 16 / 9;
+  height: auto;              /* el alto lo da aspect-ratio */
+}
+
+/* Portada y video ocupan toda la tarjeta */
+.grid .cover { height: 100%; background-size: cover; background-position: center; }
+.grid .tile-video { height: 100%; width: 100%; object-fit: cover; }
+
+/* Paginación */
+.pager {
+  display: flex; align-items: center; justify-content: center;
+  gap: 12px; padding: 8px 0 12px; border-top: 1px solid rgba(255,255,255,0.06);
+}
+.pg-btn {
+  background: linear-gradient(90deg,#a855f7,#06b6d4);
+  border: none; color: #0b1220; font-weight: 700;
+  padding: 8px 14px; border-radius: 10px; cursor: pointer;
+}
+.pg-btn[disabled] { opacity: .45; cursor: not-allowed; }
+.pg-status { opacity: .8; }
+
+/* Mantén tu "Añadir juego" pegado arriba a la izquierda en grid */
+.add-game-tile {
+  display: grid; place-items: center;
+  border: 1px dashed rgba(255,255,255,.15);
+  background: rgba(255,255,255,.03);
+  border-radius: 14px; cursor: pointer; font-weight: 700;
+}
+.add-game-tile:hover { background: rgba(255,255,255,.06); }
