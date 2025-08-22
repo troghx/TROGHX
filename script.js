@@ -1021,21 +1021,36 @@ function openAdminCenter(){
    Badge lateral → Admin Center
    ========================= */
 function ensureSidebarChannelBadge(){
-  const rail=document.querySelector(".side-nav");
+  const rail = document.querySelector(".side-nav");
   if(!rail) return;
-  let badge=rail.querySelector(".yt-channel-badge");
-  if(!badge){
-    badge=document.createElement("button");
-    badge.type="button";
-    badge.className="yt-channel-badge";
-    badge.title="Admin Center";
-    const img=document.createElement("img");
-    img.src="assets/images/youtube-channel.png";
-    img.alt="Admin Center";
-    badge.appendChild(img);
-    rail.appendChild(badge);
+
+  let el = rail.querySelector(".yt-channel-badge");
+
+  // Si ya existe y es <a>, lo convertimos en <button> sin perder la imagen/hijos
+  if (el && el.tagName === "A") {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = el.className;  // conserva estilos .yt-channel-badge
+    // mover los hijos (la imagen) al nuevo botón
+    while (el.firstChild) btn.appendChild(el.firstChild);
+    el.replaceWith(btn);
+    el = btn;
   }
-  badge.onclick = ()=> { if(isAdmin) openAdminCenter(); };
+
+  // Si no existía, lo creamos
+  if (!el) {
+    el = document.createElement("button");
+    el.type = "button";
+    el.className = "yt-channel-badge";
+    const img = document.createElement("img");
+    img.src = "assets/images/youtube-channel.png";
+    img.alt = "Admin Center";
+    el.appendChild(img);
+    rail.appendChild(el);
+  }
+
+  // Click: sólo admins abren Admin Center. No hay navegación a ningún link.
+  el.onclick = () => { if (isAdmin) openAdminCenter(); };
 }
 
 /* =========================
@@ -1061,3 +1076,4 @@ async function initData(){
   setupSideNav();
 }
 initData();
+
