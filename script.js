@@ -297,7 +297,7 @@ async function applyLinkStatusBadge(tile, game){
 
 /* === RENDER ROW === */
 function renderRow(){
-  const container = document.querySelector(`.carousel[data-row="recientes"]`);
+  const container = document.querySelector(`.feed-grid[data-row="recientes"]`);
   if(!container) return;
   container.innerHTML = "";
 
@@ -385,8 +385,6 @@ function openGame(game){
   modalTitle.textContent = game.title || "Sin título";
   modalDescription.innerHTML = game.description || "Sin descripción";
 
-  let docClickHandler = null;
-
   if(isAdmin){
     const kebabBtn = document.createElement("button");
     kebabBtn.className = "tw-modal-menu";
@@ -398,8 +396,7 @@ function openGame(game){
       <button class="tw-kebab-item danger" data-action="delete">Eliminar</button>
     `;
     kebabBtn.addEventListener("click",(e)=>{ e.stopPropagation(); panel.classList.toggle("show"); });
-    docClickHandler = (e)=>{ if(!panel.contains(e.target) && e.target!==kebabBtn) panel.classList.remove("show"); };
-    document.addEventListener("click", docClickHandler);
+    document.addEventListener("click",(e)=>{ if(!panel.contains(e.target) && e.target!==kebabBtn) panel.classList.remove("show"); });
     panel.addEventListener("click",(e)=>{
       const action = e.target?.dataset?.action;
       if(action==="edit"){ panel.classList.remove("show"); openEditGame(game); }
@@ -413,19 +410,9 @@ function openGame(game){
   }
 
   const removeTrap = trapFocus(modalNode);
-  const onEscape = (e)=>{
-    if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape);
-  };
+  const onEscape = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
   modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
   openModalFragment(modalNode);
-
-  // Clean up document click handler when modal closes
-  modalNode.addEventListener("transitionend", function cleanup() {
-    if (!modalNode.classList.contains("active")) {
-      if (docClickHandler) document.removeEventListener("click", docClickHandler);
-      modalNode.removeEventListener("transitionend", cleanup);
-    }
-  });
 }
 
 /* === CRUD === */
@@ -722,7 +709,7 @@ function setupSearch(){
       (g.title||"").toLowerCase().includes(q) ||
       (g.description||"").toLowerCase().includes(q)
     );
-    const container = document.querySelector(`.carousel[data-row="recientes"]`);
+    const container = document.querySelector(`.feed-grid[data-row="recientes"]`);
     if(!container) return;
     container.innerHTML = "";
     filtered.forEach((g)=>{
@@ -730,51 +717,19 @@ function setupSearch(){
       const tile = node.querySelector(".tile");
       const cover = node.querySelector(".cover");
       const title = node.querySelector(".title");
-      const vid   = node.querySelector(".tile-video");
       cover.style.backgroundImage = `url(${g.image})`;
-      preload(g.image);
       title.textContent = g.title;
-      tile.tabIndex = 0;
       tile.addEventListener("click", ()=>openGame(g));
-      // Add video preview logic as in renderRow
-      if (vid) {
-        let loaded = false;
-        vid.poster = g.image;
-        vid.muted = true; vid.loop = true; vid.playsInline = true;
-        vid.setAttribute("muted",""); vid.setAttribute("playsinline","");
-        vid.preload = "metadata";
-        const sourceEl = vid.querySelector("source");
-        const ensureSrc = async () => {
-          if (loaded) return true;
-          let pv = g.previewVideo || g.preview_video || "";
-          if (!pv && g.id) {
-            try { const full = await apiGet(g.id); pv = full.previewVideo || full.preview_video || ""; if (pv) g.previewVideo = pv; } catch {}
-          }
-          if (!pv) return false;
-          if (sourceEl) { sourceEl.src = pv; vid.load(); } else { vid.src = pv; }
-          loaded = true; return true;
-        };
-        const start = async ()=>{ const ok = await ensureSrc(); if(!ok) return; vid.currentTime = 0; const p=vid.play(); if(p&&p.catch) p.catch(()=>{}); };
-        const stop  = ()=>{ vid.pause(); vid.currentTime = 0; };
-        const show  = ()=>vid.classList.add("playing");
-        const hide  = ()=>vid.classList.remove("playing");
-        vid.addEventListener("playing", show);
-        vid.addEventListener("pause", hide);
-        vid.addEventListener("ended", hide);
-        vid.addEventListener("error", ()=>{ vid.remove(); });
-        tile.addEventListener("pointerenter", start);
-        tile.addEventListener("pointerleave", stop);
-        tile.addEventListener("focus", start);
-        tile.addEventListener("blur", stop);
-      }
       container.appendChild(node);
-      applyLinkStatusBadge(tile, g);
     });
   });
 }
+function setupArrows(){ /* arrows removed in grid layout */ }
+function setupKeyboardNav(){ /* grid: no-op */ }
 
+// Ajusta la altura de las tarjetas al alto visible (sin scroll global)
 function fitRecientesRow(){
-  const row = document.querySelector('.carousel[data-row="recientes"]');
+  const row = document.querySelector('.feed-grid[data-row="recientes"]');
   if(!row) return;
 
   const section = row.closest('.section-recientes') || row.parentElement;
@@ -794,94 +749,12 @@ function fitRecientesRow(){
   row.style.setProperty('--tile-h', `${tileH}px`);
 }
 
-function setupArrows(){
-  const row  = document.querySelector(`.carousel[data-row="recientes"]`);
-  const prev = document.querySelector(".arrow.prev");
-  const next = document.querySelector(".arrow.next");
-  if(!row || !prev || !next) return;
 
-  const SCROLL_THRESHOLD = 18;
-
-  // Remove previous listeners to avoid duplicates
-  prev.replaceWith(prev.cloneNode(true));
-  next.replaceWith(next.cloneNode(true));
-  const prevNew = document.querySelector(".arrow.prev");
-  const nextNew = document.querySelector(".arrow.next");
-
-  const recalc = ()=>{
-    fitRecientesRow();
-    const tiles = row.querySelectorAll(".tile");
-    const addTile = row.querySelector(".add-game-tile");
-    const count = tiles.length + (addTile ? 1 : 0);
-    const hasOverflow = row.scrollWidth > row.clientWidth + 2;
-
-    if (count >= SCROLL_THRESHOLD) {
-      row.classList.add("scrollable");
-    } else {
-      row.classList.remove("scrollable");
-    }
-
-    const showArrows = hasOverflow || count >= SCROLL_THRESHOLD;
-    prevNew.style.display = showArrows ? "" : "none";
-    nextNew.style.display = showArrows ? "" : "none";
-
-    if (!showArrows) row.scrollLeft = 0;
-  };
-
-  prevNew.addEventListener("click", ()=> row.scrollBy({ left: -Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
-  nextNew.addEventListener("click", ()=> row.scrollBy({ left:  Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
-
-  ["wheel", "touchmove"].forEach(evt => {
-    row.addEventListener(evt, e => e.preventDefault(), { passive: false });
-  });
-
-  window.addEventListener("resize", recalc);
-  new ResizeObserver(recalc).observe(row);
-  new MutationObserver(recalc).observe(row, { childList: true });
-
-  recalc();
-}
-
-function setupAdminButton(){
-  const adminBtn = document.querySelector(".user-pill");
-  if(!adminBtn) return;
-  adminBtn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
-  // Remove previous event listeners by cloning
-  const newBtn = adminBtn.cloneNode(true);
-  if (adminBtn.parentNode) {
-    adminBtn.parentNode.replaceChild(newBtn, adminBtn);
-    newBtn.addEventListener("click", ()=>{
-      if(isAdmin){
-        if(confirm("¿Cerrar sesión de administrador?")){
-          isAdmin = false; persistAdmin(false);
-          renderRow(); renderHeroCarousel(); renderSocialBar();
-          alert("Sesión cerrada.");
-        }
-      } else {
-        openAdminLoginModal();
-      }
-    });
-  }
-}
-
-function ensureSidebarChannelBadge(){
-  const rail = document.querySelector(".sidebar, .side-rail, aside[aria-label='Sidebar'], aside") || null;
-  if(!rail) return;
-  const cs = getComputedStyle(rail);
-  if (cs.position === "static") rail.style.position = "relative";
-  let badge = rail.querySelector(".yt-channel-badge");
-  if(!badge){
-    badge = document.createElement("a");
-    badge.className = "yt-channel-badge";
-    badge.href = "https://youtube.com/@TU_CANAL";
-    badge.target = "_blank"; badge.rel = "noopener";
-    const img = document.createElement("img");
-    img.src = "assets/images/youtube-channel.png";
-    img.alt = "YouTube channel";
-    badge.appendChild(img);
-    rail.appendChild(badge);
-  }
-}
+/* === ADMIN LOGIN === */
+function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
+async function sha256(str){ const enc=new TextEncoder().encode(str); const digest=await crypto.subtle.digest("SHA-256",enc); return toHex(digest); }
+function genSaltHex(len=16){ const a=new Uint8Array(len); crypto.getRandomValues(a); return Array.from(a).map(b=>b.toString(16).padStart(2,"0")).join(""); }
+async function hashCreds(user,pin,salt){ return sha256(`${user}::${pin}::${salt}`); }
 
 function openAdminLoginModal(){
   const modal = adminLoginModalTemplate.content.cloneNode(true);
@@ -956,20 +829,18 @@ function setupAdminButton(){
   adminBtn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
   // Remove previous event listeners by cloning
   const newBtn = adminBtn.cloneNode(true);
-  if (adminBtn.parentNode) {
-    adminBtn.parentNode.replaceChild(newBtn, adminBtn);
-    newBtn.addEventListener("click", ()=>{
-      if(isAdmin){
-        if(confirm("¿Cerrar sesión de administrador?")){
-          isAdmin = false; persistAdmin(false);
-          renderRow(); renderHeroCarousel(); renderSocialBar();
-          alert("Sesión cerrada.");
-        }
-      } else {
-        openAdminLoginModal();
+  adminBtn.parentNode.replaceChild(newBtn, adminBtn);
+  newBtn.addEventListener("click", ()=>{
+    if(isAdmin){
+      if(confirm("¿Cerrar sesión de administrador?")){
+        isAdmin = false; persistAdmin(false);
+        renderRow(); renderHeroCarousel(); renderSocialBar();
+        alert("Sesión cerrada.");
       }
-    });
-  }
+    } else {
+      openAdminLoginModal();
+    }
+  });
 }
 
 /* === SIDEBAR BADGE (imagen canal) === */
@@ -993,28 +864,22 @@ function ensureSidebarChannelBadge(){
 }
 
 /* === NAV: Games / Apps / Movies === */
-function setupCategoryNav()
-{
-  let btnGames = document.querySelector('[data-nav="games"], .nav-games');
-  let btnApps  = document.querySelector('[data-nav="apps"], .nav-apps');
-  let btnMovies= document.querySelector('[data-nav="movies"], .nav-movies');
-
-  // Fallback: map side-nav buttons by order if missing data attributes
-  const navBtns = Array.from(document.querySelectorAll('.side-nav .nav-btn'));
-  if (!btnGames && navBtns[0]) { btnGames = navBtns[0]; btnGames.classList.add('nav-games'); btnGames.setAttribute('data-nav','games'); }
-  if (!btnApps  && navBtns[1]) { btnApps  = navBtns[1]; btnApps .classList.add('nav-apps');  btnApps .setAttribute('data-nav','apps');  }
-  if (!btnMovies&& navBtns[2]) { btnMovies= navBtns[2]; btnMovies.classList.add('nav-movies');btnMovies.setAttribute('data-nav','movies');}
+function setupCategoryNav(){
+  const btnGames = document.querySelector('[data-nav="games"], .nav-games');
+  const btnApps  = document.querySelector('[data-nav="apps"], .nav-apps');
+  const btnMovies= document.querySelector('[data-nav="movies"], .nav-movies');
 
   function setActive(cat){
     currentCategory = cat;
     [btnGames, btnApps, btnMovies].forEach(b=>{
       if(!b) return;
-      const active = (b === btnGames && cat === "game") ||
-                     (b === btnApps  && cat === "app")  ||
-                     (b === btnMovies&& cat === "movie");
-      b.classList.toggle("active", active);
-      b.setAttribute('aria-pressed', active ? 'true' : 'false');
+      b.classList.toggle("active", 
+        (b === btnGames && cat === "game") ||
+        (b === btnApps && cat === "app") ||
+        (b === btnMovies && cat === "movie")
+      );
     });
+    // Await reloadData to ensure UI updates after data is loaded
     reloadData();
   }
 
@@ -1023,29 +888,7 @@ function setupCategoryNav()
   if(btnMovies)btnMovies.addEventListener("click", ()=> setActive("movie"));
 }
 
-
-// Utilidad: ¿el objetivo es editable o está dentro de un modal?
-function isEditableTarget(target){
-  if(!target) return false;
-  if (target.closest && (target.closest('.tw-modal') || target.closest('.rich-editor'))) return true;
-  const el = target.nodeType === 3 ? target.parentElement : target; // text node fallback
-  if(!el) return false;
-  if (el.isContentEditable) return true;
-  const tag = el.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.getAttribute('role') === 'textbox';
-}
-// Evita scroll global; permite scroll horizontal en .carousel
-window.addEventListener('wheel', (e) => {
-  if (e.target.closest && e.target.closest('.carousel')) return; 
-  if (isEditableTarget(e.target)) return; 
-  e.preventDefault();
-}, { passive: false });
-
-window.addEventListener('keydown', (e) => {
-  const keys = ['ArrowDown','ArrowUp','PageDown','PageUp','Home','End',' '];
-  if (e.target.closest && e.target.closest('.carousel')) return;
-  if (isEditableTarget(e.target)) return;
-  if (keys.includes(e.key)) e.preventDefault();
+// Scroll desbloqueado para permitir ajuste responsivo y uso de barra espaciadora.
 }, { passive: false });
 
 
