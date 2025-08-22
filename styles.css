@@ -269,23 +269,29 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 }
 .arrow:hover { background: #19222c; }
 
+/* Carrusel: horizontal, sin wrap; el alto lo recalcula JS */
 .carousel {
-  --tile-w: 280px;
+  --tile-h: 180px;               /* JS la recalcula según viewport */
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;             /* <— importante */
   gap: 14px;
-  overflow: hidden;
+  overflow-x: auto;              /* <— scroll horizontal */
+  overflow-y: hidden;
   align-content: flex-start;
   padding-bottom: 8px;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
 .carousel::-webkit-scrollbar { display: none; }
+
+/* Tarjetas 16:9 con altura variable (—tile-h) */
 .carousel .tile,
-.carousel .add-game-tile {
-  flex: 0 0 var(--tile-w);
-  width: var(--tile-w);
+.carousel .add-game-tile{
+  height: var(--tile-h);
+  width: calc(var(--tile-h) * 16 / 9);
+  flex: 0 0 auto;
 }
+
 
 /* Mantener visible el “+ Añadir juego” (solo admin) */
 .add-game-tile {
