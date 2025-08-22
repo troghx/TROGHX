@@ -297,7 +297,7 @@ async function applyLinkStatusBadge(tile, game){
 
 /* === RENDER ROW === */
 function renderRow(){
-  const container = document.querySelector(`.feed-grid[data-row="recientes"]`);
+  const container = document.querySelector(`.carousel[data-row="recientes"]`);
   if(!container) return;
   container.innerHTML = "";
 
@@ -709,7 +709,7 @@ function setupSearch(){
       (g.title||"").toLowerCase().includes(q) ||
       (g.description||"").toLowerCase().includes(q)
     );
-    const container = document.querySelector(`.feed-grid[data-row="recientes"]`);
+    const container = document.querySelector(`.carousel[data-row="recientes"]`);
     if(!container) return;
     container.innerHTML = "";
     filtered.forEach((g)=>{
@@ -724,12 +724,59 @@ function setupSearch(){
     });
   });
 }
-function setupArrows(){ /* arrows removed in grid layout */ }
-function setupKeyboardNav(){ /* grid: no-op */ }
+function setupArrows(){
+  const row  = document.querySelector(`.carousel[data-row="recientes"]`);
+  const prev = document.querySelector(".arrow.prev");
+  const next = document.querySelector(".arrow.next");
+  if(!row || !prev || !next) return;
+
+  const SCROLL_THRESHOLD = 18;
+
+  const recalc = ()=>{
+    fitRecientesRow();
+    const tiles = row.querySelectorAll(".tile");
+    const addTile = row.querySelector(".add-game-tile");
+    const count = tiles.length + (addTile ? 1 : 0);
+    const hasOverflow = row.scrollWidth > row.clientWidth + 2;
+
+    if (count >= SCROLL_THRESHOLD) {
+      row.classList.add("scrollable");
+    } else {
+      row.classList.remove("scrollable");
+    }
+
+    const showArrows = hasOverflow || count >= SCROLL_THRESHOLD;
+    prev.style.display = showArrows ? "" : "none";
+    next.style.display = showArrows ? "" : "none";
+
+    if (!showArrows) row.scrollLeft = 0;
+  };
+
+  prev.addEventListener("click", ()=> row.scrollBy({ left: -Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
+  next.addEventListener("click", ()=> row.scrollBy({ left:  Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
+
+  ["wheel", "touchmove"].forEach(evt => {
+    row.addEventListener(evt, e => e.preventDefault(), { passive: false });
+  });
+
+  window.addEventListener("resize", recalc);
+  new ResizeObserver(recalc).observe(row);
+  new MutationObserver(recalc).observe(row, { childList: true });
+
+  recalc();
+}
+function setupKeyboardNav(){
+  const row = document.querySelector(`.carousel[data-row="recientes"]`);
+  if(!row) return;
+  row.addEventListener("keydown",(e)=>{
+    if(e.key==="ArrowRight"){ e.preventDefault(); row.scrollBy({ left: 200, behavior: "smooth" }); }
+    if(e.key==="ArrowLeft") { e.preventDefault(); row.scrollBy({ left: -200, behavior: "smooth" }); }
+  });
+}
 
 // Ajusta la altura de las tarjetas al alto visible (sin scroll global)
 function fitRecientesRow(){
-  const row = document.querySelector('.feed-grid[data-row="recientes"]');
+  const row = document.querySelector('.carousel[data-row="recientes"]');
   if(!row) return;
 
   const section = row.closest('.section-recientes') || row.parentElement;
@@ -888,7 +935,14 @@ function setupCategoryNav(){
   if(btnMovies)btnMovies.addEventListener("click", ()=> setActive("movie"));
 }
 
-// Scroll desbloqueado para permitir ajuste responsivo y uso de barra espaciadora.
+// Evita scroll global; permite scroll horizontal en .carousel
+window.addEventListener('wheel', (e) => {
+  if (!e.target.closest('.carousel')) e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('keydown', (e) => {
+  const keys = ['ArrowDown','ArrowUp','PageDown','PageUp','Home','End',' '];
+  if (keys.includes(e.key) && !e.target.closest('.carousel')) e.preventDefault();
 }, { passive: false });
 
 

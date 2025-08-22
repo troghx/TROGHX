@@ -15,10 +15,8 @@
 
 * { box-sizing: border-box; }
 html, body {
-  min-height: 100%;
-  height: auto;
-  overflow-y: auto;
-  overflow-x: hidden;
+  height: 100vh;
+  overflow: hidden;
 }
 @supports (height: 100dvh) {
   body { height: 100dvh; }
@@ -623,30 +621,3 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 }
 .hero.hero--simple .hero-copy h1{ font-size:1.5rem; }
 .hero.hero--simple .socials{ margin-top:12px; }
-
-
-/* === Responsive feed grid (reemplaza carrusel) === */
-.feed-grid{
-  --tile-min: 220px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--tile-min), 1fr));
-  gap: 16px;
-  align-content: start;
-  padding-bottom: 8px;
-}
-@media (max-width: 1200px){
-  .feed-grid{ --tile-min: 200px; }
-}
-@media (max-width: 768px){
-  .feed-grid{ --tile-min: 160px; }
-}
-.feed-grid .tile,
-.feed-grid .add-game-tile{
-  width: 100%;
-  flex: initial;
-}
-/* Botón de agregar social: sin flechas/pseudo elementos */
-.add-social-tile::before,
-.add-social-tile::after{ content: none !important; }
-
-.feed-grid .tile{ flex-basis: auto !important; }
