@@ -156,32 +156,45 @@
 
           <label>Descripción</label>
           <div class="rich-editor">
-            <div class="rich-toolbar" role="toolbar" aria-label="Editor de texto">
-              <button type="button" class="rtb-btn" data-cmd="bold" title="Negritas (Ctrl+B)"><b>B</b></button>
-              <button type="button" class="rtb-btn" data-cmd="italic" title="Itálica (Ctrl+I)"><i>I</i></button>
-              <button type="button" class="rtb-btn" data-cmd="underline" title="Subrayado (Ctrl+U)"><u>U</u></button>
-              <span class="rtb-sep"></span>
-              <button type="button" class="rtb-btn" data-block="h2" title="Encabezado H2">H2</button>
-              <button type="button" class="rtb-btn" data-block="p" title="Párrafo">P</button>
-              <span class="rtb-sep"></span>
-              <label class="rtb-inline">
-                Fuente
-                <select class="rtb-font">
-                  <option value="">Sistema</option>
-                  <option value="Segoe UI">Segoe UI</option>
-                  <option value="Roboto">Roboto</option>
-                  <option value="Arial">Arial</option>
-                  <option value="Times New Roman">Times New Roman</option>
-                  <option value="Courier New">Courier New</option>
-                </select>
-              </label>
-              <span class="rtb-sep"></span>
-              <button type="button" class="rtb-btn" data-list="ul" title="Lista con viñetas">• Lista</button>
-              <span class="rtb-sep"></span>
-              <button type="button" class="rtb-btn rtb-link" title="Insertar enlace">🔗 Enlace</button>
-            </div>
-            <div class="editor-area" contenteditable="true" aria-label="Descripción enriquecida"></div>
-          </div>
+  <div class="rich-toolbar" role="toolbar" aria-label="Editor de texto">
+    <button type="button" class="rtb-btn" data-cmd="bold" title="Negritas (Ctrl+B)"><b>B</b></button>
+    <button type="button" class="rtb-btn" data-cmd="italic" title="Itálica (Ctrl+I)"><i>I</i></button>
+    <button type="button" class="rtb-btn" data-cmd="underline" title="Subrayado (Ctrl+U)"><u>U</u></button>
+
+    <span class="rtb-sep"></span>
+
+    <button type="button" class="rtb-btn" data-block="h2" title="Encabezado H2">H2</button>
+    <button type="button" class="rtb-btn" data-block="p"  title="Párrafo">P</button>
+
+    <span class="rtb-sep"></span>
+
+    <label class="rtb-inline">
+      Fuente
+      <select class="rtb-font">
+        <option value="">Sistema</option>
+        <option value="Segoe UI">Segoe UI</option>
+        <option value="Roboto">Roboto</option>
+        <option value="Arial">Arial</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Courier New">Courier New</option>
+      </select>
+    </label>
+
+    <span class="rtb-sep"></span>
+
+    <button type="button" class="rtb-btn" data-list="ul" title="Lista con viñetas">• Lista</button>
+
+    <span class="rtb-sep"></span>
+
+    <button type="button" class="rtb-btn rtb-link"  title="Insertar enlace">🔗 Enlace</button>
+    <button type="button" class="rtb-btn rtb-color" title="Color de texto">🎨 Color</button>
+    <!-- input oculto para color -->
+    <input type="color" class="rtb-color-input" value="#cfe3ff" hidden />
+  </div>
+
+  <div class="editor-area" contenteditable="true" aria-label="Descripción enriquecida"></div>
+</div>
+
 
           <label>
             Imagen de portada
