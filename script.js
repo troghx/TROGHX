@@ -895,7 +895,7 @@ function openAdminLoginModal(){
   const actions = form.querySelector(".tw-modal-actions") || form;
   const createBtn = document.createElement("button");
   createBtn.type = "button";
-  createBtn.className = "tw-btn-secondary";
+  createBtn.className = "tw-btn-secondary is-gradient";
   createBtn.textContent = "Crear usuario";
   actions.appendChild(createBtn);
 
@@ -1131,5 +1131,6 @@ async function initData(){
   setupSideNav();
 }
 initData();
+
 
 
