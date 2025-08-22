@@ -1,13 +1,6 @@
 // netlify/functions/posts.js
 import { neon } from "@neondatabase/serverless";
 
-/**
- * PERF-ORIENTED VERSION
- * - ?lite=1 returns ONLY lightweight fields (no base64 blobs)
- * - Adds short cache headers on GET
- * - All writes/reads remain compatible with existing schema
- */
-
 const DB_URL =
   process.env.DATABASE_URL ||
   process.env.NETLIFY_DATABASE_URL ||
@@ -32,12 +25,26 @@ const json = (status, data, extraHeaders = {}) => ({
 });
 
 function getIdFromPath(path = "") {
-  // path like: /.netlify/functions/posts/123
   const parts = String(path).split("/").filter(Boolean);
   const idx = parts.lastIndexOf("posts");
   if (idx === -1) return null;
   const id = parts[idx + 1];
   return id || null;
+}
+
+const CATS = new Set(["game", "app", "movie"]);
+function normCat(c) {
+  const v = String(c || "").toLowerCase().trim();
+  return CATS.has(v) ? v : "game";
+}
+
+let schemaEnsured = false;
+async function ensureSchema() {
+  if (schemaEnsured) return;
+  // Añade columna category si no existe e índice para ordenar por fecha dentro de la categoría
+  await sql`ALTER TABLE IF EXISTS posts ADD COLUMN IF NOT EXISTS category text DEFAULT 'game'`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_posts_category_created ON posts (category, created_at DESC)`;
+  schemaEnsured = true;
 }
 
 export async function handler(event) {
@@ -48,36 +55,37 @@ export async function handler(event) {
 
     if (!sql) return json(500, { error: "DB not configured" });
 
+    await ensureSchema();
+
     // ---- GET /posts or /posts/:id
     if (event.httpMethod === "GET") {
       const id = getIdFromPath(event.path);
       if (id) {
-        // Full detail (includes image/preview_video)
         const rows =
-          await sql`SELECT id, title, image, description, preview_video, download_url, details_url, created_at
+          await sql`SELECT id, title, image, description, preview_video, download_url, details_url, category, created_at
                     FROM posts WHERE id = ${id} LIMIT 1`;
         if (!rows.length) return json(404, { error: "Not found" });
         return json(200, rows[0], { "Cache-Control": "public, max-age=0, s-maxage=60" });
       }
 
-      // List
       const qp = event.queryStringParameters || {};
       const lite  = qp.lite === "1" || qp.lite === "true";
       const limit = Math.min(Math.max(parseInt(qp.limit || "100", 10) || 100, 1), 500);
+      const category = normCat(qp.category);
 
       if (lite) {
-        // SUPER LIGERO: no imagenes ni preview
         const rows =
-          await sql`SELECT id, title, created_at
+          await sql`SELECT id, title, category, created_at
                     FROM posts
+                    WHERE category = ${category}
                     ORDER BY created_at DESC
                     LIMIT ${limit}`;
         return json(200, rows, { "Cache-Control": "public, max-age=0, s-maxage=30" });
       } else {
-        // Full listing (evita usarlo en UI normal)
         const rows =
-          await sql`SELECT id, title, image, description, preview_video, download_url, details_url, created_at
+          await sql`SELECT id, title, image, description, preview_video, download_url, details_url, category, created_at
                     FROM posts
+                    WHERE category = ${category}
                     ORDER BY created_at DESC
                     LIMIT ${limit}`;
         return json(200, rows, { "Cache-Control": "public, max-age=0, s-maxage=10" });
@@ -96,23 +104,25 @@ export async function handler(event) {
       const body = JSON.parse(event.body || "{}");
       const {
         title,
-        image,                // base64 data URL (compressed client-side)
+        image,
         description,
-        previewVideo,         // optional base64 data URL
-        preview_video,        // legacy
+        previewVideo,
+        preview_video,
         downloadUrl = null,
         detailsUrl  = null,
+        category    = "game",
       } = body || {};
 
       if (!title || !image || !description) {
         return json(400, { error: "Missing fields" });
       }
 
+      const cat = normCat(category);
       const pv = previewVideo ?? preview_video ?? null;
 
       const rows =
-        await sql`INSERT INTO posts (title, image, description, preview_video, download_url, details_url)
-                  VALUES (${title}, ${image}, ${description}, ${pv}, ${downloadUrl}, ${detailsUrl})
+        await sql`INSERT INTO posts (title, image, description, preview_video, download_url, details_url, category)
+                  VALUES (${title}, ${image}, ${description}, ${pv}, ${downloadUrl}, ${detailsUrl}, ${cat})
                   RETURNING id`;
 
       return json(200, { ok: true, id: rows[0].id });
@@ -131,15 +141,18 @@ export async function handler(event) {
 
       const body = JSON.parse(event.body || "{}");
       const fields = {};
-      ["title", "image", "description", "previewVideo", "preview_video", "downloadUrl", "detailsUrl"].forEach((k) => {
+      ["title", "image", "description", "previewVideo", "preview_video", "downloadUrl", "detailsUrl", "category"].forEach((k) => {
         if (k in body && body[k] !== undefined) fields[k] = body[k];
       });
+
+      if ("category" in fields) fields.category = normCat(fields.category);
 
       if (Object.keys(fields).length === 0) {
         return json(400, { error: "No fields to update" });
       }
 
       const pv = fields.previewVideo ?? fields.preview_video;
+
       const result =
         await sql`UPDATE posts
                   SET title = COALESCE(${fields.title}, title),
@@ -147,7 +160,8 @@ export async function handler(event) {
                       description = COALESCE(${fields.description}, description),
                       preview_video = COALESCE(${pv}, preview_video),
                       download_url = COALESCE(${fields.downloadUrl}, download_url),
-                      details_url  = COALESCE(${fields.detailsUrl}, details_url)
+                      details_url  = COALESCE(${fields.detailsUrl}, details_url),
+                      category     = COALESCE(${fields.category}, category)
                   WHERE id = ${id}
                   RETURNING id`;
 
