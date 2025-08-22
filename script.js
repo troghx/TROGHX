@@ -1,5 +1,5 @@
 /* =========================
-   TROGH — script.js (Grid + Paginación + Admin Keys + Crear Usuario)
+   TROGH — script.js (Lite grid + thumbs + video on-demand + link_ok)
    ========================= */
 
 /* ------- Templates del HTML ------- */
@@ -32,6 +32,7 @@ let PAGE_SIZE = 12;
 let page = 1;
 let searchQuery = "";
 const fullCache = new Map();
+const videoCache = new Map();
 
 /* =========================
    Utilidades base
@@ -44,7 +45,7 @@ function rehydrate() {
 }
 rehydrate();
 
-function persistAdmin(flag){ try{ localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); }catch{} }
+function persistAdmin(flag){ try{ localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); }catch (err) {} }
 function preload(src){ const img = new Image(); img.src = src; }
 
 function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
@@ -57,7 +58,7 @@ async function hashCreds(user,pin,salt){ const key=`${user}::${pin}::${salt}`; r
    ========================= */
 async function apiList(category = window.currentCategory) {
   const qs = new URLSearchParams({ lite: "1", limit: "200", category });
-  const r = await fetch(`${API_POSTS}?${qs.toString()}`, { cache: "no-store" });
+  const r = await fetch(`${API_POSTS}?${qs.toString()}`); // deja caché del navegador (tenemos Cache-Control)
   if (!r.ok) throw new Error("No se pudo listar posts");
   return r.json();
 }
@@ -78,6 +79,14 @@ async function apiGet(id){
   fullCache.set(id, j);
   return j;
 }
+async function apiGetVideo(id){
+  if(videoCache.has(id)) return videoCache.get(id);
+  const r = await fetch(`${API_POSTS}/${id}?video=1`, { cache:"no-store" });
+  if(!r.ok) return null;
+  const j = await r.json();
+  videoCache.set(id, j?.previewVideo || null);
+  return j?.previewVideo || null;
+}
 async function apiUpdate(id, patch, token){
   const r = await fetch(`${API_POSTS}/${id}`, {
     method:"PUT",
@@ -91,7 +100,7 @@ async function apiUpdate(id, patch, token){
 async function apiDelete(id, token){
   const r = await fetch(`${API_POSTS}/${id}`, { method:"DELETE", headers:{ "Authorization":`Bearer ${token||""}` } });
   if(!r.ok){ const t=await r.text().catch(()=> ""); throw new Error(`Delete falló: ${t}`); }
-  fullCache.delete(id);
+  fullCache.delete(id); videoCache.delete(id);
   return r.json();
 }
 
@@ -99,7 +108,7 @@ async function apiDelete(id, token){
    API: Socials
    ========================= */
 async function socialsList(){
-  const r = await fetch(API_SOC, { cache:"no-store" });
+  const r = await fetch(API_SOC);
   if(!r.ok) throw new Error("No se pudo listar socials");
   return r.json();
 }
@@ -159,7 +168,7 @@ function closeModal(modalNode, removeTrap, onEscape){
   document.body.style.overflow="";
   if(removeTrap) removeTrap();
   if(onEscape) modalNode.removeEventListener("keydown", onEscape);
-  setTimeout(()=>{ try{ modalNode.remove(); }catch{} }, 250);
+  setTimeout(()=>{ try{ modalNode.remove(); }catch (err) {} }, 250);
 }
 function trapFocus(modalNode){
   const selectors=["a[href]","button:not([disabled])","textarea:not([disabled])","input:not([disabled])","select:not([disabled])","[tabindex]:not([tabindex='-1'])"];
@@ -186,7 +195,7 @@ function readAsDataURL(file){
     fr.readAsDataURL(file);
   });
 }
-async function compressImage(file,{maxW=960,maxH=960,quality=0.8}={}){
+async function compressImage(file,{maxW=960,maxH=960,quality=0.8,mime="image/webp"}={}){
   const blobUrl=URL.createObjectURL(file);
   const img=await new Promise((res,rej)=>{
     const im=new Image();
@@ -200,13 +209,13 @@ async function compressImage(file,{maxW=960,maxH=960,quality=0.8}={}){
   canvas.width=nw; canvas.height=nh;
   const ctx=canvas.getContext("2d");
   ctx.drawImage(img,0,0,nw,nh);
-  const out=canvas.toDataURL("image/jpeg", quality);
+  const out=canvas.toDataURL(mime, quality);
   URL.revokeObjectURL(blobUrl);
   return out;
 }
 
 /* =========================
-   Chips de enlace y estilos por plataforma
+   Chips de enlace y plataforma
    ========================= */
 function platformFromUrl(u){
   const s=(u||"").toLowerCase();
@@ -240,20 +249,22 @@ function extractFirstLink(html){
 }
 
 /* =========================
-   Linkcheck + badge
+   Linkcheck (sólo al crear/editar)
    ========================= */
-const linkCache = new Map();
-async function checkLink(url){
-  if(!url) return { ok:false, status:null };
-  if(linkCache.has(url)) return linkCache.get(url);
+async function fetchLinkOk(url){
+  if(!url) return null;
   try{
     const r = await fetch(`${API_LINK}?url=${encodeURIComponent(url)}`, { cache:"no-store" });
     const j = await r.json();
-    const val = { ok: !!j.ok, status: j.status ?? null };
-    linkCache.set(url, val);
-    return val;
-  }catch{ return { ok:false, status:null }; }
+    return !!j.ok;
+  }catch (err){
+    return null;
+  }
 }
+
+/* =========================
+   Badges de estado (sin red)
+   ========================= */
 function platformIconSVG(plat){
   const sz=12; const common=`width="${sz}" height="${sz}" viewBox="0 0 24 24" aria-hidden="true"`;
   switch(plat){
@@ -269,35 +280,29 @@ function platformIconSVG(plat){
     default:          return `<svg ${common} fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>`;
   }
 }
-async function applyLinkStatusBadge(tile, game){
+function applyStatusBadge(tile, first_link, link_ok){
   let badge = tile.querySelector(".tile-info .badge");
   if(!badge){
     badge=document.createElement("span");
     badge.className="badge";
     tile.querySelector(".tile-info")?.appendChild(badge);
   }
-  const url = extractFirstLink(game.description || "");
-  const plat = platformFromUrl(url);
+  const plat = platformFromUrl(first_link || "");
   const platformClass = `pill-${plat}`;
 
-  badge.className=`badge badge-status status-checking ${platformClass}`;
-  badge.innerHTML=`<span class="pill-icon"></span><span class="pill-text">Comprobando…</span>`;
+  badge.className=`badge badge-status ${platformClass}`;
+  badge.innerHTML=`<span class="pill-icon"></span><span class="pill-text"></span>`;
   badge.querySelector(".pill-icon").innerHTML = platformIconSVG(plat);
 
-  if(!url){
-    badge.className=`badge badge-status status-warn ${platformClass}`;
-    badge.querySelector(".pill-text").textContent="Sin enlace";
-    return;
-  }
-  try{
-    const res=await checkLink(url);
-    const ok=!!res.ok;
-    badge.classList.remove("status-checking","status-warn","status-down","status-ok");
-    if(ok){ badge.classList.add("status-ok");  badge.querySelector(".pill-text").textContent="Disponible"; }
-    else  { badge.classList.add("status-warn"); badge.querySelector(".pill-text").textContent="Revisar enlace"; }
-  }catch{
-    badge.classList.remove("status-checking"); badge.classList.add("status-warn");
+  if (link_ok === true) {
+    badge.classList.add("status-ok");
+    badge.querySelector(".pill-text").textContent="Disponible";
+  } else if (link_ok === false) {
+    badge.classList.add("status-warn");
     badge.querySelector(".pill-text").textContent="Revisar enlace";
+  } else {
+    badge.classList.add("status-checking");
+    badge.querySelector(".pill-text").textContent="Comprobar";
   }
 }
 
@@ -352,7 +357,7 @@ function initRichEditor(editorRoot){
 }
 
 /* =========================
-   GRID + Paginación
+   GRID + Paginación (thumbs)
    ========================= */
 function getFilteredList(){
   if(!searchQuery) return recientes;
@@ -375,57 +380,41 @@ function updatePager(totalPages){
 
   pager.style.display = (totalPages>1) ? "flex" : "none";
 }
-function observeTileForDetails(tile, g, coverEl, vidEl){
-  const placeholder = "assets/images/construction/en-proceso.svg";
-  coverEl.style.backgroundImage = `url(${placeholder})`;
+function attachHoverVideo(tile, g, vidEl){
+  if(!vidEl) return;
+  let once = false;
 
-  const io = new IntersectionObserver(async (entries, obs)=>{
-    for(const e of entries){
-      if(!e.isIntersecting) continue;
-      obs.unobserve(e.target);
-      try{
-        const full = await apiGet(g.id);
-        g.image = full.image;
-        g.description = full.description;
-        g.previewVideo = full.previewVideo || full.preview_video || null;
-        coverEl.style.backgroundImage = `url(${g.image})`;
-        preload(g.image);
-        applyLinkStatusBadge(tile, g);
+  const ensureVideo = async () => {
+    if (once) return true;
+    const src = await apiGetVideo(g.id);
+    if (!src) return false;
+    const sEl = vidEl.querySelector("source");
+    if (sEl) { sEl.src = src; vidEl.load(); } else { vidEl.src = src; }
+    once = true;
+    return true;
+  };
+  const start = async()=>{
+    const ok=await ensureVideo(); if(!ok) return;
+    vidEl.currentTime=0;
+    const p=vidEl.play(); if(p && p.catch) p.catch(()=>{});
+  };
+  const stop  = ()=>{ vidEl.pause(); vidEl.currentTime=0; };
+  const show  = ()=> vidEl.classList.add("playing");
+  const hide  = ()=> vidEl.classList.remove("playing");
+  vidEl.addEventListener("playing", show);
+  vidEl.addEventListener("pause", hide);
+  vidEl.addEventListener("ended", hide);
+  vidEl.addEventListener("error", ()=>{ vidEl.remove(); });
 
-        if(vidEl){
-          let loaded=false;
-          const ensureSrc = async ()=>{
-            if(loaded) return true;
-            let src = g.previewVideo || "";
-            if(!src) return false;
-            const sEl = vidEl.querySelector("source");
-            if(sEl){ sEl.src=src; vidEl.load(); } else { vidEl.src=src; }
-            loaded=true; return true;
-          };
-          const start = async()=>{ const ok=await ensureSrc(); if(!ok) return; vidEl.currentTime=0; const p=vidEl.play(); if(p&&p.catch) p.catch(()=>{}); };
-          const stop  = ()=>{ vidEl.pause(); vidEl.currentTime=0; };
-          const show  = ()=> vidEl.classList.add("playing");
-          const hide  = ()=> vidEl.classList.remove("playing");
-          vidEl.addEventListener("playing", show);
-          vidEl.addEventListener("pause", hide);
-          vidEl.addEventListener("ended", hide);
-          vidEl.addEventListener("error", ()=>{ vidEl.remove(); });
-          tile.addEventListener("pointerenter", start);
-          tile.addEventListener("pointerleave", stop);
-          tile.addEventListener("focus", start);
-          tile.addEventListener("blur", stop);
-        }
-      }catch(err){
-        console.error("[tile load]", err);
-      }
-    }
-  }, { root: document.getElementById("gridRecientes"), rootMargin: "200px", threshold: 0.1 });
-
-  io.observe(tile);
+  tile.addEventListener("pointerenter", start);
+  tile.addEventListener("pointerleave", stop);
+  tile.addEventListener("focus", start);
+  tile.addEventListener("blur", stop);
 }
 function renderRow(keepScroll=false){
   const grid = document.getElementById("gridRecientes");
   if(!grid) return;
+
   const list = getFilteredList();
   const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   if(page > totalPages) page = totalPages;
@@ -444,6 +433,8 @@ function renderRow(keepScroll=false){
     grid.appendChild(addTile);
   }
 
+  const placeholder = "assets/images/construction/en-proceso.svg";
+
   slice.forEach((g)=>{
     const node = template.content.cloneNode(true);
     const tile = node.querySelector(".tile");
@@ -455,9 +446,14 @@ function renderRow(keepScroll=false){
     tile.tabIndex=0;
     tile.addEventListener("click", ()=> openGameLazy(g));
 
-    grid.appendChild(node);
+    // Usamos la miniatura directamente (sin pedir detalle)
+    cover.style.backgroundImage = `url(${g.image_thumb || placeholder})`;
 
-    observeTileForDetails(tile, g, cover, vid);
+    // Badge de estado usando campos lite (sin red)
+    applyStatusBadge(tile, g.first_link || "", g.link_ok);
+
+    grid.appendChild(node);
+    attachHoverVideo(tile, g, vid);
   });
 
   updatePager(totalPages);
@@ -465,7 +461,7 @@ function renderRow(keepScroll=false){
 }
 
 /* =========================
-   HERO (versión simple)
+   HERO simple
    ========================= */
 function renderHeroCarousel(){
   const hero = document.querySelector(".hero");
@@ -478,16 +474,15 @@ function renderHeroCarousel(){
 }
 
 /* =========================
-   Modal: ver juego
+   Modal ver juego (carga detalle al abrir)
    ========================= */
 async function openGameLazy(game){
-  let g = game;
   try{
-    if(!g.image || !g.description){
-      g = await apiGet(game.id);
-    }
-  }catch{}
-  openGame(g);
+    const full = await apiGet(game.id);
+    openGame(full);
+  }catch (err){
+    console.error("[openGameLazy]", err);
+  }
 }
 function openGame(game){
   const modal = modalTemplate.content.cloneNode(true);
@@ -566,7 +561,7 @@ function makeCategorySelect(current="game"){
 }
 
 /* =========================
-   Nuevo / Editar
+   Nuevo / Editar (genera thumb + link_ok)
    ========================= */
 function openNewGameModal(){
   const modal = newGameModalTemplate.content.cloneNode(true);
@@ -605,41 +600,40 @@ function openNewGameModal(){
     if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
-     // --- dentro de openNewGameModal(), antes de procesar el trailer ---
-let coverDataUrl;
-try {
-  coverDataUrl = await compressImage(imageFile, { maxW: 960, maxH: 960, quality: 0.8 });
-} catch (err) {
-  console.error("[cover compress]", err);
-  alert("No se pudo compactar la portada.");
-  return;
-}
+    let coverDataUrl, thumbDataUrl;
+    try {
+      coverDataUrl = await compressImage(imageFile, { maxW: 960, maxH: 960, quality: 0.78, mime: "image/webp" });
+      thumbDataUrl = await compressImage(imageFile, { maxW: 320, maxH: 320, quality: 0.7, mime: "image/webp" });
+    } catch (err) {
+      console.error("[cover compress]", err);
+      alert("No se pudo compactar la portada.");
+      return;
+    }
 
-// --- trailer opcional (subido desde PC) ---
-let previewSrc = null;
-if (trailerFile) {
-  if (!/^video\/(mp4|webm)$/i.test(trailerFile.type)) {
-    alert("El trailer debe ser MP4 o WEBM.");
-    return;
-  }
-  if (trailerFile.size > 6 * 1024 * 1024) {
-    alert("Trailer >6MB. Usa uno más ligero.");
-    return;
-  }
-  try {
-    previewSrc = await readAsDataURL(trailerFile);
-  } catch (err) {
-    console.error("[trailer read]", err);
-    alert("No se pudo leer el trailer.");
-    return;
-  }
-}
+    // trailer opcional
+    let previewSrc=null;
+    if(trailerFile){
+      if(!/^video\/(mp4|webm)$/i.test(trailerFile.type)){ alert("El trailer debe ser MP4 o WEBM."); return; }
+      if(trailerFile.size > 6*1024*1024){ alert("Trailer >6MB. Usa uno más ligero."); return; }
+      try{ previewSrc = await readAsDataURL(trailerFile); }catch (err){ console.error("[trailer read]", err); alert("No se pudo leer el trailer."); return; }
+    }
 
+    const first_link = extractFirstLink(descHTML);
+    const link_ok = first_link ? await fetchLinkOk(first_link) : null;
 
     const token=localStorage.getItem("tgx_admin_token")||"";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
-    const newGame = { title, image: coverDataUrl, description: descHTML, previewVideo: previewSrc, category };
+    const newGame = {
+      title,
+      image: coverDataUrl,
+      image_thumb: thumbDataUrl,
+      description: descHTML,
+      previewVideo: previewSrc,
+      category,
+      first_link,
+      link_ok
+    };
 
     try{
       await apiCreate(newGame, token);
@@ -700,36 +694,28 @@ function openEditGame(original){
 
     const patch={ title, description: descHTML, category };
 
-    if (imageFile) {
-  try {
-    patch.image = await compressImage(imageFile);
-  } catch (err) {
-    console.error("[edit cover compress]", err);
-    alert("No se pudo compactar la portada.");
-    return;
-  }
-}
+    if(imageFile){
+      try{
+        patch.image = await compressImage(imageFile, { maxW: 960, maxH: 960, quality: 0.78, mime: "image/webp" });
+        patch.image_thumb = await compressImage(imageFile, { maxW: 320, maxH: 320, quality: 0.7, mime: "image/webp" });
+      } catch (err) {
+        console.error("[edit cover compress]", err);
+        alert("No se pudo compactar la portada.");
+        return;
+      }
+    }
+    if(clearTrailerCb?.checked){
+      patch.previewVideo=null;
+    }else if(trailerFile){
+      if(!/^video\/(mp4|webm)$/i.test(trailerFile.type)){ alert("Archivo del trailer debe ser MP4/WEBM."); return; }
+      if(trailerFile.size > 6*1024*1024){ alert("Trailer >6MB. Usa uno más ligero."); return; }
+      try{ patch.previewVideo = await readAsDataURL(trailerFile); }catch (err){ console.error("[edit trailer read]", err); alert("No se pudo leer el trailer."); return; }
+    }
 
-// si cambia el trailer:
-if (clearTrailerCb?.checked) {
-  patch.previewVideo = null;
-} else if (trailerFile) {
-  if (!/^video\/(mp4|webm)$/i.test(trailerFile.type)) {
-    alert("Archivo del trailer debe ser MP4/WEBM.");
-    return;
-  }
-  if (trailerFile.size > 6 * 1024 * 1024) {
-    alert("Trailer >6MB. Usa uno más ligero.");
-    return;
-  }
-  try {
-    patch.previewVideo = await readAsDataURL(trailerFile);
-  } catch (err) {
-    console.error("[edit trailer read]", err);
-    alert("No se pudo leer el trailer.");
-    return;
-  }
-}
+    // recalcular link_ok y first_link
+    const first_link = extractFirstLink(descHTML);
+    patch.first_link = first_link || null;
+    patch.link_ok = first_link ? await fetchLinkOk(first_link) : null;
 
     const token=localStorage.getItem("tgx_admin_token")||"";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
@@ -781,8 +767,8 @@ function openNewSocialModal(){
         await socialsCreate({ name, image: reader.result, url }, token);
         socials = await socialsList();
         renderSocialBar();
-        closeModal(node, removeTrap, onEscape);
       }catch(err){ console.error(err); alert("Error al guardar red social."); }
+      closeModal(node, removeTrap, onEscape);
     };
     reader.readAsDataURL(file);
   });
@@ -823,7 +809,7 @@ function renderSocialBar(){
 }
 
 /* =========================
-   Búsqueda
+   Búsqueda + SideNav
    ========================= */
 function setupSearch(){
   const input=document.getElementById("searchInput");
@@ -834,10 +820,6 @@ function setupSearch(){
     renderRow();
   });
 }
-
-/* =========================
-   Side nav (categorías)
-   ========================= */
 function setupSideNav(){
   const btns = Array.from(document.querySelectorAll('.side-nav .nav-btn'));
   if(!btns.length) return;
@@ -870,7 +852,7 @@ function ensureAuthTokenPrompt(){
   try{
     const k="tgx_admin_token"; let t=localStorage.getItem(k);
     if(!t){ t = prompt("Pega tu AUTH_TOKEN de Netlify (requerido para publicar/editar/borrar):"); if(t) localStorage.setItem(k, t.trim()); }
-  }catch{}
+  }catch (err) {}
 }
 
 function openAdminLoginModal(){
@@ -885,13 +867,11 @@ function openAdminLoginModal(){
 
   const imgDecor = node.querySelector(".tw-modal-image"); if (imgDecor) imgDecor.style.display = "none";
 
-  // Campo: llave de acceso
   const accessWrap = document.createElement("label");
   accessWrap.innerHTML = `Llave de acceso <input type="password" class="admin-access" required>
     <span class="input-hint">Se valida contra el servidor y puede revocarse</span>`;
   form.insertBefore(accessWrap, form.querySelector(".tw-modal-actions") || form.lastElementChild);
 
-  // Botón “Crear usuario”
   const actions = form.querySelector(".tw-modal-actions") || form;
   const createBtn = document.createElement("button");
   createBtn.type = "button";
@@ -899,7 +879,6 @@ function openAdminLoginModal(){
   createBtn.textContent = "Crear usuario";
   actions.appendChild(createBtn);
 
-  // Campo oculto: confirmar PIN (para crear usuario)
   const confirmWrap = document.createElement("label");
   confirmWrap.style.display = "none";
   confirmWrap.innerHTML = `Confirmar PIN <input type="password" class="admin-pin2">
@@ -917,10 +896,7 @@ function openAdminLoginModal(){
     if (h2) h2.textContent = flag ? "Crear usuario administrador" : "Entrar como administrador";
     if (submitBtn) submitBtn.textContent = flag ? "Crear y entrar" : "Entrar";
   }
-
-  // Si no hay usuario local, sugerimos crear
   if (!savedHash || !savedSalt || !savedUser) setModeCreate(true);
-
   createBtn.addEventListener("click", ()=> setModeCreate(!isCreateMode.value));
 
   const removeTrap=trapFocus(node);
@@ -935,7 +911,6 @@ function openAdminLoginModal(){
     if(!user || !pin || !accessPlain){ alert("Usuario, PIN y Llave son obligatorios."); return; }
     if(!/^[0-9]{4,6}$/.test(pin)){ alert("PIN debe ser 4 a 6 dígitos."); return; }
 
-    // validar llave contra servidor
     const accessHash = await sha256(accessPlain);
     const res = await adminLoginByKeyHash(accessHash);
     if(!res?.ok){ alert("Llave inválida o revocada."); return; }
@@ -949,7 +924,7 @@ function openAdminLoginModal(){
         localStorage.setItem(LS_ADMIN_HASH,hash);
         localStorage.setItem(LS_ADMIN_SALT,salt);
         localStorage.setItem(LS_ADMIN_USER,user);
-      }catch{}
+      }catch (err) {}
     } else {
       if(user!==savedUser){ alert("Usuario o PIN incorrectos."); return; }
       const hash=await hashCreds(user,pin,savedSalt);
@@ -984,7 +959,39 @@ function setupAdminButton(){
 }
 
 /* =========================
-   Admin Center (gestión de llaves)
+   Badge lateral → Admin Center
+   ========================= */
+function ensureSidebarChannelBadge(){
+  const rail = document.querySelector(".side-nav");
+  if(!rail) return;
+
+  let el = rail.querySelector(".yt-channel-badge");
+
+  if (el && el.tagName === "A") {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = el.className;
+    while (el.firstChild) btn.appendChild(el.firstChild);
+    el.replaceWith(btn);
+    el = btn;
+  }
+
+  if (!el) {
+    el = document.createElement("button");
+    el.type = "button";
+    el.className = "yt-channel-badge";
+    const img = document.createElement("img");
+    img.src = "assets/images/youtube-channel.png";
+    img.alt = "Admin Center";
+    el.appendChild(img);
+    rail.appendChild(el);
+  }
+
+  el.onclick = () => { if (isAdmin) openAdminCenter(); };
+}
+
+/* =========================
+   Admin Center (igual que antes)
    ========================= */
 function randomKey(len=28){
   const chars="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -992,7 +999,7 @@ function randomKey(len=28){
   for(const n of a) s += chars[n % chars.length];
   return s;
 }
-function openAdminCenter(){
+async function openAdminCenter(){
   if(!isAdmin){ return; }
   const token=localStorage.getItem("tgx_admin_token")||"";
   if(!token){ alert("Falta AUTH_TOKEN de Netlify para gestionar llaves."); return; }
@@ -1077,38 +1084,6 @@ function openAdminCenter(){
 }
 
 /* =========================
-   Badge lateral → Admin Center (sin link)
-   ========================= */
-function ensureSidebarChannelBadge(){
-  const rail = document.querySelector(".side-nav");
-  if(!rail) return;
-
-  let el = rail.querySelector(".yt-channel-badge");
-
-  if (el && el.tagName === "A") {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = el.className;
-    while (el.firstChild) btn.appendChild(el.firstChild);
-    el.replaceWith(btn);
-    el = btn;
-  }
-
-  if (!el) {
-    el = document.createElement("button");
-    el.type = "button";
-    el.className = "yt-channel-badge";
-    const img = document.createElement("img");
-    img.src = "assets/images/youtube-channel.png";
-    img.alt = "Admin Center";
-    el.appendChild(img);
-    rail.appendChild(el);
-  }
-
-  el.onclick = () => { if (isAdmin) openAdminCenter(); };
-}
-
-/* =========================
    Carga inicial
    ========================= */
 async function reloadData(){
@@ -1131,6 +1106,3 @@ async function initData(){
   setupSideNav();
 }
 initData();
-
-
-
