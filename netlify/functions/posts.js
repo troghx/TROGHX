@@ -89,12 +89,19 @@ export async function handler(event) {
       } else {
         // versión pesada (evita usarla en el grid)
         const rows = await sql`
-          SELECT id, title, category, image, description, preview_video, created_at, link_ok, first_link
-          FROM posts
-          WHERE category = ${category}
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `;
+  SELECT
+    id,
+    title,
+    category,
+    COALESCE(image_thumb, image) AS image_thumb,
+    created_at,
+    link_ok,
+    first_link
+  FROM posts
+  WHERE category = ${category}
+  ORDER BY created_at DESC
+  LIMIT ${limit}
+`;
         return json(200, rows, cacheHeaders(20));
       }
     }
@@ -198,3 +205,4 @@ export async function handler(event) {
     return json(500, { error: "Internal Server Error" });
   }
 }
+
