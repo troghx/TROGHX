@@ -47,7 +47,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .nav-btn svg { width: 24px; height: 24px; fill: #b7c0ca; }
 .nav-btn:hover { transform: translateY(-2px); background: #1a2028; }
 .nav-btn.active { outline: 2px solid #ff00ff; background: #132018; }
-.nav-btn.active svg { fill: #c8f5d6; }
+.nav-btn.active svg { width: 40px; fill: #c8f5d6; }
 
 /* ---------- Layout principal ---------- */
 .main {
