@@ -381,30 +381,43 @@ function updatePager(totalPages){
   pager.style.display = (totalPages>1) ? "flex" : "none";
 }
 function attachHoverVideo(tile, g, vidEl){
-  if(!vidEl) return;
-  let once = false;
+  // crea video si el template no lo tiene
+  if (!vidEl) {
+    vidEl = document.createElement("video");
+    vidEl.className = "tile-video";
+    vidEl.muted = true;
+    vidEl.playsInline = true;
+    vidEl.preload = "metadata";
+    tile.appendChild(vidEl);
+  }
 
+  let once = false;
   const ensureVideo = async () => {
     if (once) return true;
     const src = await apiGetVideo(g.id);
     if (!src) return false;
-    const sEl = vidEl.querySelector("source");
-    if (sEl) { sEl.src = src; vidEl.load(); } else { vidEl.src = src; }
+    // asigna src
+    vidEl.src = src;
+    try { vidEl.load(); } catch {}
     once = true;
     return true;
   };
-  const start = async()=>{
-    const ok=await ensureVideo(); if(!ok) return;
-    vidEl.currentTime=0;
-    const p=vidEl.play(); if(p && p.catch) p.catch(()=>{});
+
+  const start = async () => {
+    const ok = await ensureVideo();
+    if (!ok) return;
+    vidEl.currentTime = 0;
+    const p = vidEl.play();
+    if (p && p.catch) p.catch(()=>{ /* autoplay blocked, ignore */ });
   };
-  const stop  = ()=>{ vidEl.pause(); vidEl.currentTime=0; };
-  const show  = ()=> vidEl.classList.add("playing");
-  const hide  = ()=> vidEl.classList.remove("playing");
+  const stop  = () => { try{ vidEl.pause(); vidEl.currentTime=0; }catch{} };
+  const show  = () => vidEl.classList.add("playing");
+  const hide  = () => vidEl.classList.remove("playing");
+
   vidEl.addEventListener("playing", show);
   vidEl.addEventListener("pause", hide);
   vidEl.addEventListener("ended", hide);
-  vidEl.addEventListener("error", ()=>{ vidEl.remove(); });
+  vidEl.addEventListener("error", hide);
 
   tile.addEventListener("pointerenter", start);
   tile.addEventListener("pointerleave", stop);
@@ -477,12 +490,14 @@ function renderHeroCarousel(){
    Modal ver juego (carga detalle al abrir)
    ========================= */
 async function openGameLazy(game){
+  let data = game; // fallback: usa datos lite
   try{
     const full = await apiGet(game.id);
-    openGame(full);
-  }catch (err){
-    console.error("[openGameLazy]", err);
+    data = { ...game, ...full };
+  }catch(err){
+    console.error("[openGameLazy] detalle falló", err);
   }
+  openGame(data);
 }
 function openGame(game){
   const modal = modalTemplate.content.cloneNode(true);
@@ -1106,3 +1121,4 @@ async function initData(){
   setupSideNav();
 }
 initData();
+
