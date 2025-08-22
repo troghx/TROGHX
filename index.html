@@ -72,15 +72,16 @@
 </section>
 
     <!-- Filas / carruseles -->
-    
-    <section class="row section-recientes">
+    <section class="row">
       <div class="row-head">
         <h2>Recientes</h2>
-        <!-- Controles removidos; ahora se usa grid responsivo -->
+        <div class="row-controls">
+          <button class="arrow prev" aria-label="Anterior">‹</button>
+          <button class="arrow next" aria-label="Siguiente">›</button>
+        </div>
       </div>
-      <div class="feed-grid" id="feedGrid" data-row="recientes" aria-live="polite"></div>
+      <div class="carousel" data-row="recientes"></div>
     </section>
-    
   </main>
 
   <!-- Template de tarjeta -->
