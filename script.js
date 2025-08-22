@@ -385,6 +385,8 @@ function openGame(game){
   modalTitle.textContent = game.title || "Sin título";
   modalDescription.innerHTML = game.description || "Sin descripción";
 
+  let docClickHandler = null;
+
   if(isAdmin){
     const kebabBtn = document.createElement("button");
     kebabBtn.className = "tw-modal-menu";
@@ -396,7 +398,8 @@ function openGame(game){
       <button class="tw-kebab-item danger" data-action="delete">Eliminar</button>
     `;
     kebabBtn.addEventListener("click",(e)=>{ e.stopPropagation(); panel.classList.toggle("show"); });
-    document.addEventListener("click",(e)=>{ if(!panel.contains(e.target) && e.target!==kebabBtn) panel.classList.remove("show"); });
+    docClickHandler = (e)=>{ if(!panel.contains(e.target) && e.target!==kebabBtn) panel.classList.remove("show"); };
+    document.addEventListener("click", docClickHandler);
     panel.addEventListener("click",(e)=>{
       const action = e.target?.dataset?.action;
       if(action==="edit"){ panel.classList.remove("show"); openEditGame(game); }
@@ -410,9 +413,19 @@ function openGame(game){
   }
 
   const removeTrap = trapFocus(modalNode);
-  const onEscape = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
+  const onEscape = (e)=>{
+    if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape);
+  };
   modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
   openModalFragment(modalNode);
+
+  // Clean up document click handler when modal closes
+  modalNode.addEventListener("transitionend", function cleanup() {
+    if (!modalNode.classList.contains("active")) {
+      if (docClickHandler) document.removeEventListener("click", docClickHandler);
+      modalNode.removeEventListener("transitionend", cleanup);
+    }
+  });
 }
 
 /* === CRUD === */
@@ -717,64 +730,49 @@ function setupSearch(){
       const tile = node.querySelector(".tile");
       const cover = node.querySelector(".cover");
       const title = node.querySelector(".title");
+      const vid   = node.querySelector(".tile-video");
       cover.style.backgroundImage = `url(${g.image})`;
+      preload(g.image);
       title.textContent = g.title;
+      tile.tabIndex = 0;
       tile.addEventListener("click", ()=>openGame(g));
+      // Add video preview logic as in renderRow
+      if (vid) {
+        let loaded = false;
+        vid.poster = g.image;
+        vid.muted = true; vid.loop = true; vid.playsInline = true;
+        vid.setAttribute("muted",""); vid.setAttribute("playsinline","");
+        vid.preload = "metadata";
+        const sourceEl = vid.querySelector("source");
+        const ensureSrc = async () => {
+          if (loaded) return true;
+          let pv = g.previewVideo || g.preview_video || "";
+          if (!pv && g.id) {
+            try { const full = await apiGet(g.id); pv = full.previewVideo || full.preview_video || ""; if (pv) g.previewVideo = pv; } catch {}
+          }
+          if (!pv) return false;
+          if (sourceEl) { sourceEl.src = pv; vid.load(); } else { vid.src = pv; }
+          loaded = true; return true;
+        };
+        const start = async ()=>{ const ok = await ensureSrc(); if(!ok) return; vid.currentTime = 0; const p=vid.play(); if(p&&p.catch) p.catch(()=>{}); };
+        const stop  = ()=>{ vid.pause(); vid.currentTime = 0; };
+        const show  = ()=>vid.classList.add("playing");
+        const hide  = ()=>vid.classList.remove("playing");
+        vid.addEventListener("playing", show);
+        vid.addEventListener("pause", hide);
+        vid.addEventListener("ended", hide);
+        vid.addEventListener("error", ()=>{ vid.remove(); });
+        tile.addEventListener("pointerenter", start);
+        tile.addEventListener("pointerleave", stop);
+        tile.addEventListener("focus", start);
+        tile.addEventListener("blur", stop);
+      }
       container.appendChild(node);
+      applyLinkStatusBadge(tile, g);
     });
   });
 }
-function setupArrows(){
-  const row  = document.querySelector(`.carousel[data-row="recientes"]`);
-  const prev = document.querySelector(".arrow.prev");
-  const next = document.querySelector(".arrow.next");
-  if(!row || !prev || !next) return;
 
-  const SCROLL_THRESHOLD = 18;
-
-  const recalc = ()=>{
-    fitRecientesRow();
-    const tiles = row.querySelectorAll(".tile");
-    const addTile = row.querySelector(".add-game-tile");
-    const count = tiles.length + (addTile ? 1 : 0);
-    const hasOverflow = row.scrollWidth > row.clientWidth + 2;
-
-    if (count >= SCROLL_THRESHOLD) {
-      row.classList.add("scrollable");
-    } else {
-      row.classList.remove("scrollable");
-    }
-
-    const showArrows = hasOverflow || count >= SCROLL_THRESHOLD;
-    prev.style.display = showArrows ? "" : "none";
-    next.style.display = showArrows ? "" : "none";
-
-    if (!showArrows) row.scrollLeft = 0;
-  };
-
-  prev.addEventListener("click", ()=> row.scrollBy({ left: -Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
-  next.addEventListener("click", ()=> row.scrollBy({ left:  Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
-
-  ["wheel", "touchmove"].forEach(evt => {
-    row.addEventListener(evt, e => e.preventDefault(), { passive: false });
-  });
-
-  window.addEventListener("resize", recalc);
-  new ResizeObserver(recalc).observe(row);
-  new MutationObserver(recalc).observe(row, { childList: true });
-
-  recalc();
-}
-function setupKeyboardNav(){
-  const row = document.querySelector(`.carousel[data-row="recientes"]`);
-  if(!row) return;
-  row.addEventListener("keydown",(e)=>{
-    if(e.key==="ArrowRight"){ e.preventDefault(); row.scrollBy({ left: 200, behavior: "smooth" }); }
-    if(e.key==="ArrowLeft") { e.preventDefault(); row.scrollBy({ left: -200, behavior: "smooth" }); }
-  });
-}
-
-// Ajusta la altura de las tarjetas al alto visible (sin scroll global)
 function fitRecientesRow(){
   const row = document.querySelector('.carousel[data-row="recientes"]');
   if(!row) return;
@@ -796,12 +794,94 @@ function fitRecientesRow(){
   row.style.setProperty('--tile-h', `${tileH}px`);
 }
 
+function setupArrows(){
+  const row  = document.querySelector(`.carousel[data-row="recientes"]`);
+  const prev = document.querySelector(".arrow.prev");
+  const next = document.querySelector(".arrow.next");
+  if(!row || !prev || !next) return;
 
-/* === ADMIN LOGIN === */
-function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
-async function sha256(str){ const enc=new TextEncoder().encode(str); const digest=await crypto.subtle.digest("SHA-256",enc); return toHex(digest); }
-function genSaltHex(len=16){ const a=new Uint8Array(len); crypto.getRandomValues(a); return Array.from(a).map(b=>b.toString(16).padStart(2,"0")).join(""); }
-async function hashCreds(user,pin,salt){ return sha256(`${user}::${pin}::${salt}`); }
+  const SCROLL_THRESHOLD = 18;
+
+  // Remove previous listeners to avoid duplicates
+  prev.replaceWith(prev.cloneNode(true));
+  next.replaceWith(next.cloneNode(true));
+  const prevNew = document.querySelector(".arrow.prev");
+  const nextNew = document.querySelector(".arrow.next");
+
+  const recalc = ()=>{
+    fitRecientesRow();
+    const tiles = row.querySelectorAll(".tile");
+    const addTile = row.querySelector(".add-game-tile");
+    const count = tiles.length + (addTile ? 1 : 0);
+    const hasOverflow = row.scrollWidth > row.clientWidth + 2;
+
+    if (count >= SCROLL_THRESHOLD) {
+      row.classList.add("scrollable");
+    } else {
+      row.classList.remove("scrollable");
+    }
+
+    const showArrows = hasOverflow || count >= SCROLL_THRESHOLD;
+    prevNew.style.display = showArrows ? "" : "none";
+    nextNew.style.display = showArrows ? "" : "none";
+
+    if (!showArrows) row.scrollLeft = 0;
+  };
+
+  prevNew.addEventListener("click", ()=> row.scrollBy({ left: -Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
+  nextNew.addEventListener("click", ()=> row.scrollBy({ left:  Math.max(400, row.clientWidth * 0.8), behavior: "smooth" }));
+
+  ["wheel", "touchmove"].forEach(evt => {
+    row.addEventListener(evt, e => e.preventDefault(), { passive: false });
+  });
+
+  window.addEventListener("resize", recalc);
+  new ResizeObserver(recalc).observe(row);
+  new MutationObserver(recalc).observe(row, { childList: true });
+
+  recalc();
+}
+
+function setupAdminButton(){
+  const adminBtn = document.querySelector(".user-pill");
+  if(!adminBtn) return;
+  adminBtn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
+  // Remove previous event listeners by cloning
+  const newBtn = adminBtn.cloneNode(true);
+  if (adminBtn.parentNode) {
+    adminBtn.parentNode.replaceChild(newBtn, adminBtn);
+    newBtn.addEventListener("click", ()=>{
+      if(isAdmin){
+        if(confirm("¿Cerrar sesión de administrador?")){
+          isAdmin = false; persistAdmin(false);
+          renderRow(); renderHeroCarousel(); renderSocialBar();
+          alert("Sesión cerrada.");
+        }
+      } else {
+        openAdminLoginModal();
+      }
+    });
+  }
+}
+
+function ensureSidebarChannelBadge(){
+  const rail = document.querySelector(".sidebar, .side-rail, aside[aria-label='Sidebar'], aside") || null;
+  if(!rail) return;
+  const cs = getComputedStyle(rail);
+  if (cs.position === "static") rail.style.position = "relative";
+  let badge = rail.querySelector(".yt-channel-badge");
+  if(!badge){
+    badge = document.createElement("a");
+    badge.className = "yt-channel-badge";
+    badge.href = "https://youtube.com/@TU_CANAL";
+    badge.target = "_blank"; badge.rel = "noopener";
+    const img = document.createElement("img");
+    img.src = "assets/images/youtube-channel.png";
+    img.alt = "YouTube channel";
+    badge.appendChild(img);
+    rail.appendChild(badge);
+  }
+}
 
 function openAdminLoginModal(){
   const modal = adminLoginModalTemplate.content.cloneNode(true);
@@ -876,18 +956,20 @@ function setupAdminButton(){
   adminBtn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
   // Remove previous event listeners by cloning
   const newBtn = adminBtn.cloneNode(true);
-  adminBtn.parentNode.replaceChild(newBtn, adminBtn);
-  newBtn.addEventListener("click", ()=>{
-    if(isAdmin){
-      if(confirm("¿Cerrar sesión de administrador?")){
-        isAdmin = false; persistAdmin(false);
-        renderRow(); renderHeroCarousel(); renderSocialBar();
-        alert("Sesión cerrada.");
+  if (adminBtn.parentNode) {
+    adminBtn.parentNode.replaceChild(newBtn, adminBtn);
+    newBtn.addEventListener("click", ()=>{
+      if(isAdmin){
+        if(confirm("¿Cerrar sesión de administrador?")){
+          isAdmin = false; persistAdmin(false);
+          renderRow(); renderHeroCarousel(); renderSocialBar();
+          alert("Sesión cerrada.");
+        }
+      } else {
+        openAdminLoginModal();
       }
-    } else {
-      openAdminLoginModal();
-    }
-  });
+    });
+  }
 }
 
 /* === SIDEBAR BADGE (imagen canal) === */
@@ -940,7 +1022,6 @@ function setupCategoryNav()
   if(btnApps)  btnApps .addEventListener("click", ()=> setActive("app"));
   if(btnMovies)btnMovies.addEventListener("click", ()=> setActive("movie"));
 }
-
 
 
 // Utilidad: ¿el objetivo es editable o está dentro de un modal?
