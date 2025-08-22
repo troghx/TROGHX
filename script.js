@@ -606,7 +606,7 @@ function openNewGameModal(){
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
     let coverDataUrl;
-    try { coverDataUrl = await compressImage(imageFile, {maxW=960,maxH=960,quality:0.8}); }
+    try { coverDataUrl = await compressImage(imageFile, { maxW: 960, maxH: 960, quality: 0.8 });
     catch { alert("No se pudo compactar la portada."); return; }
 
     let previewSrc=null;
@@ -1092,3 +1092,4 @@ async function initData(){
   setupSideNav();
 }
 initData();
+
