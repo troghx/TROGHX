@@ -889,7 +889,6 @@ function setupCategoryNav(){
 }
 
 // Scroll desbloqueado para permitir ajuste responsivo y uso de barra espaciadora.
-}, { passive: false });
 
 
 /* === INIT / RELOAD === */
