@@ -911,22 +911,28 @@ function ensureSidebarChannelBadge(){
 }
 
 /* === NAV: Games / Apps / Movies === */
-function setupCategoryNav(){
-  const btnGames = document.querySelector('[data-nav="games"], .nav-games');
-  const btnApps  = document.querySelector('[data-nav="apps"], .nav-apps');
-  const btnMovies= document.querySelector('[data-nav="movies"], .nav-movies');
+function setupCategoryNav()
+{
+  let btnGames = document.querySelector('[data-nav="games"], .nav-games');
+  let btnApps  = document.querySelector('[data-nav="apps"], .nav-apps');
+  let btnMovies= document.querySelector('[data-nav="movies"], .nav-movies');
+
+  // Fallback: map side-nav buttons by order if missing data attributes
+  const navBtns = Array.from(document.querySelectorAll('.side-nav .nav-btn'));
+  if (!btnGames && navBtns[0]) { btnGames = navBtns[0]; btnGames.classList.add('nav-games'); btnGames.setAttribute('data-nav','games'); }
+  if (!btnApps  && navBtns[1]) { btnApps  = navBtns[1]; btnApps .classList.add('nav-apps');  btnApps .setAttribute('data-nav','apps');  }
+  if (!btnMovies&& navBtns[2]) { btnMovies= navBtns[2]; btnMovies.classList.add('nav-movies');btnMovies.setAttribute('data-nav','movies');}
 
   function setActive(cat){
     currentCategory = cat;
     [btnGames, btnApps, btnMovies].forEach(b=>{
       if(!b) return;
-      b.classList.toggle("active", 
-        (b === btnGames && cat === "game") ||
-        (b === btnApps && cat === "app") ||
-        (b === btnMovies && cat === "movie")
-      );
+      const active = (b === btnGames && cat === "game") ||
+                     (b === btnApps  && cat === "app")  ||
+                     (b === btnMovies&& cat === "movie");
+      b.classList.toggle("active", active);
+      b.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
-    // Await reloadData to ensure UI updates after data is loaded
     reloadData();
   }
 
@@ -935,14 +941,30 @@ function setupCategoryNav(){
   if(btnMovies)btnMovies.addEventListener("click", ()=> setActive("movie"));
 }
 
+
+
+// Utilidad: ¿el objetivo es editable o está dentro de un modal?
+function isEditableTarget(target){
+  if(!target) return false;
+  if (target.closest && (target.closest('.tw-modal') || target.closest('.rich-editor'))) return true;
+  const el = target.nodeType === 3 ? target.parentElement : target; // text node fallback
+  if(!el) return false;
+  if (el.isContentEditable) return true;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.getAttribute('role') === 'textbox';
+}
 // Evita scroll global; permite scroll horizontal en .carousel
 window.addEventListener('wheel', (e) => {
-  if (!e.target.closest('.carousel')) e.preventDefault();
+  if (e.target.closest && e.target.closest('.carousel')) return; 
+  if (isEditableTarget(e.target)) return; 
+  e.preventDefault();
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
   const keys = ['ArrowDown','ArrowUp','PageDown','PageUp','Home','End',' '];
-  if (keys.includes(e.key) && !e.target.closest('.carousel')) e.preventDefault();
+  if (e.target.closest && e.target.closest('.carousel')) return;
+  if (isEditableTarget(e.target)) return;
+  if (keys.includes(e.key)) e.preventDefault();
 }, { passive: false });
 
 
