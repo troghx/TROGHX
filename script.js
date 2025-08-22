@@ -490,7 +490,8 @@ function renderHeroCarousel(){
    Modal ver juego (carga detalle al abrir)
    ========================= */
 async function openGameLazy(game){
-  let data = game; // fallback: usa datos lite
+  // Usa los datos "lite" mientras llega el detalle
+  let data = game;
   try{
     const full = await apiGet(game.id);
     data = { ...game, ...full };
@@ -499,19 +500,21 @@ async function openGameLazy(game){
   }
   openGame(data);
 }
+
 function openGame(game){
+  // Clona el template del modal de juego
   const modal = modalTemplate.content.cloneNode(true);
-  const modalNode     = modal.querySelector(".tw-modal");
-  const modalContent  = modal.querySelector(".tw-modal-content");
-  const modalImage    = modal.querySelector(".tw-modal-image");
-  const modalTitle    = modal.querySelector(".tw-modal-title");
-  const modalDesc     = modal.querySelector(".tw-modal-description");
-  const modalClose    = modal.querySelector(".tw-modal-close");
+  const modalNode    = modal.querySelector(".tw-modal");              // contenedor
+  const modalContent = modal.querySelector(".tw-modal-content");      // cuerpo
+  const modalTitle   = modal.querySelector(".tw-modal-title");        // título
+  const modalDesc    = modal.querySelector(".tw-modal-description");  // descripción
+  const modalClose   = modal.querySelector(".tw-modal-close");        // botón cerrar
 
-  modalImage.src = game.image || "assets/images/construction/en-proceso.svg";
-  modalTitle.textContent = game.title || "Sin título";
-  modalDesc.innerHTML = game.description || "Sin descripción";
+  // ⚠️ Ya NO hay imagen/hero en el modal: no intentes setear .src
+  if(modalTitle) modalTitle.textContent = game?.title || "Sin título";
+  if(modalDesc)  modalDesc.innerHTML    = game?.description || "Sin descripción";
 
+  // Opciones de admin (kebab)
   if(isAdmin){
     const kebabBtn=document.createElement("button");
     kebabBtn.className="tw-modal-menu";
@@ -537,23 +540,19 @@ function openGame(game){
       }
     });
 
-    modalContent.appendChild(kebabBtn);
-    modalContent.appendChild(panel);
+    if(modalContent){
+      modalContent.appendChild(kebabBtn);
+      modalContent.appendChild(panel);
+    }
   }
 
-  const removeTrap=trapFocus(modalNode);
-  const onEscape=(e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
-  modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
+  // Accesibilidad / cierre
+  const removeTrap = trapFocus(modalNode);
+  const onEscape   = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
+  if(modalClose) modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
+
+  // Inserta/abre el modal (usa tu helper existente)
   openModalFragment(modalNode);
-}
-function deleteGame(game){
-  if(!game.id){ alert("No se encontró ID."); return; }
-  const token = localStorage.getItem("tgx_admin_token") || "";
-  if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
-  apiDelete(game.id, token)
-    .then(()=> reloadData())
-    .then(()=> alert("Publicación eliminada."))
-    .catch(e=>{ console.error(e); alert("Error al borrar."); });
 }
 
 /* =========================
@@ -1121,4 +1120,5 @@ async function initData(){
   setupSideNav();
 }
 initData();
+
 
