@@ -794,3 +794,18 @@ main, .main, .page, .app, .content {
 .game-card a, .post-card a, .tile a {
   cursor: var(--cursor-hand);
 }
+
+/* Baseline: que siempre sea “manita” aunque falle el archivo */
+.game-card, .post-card, .tile, .grid .card,
+.game-card a, .post-card a, .tile a {
+  cursor: pointer;
+}
+
+/* Cursor personalizado con fallback. 
+   Si el .cur existe, lo usa; si no, cae a .png; si tampoco, queda pointer. */
+.game-card, .post-card, .tile, .grid .card {
+  cursor: url("/assets/cursor/hand.cur") 10 2,
+          url("/assets/cursor/hand.png") 10 2,
+          pointer;
+}
+
