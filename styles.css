@@ -15,10 +15,10 @@
 
 * { box-sizing: border-box; }
 html, body {
-  height: 100vh;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth;
+  min-height: 100%;
+  height: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 @supports (height: 100dvh) {
   body { height: 100dvh; }
@@ -76,7 +76,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 /* ---------- Barra de redes sociales en el hero ---------- */
 .socials { margin-top: 8px; }
 .social-bar {
-  display: flex; flex-wrap: nowrap; gap: 10px;
+  display: flex; flex-wrap: wrap; gap: 10px;
   align-items: center;
 }
 
@@ -88,9 +88,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   background: #131920;
   display: grid; place-items: center;
   box-shadow: var(--shadow-soft);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth; cursor: pointer;
+  overflow: hidden; cursor: pointer;
   transition: transform .18s, box-shadow .18s, outline .18s, background .18s;
 }
 .social-tile:hover, .add-social-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
@@ -142,15 +140,13 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   box-shadow: var(--shadow);
 }
 .hero {
-  position: relative; overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth; display: grid;
+  position: relative; overflow: hidden; display: grid;
   grid-template-columns: 1.1fr .9fr; gap: 10px; min-height: 240px; flex: 0 0 auto;
 }
 .hero-copy { padding: 22px; }
 .hero-copy h1 { margin: 0 0 8px; font-size: 1.6rem; }
 .hero-copy p { margin: 0 0 16px; color: var(--muted); }
-.hero .actions { display: flex; gap: 12px; flex-wrap: nowrap; }
+.hero .actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
 #hero button{
   padding: 15px 30px; font-size: 1.2rem; text-transform: uppercase;
@@ -168,9 +164,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 .hero-art{
   position: relative; margin: 10px; border-radius: var(--radius-lg);
-  border: 1px solid rgba(255,255,255,.06); overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.06); overflow: hidden; cursor: pointer;
   transition: transform .2s;
   background-size:cover; background-position:center;
   border-radius:1.25rem; overflow:hidden;
@@ -215,7 +209,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .tw-modal-description{
   margin: 0 0 16px; color: var(--muted); font-size: 1rem; line-height: 1.5;
 }
-.tw-modal-actions{ display: flex; gap: 12px; flex-wrap: nowrap; }
+.tw-modal-actions{ display: flex; gap: 12px; flex-wrap: wrap; }
 .tw-modal-download, .tw-modal-secondary{
   padding: 12px 24px; font-size: 1rem; text-transform: uppercase; border: none;
   border-radius: 50px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
@@ -266,12 +260,8 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .new-game-form textarea { min-height: 100px; resize: vertical; }
 
 /* ---------- Filas y carruseles ---------- */
-.row { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth; }
-.section-recientes, .rows, .rows-wrap { flex: 1 1 auto; min-height: 0; overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth; }
+.row { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; overflow: hidden; }
+.section-recientes, .rows, .rows-wrap { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .row-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
 .row-head h2 { margin: 0; font-size: 1.1rem; }
 .row-controls { display: flex; gap: 8px; }
@@ -284,11 +274,9 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .carousel {
   --tile-w: 280px;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 14px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth;
+  overflow: hidden;
   align-content: flex-start;
   padding-bottom: 8px;
   scroll-snap-type: x mandatory;
@@ -299,7 +287,6 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .carousel .add-game-tile {
   flex: 0 0 var(--tile-w);
   width: var(--tile-w);
-  height: var(--tile-h, 180px);
 }
 
 /* Mantener visible el “+ Añadir juego” (solo admin) */
@@ -309,7 +296,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   z-index: 3;
   display: grid;
   place-content: center;
-  min-height: var(--tile-h, 180px);
+  min-height: 148px;
   border-radius: 14px;
   border: 1px dashed var(--border-color, #364049);
   background: color-mix(in srgb, var(--panel, #12161a) 85%, #000 15%);
@@ -324,7 +311,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 /* ====== Rich Editor ====== */
 .rich-editor { display: flex; flex-direction: column; gap: 8px; }
 .rich-toolbar {
-  display: flex; flex-wrap: nowrap; gap: 8px; align-items: center;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   background: var(--panel-2); border: 1px solid rgba(255,255,255,.12);
   border-radius: var(--radius); padding: 8px;
 }
@@ -377,9 +364,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .tile{
   flex: 0 0 clamp(200px, 28vw, 350px);
   aspect-ratio: 16 / 9; border-radius: var(--radius-xl);
-  background: #131920; position: relative; overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth;
+  background: #131920; position: relative; overflow: hidden;
   scroll-snap-align: start;
   transition: transform .18s, box-shadow .18s, outline .18s;
   outline: 1px solid rgba(255,255,255,.06);
@@ -534,9 +519,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   bottom: 12px;
   display: inline-flex;
   border-radius: 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth;
+  overflow: hidden;
   box-shadow: 0 8px 20px rgba(0,0,0,.45);
   border: 1px solid rgba(255,255,255,.07);
   background: #000;
@@ -640,3 +623,30 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 }
 .hero.hero--simple .hero-copy h1{ font-size:1.5rem; }
 .hero.hero--simple .socials{ margin-top:12px; }
+
+
+/* === Responsive feed grid (reemplaza carrusel) === */
+.feed-grid{
+  --tile-min: 220px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-min), 1fr));
+  gap: 16px;
+  align-content: start;
+  padding-bottom: 8px;
+}
+@media (max-width: 1200px){
+  .feed-grid{ --tile-min: 200px; }
+}
+@media (max-width: 768px){
+  .feed-grid{ --tile-min: 160px; }
+}
+.feed-grid .tile,
+.feed-grid .add-game-tile{
+  width: 100%;
+  flex: initial;
+}
+/* Botón de agregar social: sin flechas/pseudo elementos */
+.add-social-tile::before,
+.add-social-tile::after{ content: none !important; }
+
+.feed-grid .tile{ flex-basis: auto !important; }
