@@ -1,17 +1,13 @@
 /* =========================
-   TROGH — script.js (Grid + Paginación, optimized egress)
-   - List endpoint uses ?lite=1 (no blobs)
-   - Per-tile lazy fetch of full post (image/desc/video) via GET /posts/:id when visible
+   TROGH — script.js (Grid + Paginación, con categorías)
    ========================= */
 
-/* === Templates === */
 const template = document.getElementById("tile-template");
 const modalTemplate = document.getElementById("game-modal-template");
 const adminLoginModalTemplate = document.getElementById("admin-login-modal-template");
 const newGameModalTemplate = document.getElementById("new-game-modal-template");
 const newSocialModalTemplate = document.getElementById("new-social-modal-template");
 
-/* === LocalStorage Keys === */
 const LS_RECENTES   = "tgx_recientes";
 const LS_ADMIN      = "tgx_is_admin";
 const LS_ADMIN_HASH = "tgx_admin_hash";
@@ -19,12 +15,10 @@ const LS_ADMIN_SALT = "tgx_admin_salt";
 const LS_ADMIN_USER = "tgx_admin_user";
 const LS_SOCIALS    = "tgx_socials";
 
-/* === API endpoints (Netlify Functions) === */
 const API_POSTS = "/.netlify/functions/posts";
 const API_SOC   = "/.netlify/functions/socials";
 const API_LINK  = "/.netlify/functions/linkcheck";
 
-/* === Estado global === */
 let isAdmin = false;
 let recientes = [];
 let socials  = [];
@@ -34,12 +28,8 @@ let PAGE_SIZE = 12;
 let page = 1;
 let searchQuery = "";
 
-/* Cache de detalles para no volver a pedirlos */
 const fullCache = new Map();
 
-/* =========================
-   Utilidades básicas
-   ========================= */
 function rehydrate() {
   try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES)||"[]"); if(Array.isArray(saved)) recientes = saved; } catch {}
   try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS)||"[]"); if(Array.isArray(savedS)) socials = savedS; } catch {}
@@ -51,16 +41,14 @@ rehydrate();
 function persistAdmin(flag){ try{ localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); }catch{} }
 function preload(src){ const img = new Image(); img.src = src; }
 
-/* === Crypto helpers === */
 function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
 async function sha256(str){ const enc=new TextEncoder().encode(str); const digest=await crypto.subtle.digest("SHA-256",enc); return toHex(digest); }
 function genSaltHex(len=16){ const a=new Uint8Array(len); crypto.getRandomValues(a); return Array.from(a).map(b=>b.toString(16).padStart(2,"0")).join(""); }
 async function hashCreds(user,pin,salt){ const key=`${user}::${pin}::${salt}`; return sha256(key); }
 
-/* === API POSTS === */
+/* ============ API POSTS ============ */
 async function apiList(category = window.currentCategory) {
-  const qs = new URLSearchParams({ lite: "1", limit: "200" });
-  // if(category) qs.set("category", category); // (aún no filtramos por categoría en el backend)
+  const qs = new URLSearchParams({ lite: "1", limit: "200", category });
   const r = await fetch(`${API_POSTS}?${qs.toString()}`, { cache: "no-store" });
   if (!r.ok) throw new Error("No se pudo listar posts");
   return r.json();
@@ -99,7 +87,7 @@ async function apiDelete(id, token){
   return r.json();
 }
 
-/* === API SOCIALS === */
+/* ============ API SOCIALS ============ */
 async function socialsList(){
   const r = await fetch(API_SOC, { cache:"no-store" });
   if(!r.ok) throw new Error("No se pudo listar socials");
@@ -120,9 +108,7 @@ async function socialsDelete(id, token){
   return r.json();
 }
 
-/* =========================
-   Modales
-   ========================= */
+/* ============ Modales ============ */
 function openModalFragment(fragment){ document.body.appendChild(fragment); setTimeout(()=>fragment.classList.add("active"),0); }
 function closeModal(modalNode, removeTrap, onEscape){
   modalNode.classList.remove("active");
@@ -145,9 +131,7 @@ function trapFocus(modalNode){
   return () => modalNode.removeEventListener("keydown", onKey);
 }
 
-/* =========================
-   Imagen/Video helpers
-   ========================= */
+/* ============ Media helpers ============ */
 function readAsDataURL(file){
   return new Promise((resolve,reject)=>{
     const fr=new FileReader();
@@ -175,9 +159,7 @@ async function compressImage(file,{maxW=960,maxH=960,quality=0.8}={}){
   return out;
 }
 
-/* =========================
-   Chips de enlace (editor)
-   ========================= */
+/* ============ Enlaces/Chips ============ */
 function platformFromUrl(u){
   const s=(u||"").toLowerCase();
   if (s.startsWith("magnet:") || s.endsWith(".torrent") || s.includes("utorrent")) return "torrent";
@@ -209,7 +191,7 @@ function extractFirstLink(html){
   return a ? a.getAttribute("href") : "";
 }
 
-/* === linkcheck cache === */
+/* ============ Linkcheck ============ */
 const linkCache = new Map();
 async function checkLink(url){
   if(!url) return { ok:false, status:null };
@@ -238,9 +220,7 @@ function platformIconSVG(plat){
   }
 }
 
-/* =========================
-   Editor enriquecido
-   ========================= */
+/* ============ Editor enriquecido ============ */
 function initRichEditor(editorRoot){
   const editorArea = editorRoot.querySelector(".editor-area");
   const toolbar    = editorRoot.querySelector(".rich-toolbar");
@@ -278,9 +258,7 @@ function initRichEditor(editorRoot){
   return { getHTML: ()=>editorArea.innerHTML.trim(), setHTML: (h)=>{ editorArea.innerHTML=h||""; } };
 }
 
-/* =========================
-   Badges de estado de enlace (se aplican cuando ya cargamos detalle)
-   ========================= */
+/* ============ Badges ============ */
 async function applyLinkStatusBadge(tile, game){
   let badge = tile.querySelector(".tile-info .badge");
   if(!badge){
@@ -313,9 +291,7 @@ async function applyLinkStatusBadge(tile, game){
   }
 }
 
-/* =========================
-   Render GRID + Paginación
-   ========================= */
+/* ============ GRID + Paginación ============ */
 function getFilteredList(){
   if(!searchQuery) return recientes;
   const q = searchQuery.toLowerCase();
@@ -339,7 +315,6 @@ function updatePager(totalPages){
   pager.style.display = (totalPages>1) ? "flex" : "none";
 }
 
-/* Lazy load de detalle por visibilidad de tarjeta */
 function observeTileForDetails(tile, g, coverEl, vidEl){
   const placeholder = "assets/images/construction/en-proceso.svg";
   coverEl.style.backgroundImage = `url(${placeholder})`;
@@ -423,7 +398,6 @@ function renderRow(keepScroll=false){
 
     grid.appendChild(node);
 
-    // Lazy: cargamos detalle cuando la tarjeta sea visible
     observeTileForDetails(tile, g, cover, vid);
   });
 
@@ -431,9 +405,7 @@ function renderRow(keepScroll=false){
   if(!keepScroll) grid.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-/* =========================
-   HERO simple (leyenda + redes)
-   ========================= */
+/* ============ HERO simple ============ */
 function renderHeroCarousel(){
   const hero = document.querySelector(".hero");
   if(!hero) return;
@@ -444,9 +416,7 @@ function renderHeroCarousel(){
   if(heroCarousel) heroCarousel.innerHTML="";
 }
 
-/* =========================
-   Modal ver publicación (lazy si hace falta)
-   ========================= */
+/* ============ Modal ver ============ */
 async function openGameLazy(game){
   let g = game;
   try{
@@ -514,9 +484,24 @@ function deleteGame(game){
     .catch(e=>{ console.error(e); alert("Error al borrar."); });
 }
 
-/* =========================
-   Nuevo / Editar publicación
-   ========================= */
+/* ============ Category select helper ============ */
+function makeCategorySelect(current="game"){
+  const wrap=document.createElement("label");
+  wrap.style.display="block";
+  wrap.style.marginTop=".6rem";
+  wrap.innerHTML=`
+    <span style="display:block;font-size:.85rem;opacity:.8;margin-bottom:.25rem">Tipo</span>
+    <select class="cat-select" style="width:100%;background:#11161b;border:1px solid #2a323a;border-radius:10px;padding:.6rem .7rem;color:#cfe3ff">
+      <option value="game">Juego</option>
+      <option value="app">App</option>
+      <option value="movie">Película</option>
+    </select>
+  `;
+  wrap.querySelector("select").value = current || "game";
+  return wrap;
+}
+
+/* ============ Nuevo / Editar ============ */
 function openNewGameModal(){
   const modal = newGameModalTemplate.content.cloneNode(true);
   const node  = modal.querySelector(".tw-modal");
@@ -530,7 +515,11 @@ function openNewGameModal(){
   const editorRoot= modal.querySelector(".rich-editor");
   const editorAPI = initRichEditor(editorRoot);
 
-  // Ocultamos el input de trailer URL (no lo usamos)
+  // Selector de categoría
+  const catSel = makeCategorySelect("game");
+  form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
+
+  // Ocultamos URL de trailer (no se usa)
   if(trailerUrlInput){
     trailerUrlInput.value=""; trailerUrlInput.disabled=true;
     const label=trailerUrlInput.closest("label"); if(label) label.style.display="none";
@@ -546,6 +535,7 @@ function openNewGameModal(){
     const descHTML=editorAPI.getHTML();
     const imageFile=imageInput?.files?.[0] || null;
     const trailerFile=trailerFileInput?.files?.[0] || null;
+    const category = catSel.querySelector(".cat-select")?.value || "game";
 
     if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return; }
     if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return; }
@@ -565,13 +555,13 @@ function openNewGameModal(){
     const token=localStorage.getItem("tgx_admin_token")||"";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
-    const newGame = { title, image: coverDataUrl, description: descHTML, previewVideo: previewSrc };
+    const newGame = { title, image: coverDataUrl, description: descHTML, previewVideo: previewSrc, category };
 
     try{
       await apiCreate(newGame, token);
       await reloadData();
       closeModal(node, removeTrap, onEscape);
-      alert("¡Juego publicado!");
+      alert("¡Publicación publicada!");
     }catch(err){ console.error("[create error]", err); alert("Error al crear. Revisa consola."); }
   });
 
@@ -593,6 +583,10 @@ function openEditGame(original){
 
   if(titleInput) titleInput.value = original.title || "";
   editorAPI.setHTML(original.description || "");
+
+  // Selector de categoría
+  const catSel = makeCategorySelect(original.category || "game");
+  form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
 
   if(trailerUrlInput){ trailerUrlInput.value=""; trailerUrlInput.disabled=true; const label=trailerUrlInput.closest("label"); if(label) label.style.display="none"; }
   if(imageInput) imageInput.required=false;
@@ -617,11 +611,12 @@ function openEditGame(original){
     const descHTML=editorAPI.getHTML();
     const imageFile=imageInput?.files?.[0] || null;
     const trailerFile=trailerFileInput?.files?.[0] || null;
+    const category = catSel.querySelector(".cat-select")?.value || "game";
 
     if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return; }
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
-    const patch={ title, description: descHTML };
+    const patch={ title, description: descHTML, category };
 
     if(imageFile){
       try{ patch.image = await compressImage(imageFile); }
@@ -655,9 +650,7 @@ function openEditGame(original){
   openModalFragment(node);
 }
 
-/* =========================
-   Redes sociales
-   ========================= */
+/* ============ Social bar ============ */
 function openNewSocialModal(){
   const modal = newSocialModalTemplate.content.cloneNode(true);
   const node  = modal.querySelector(".tw-modal");
@@ -726,9 +719,7 @@ function renderSocialBar(){
   }
 }
 
-/* =========================
-   Búsqueda
-   ========================= */
+/* ============ Búsqueda ============ */
 function setupSearch(){
   const input=document.getElementById("searchInput");
   if(!input) return;
@@ -739,9 +730,7 @@ function setupSearch(){
   });
 }
 
-/* =========================
-   Navegación lateral (Juegos/Apps/Películas)
-   ========================= */
+/* ============ Side nav (categorías) ============ */
 function setupSideNav(){
   const btns = Array.from(document.querySelectorAll('.side-nav .nav-btn'));
   if(!btns.length) return;
@@ -767,16 +756,13 @@ function setupSideNav(){
   setActive(window.currentCategory || "game");
 }
 
-/* =========================
-   Admin / Login
-   ========================= */
+/* ============ Admin ============ */
 function ensureAuthTokenPrompt(){
   try{
     const k="tgx_admin_token"; let t=localStorage.getItem(k);
     if(!t){ t = prompt("Pega tu AUTH_TOKEN de Netlify para crear/editar/borrar:"); if(t) localStorage.setItem(k, t.trim()); }
   }catch{}
 }
-
 function openAdminLoginModal(){
   const modal = adminLoginModalTemplate.content.cloneNode(true);
   const node  = modal.querySelector(".tw-modal");
@@ -838,7 +824,6 @@ function openAdminLoginModal(){
 
   openModalFragment(node);
 }
-
 function setupAdminButton(){
   const btn=document.querySelector(".user-pill");
   if(!btn) return;
@@ -856,9 +841,7 @@ function setupAdminButton(){
   });
 }
 
-/* =========================
-   Badge lateral (YouTube)
-   ========================= */
+/* ============ Lateral YouTube ============ */
 function ensureSidebarChannelBadge(){
   const rail=document.querySelector(".side-nav");
   if(!rail) return;
@@ -874,21 +857,17 @@ function ensureSidebarChannelBadge(){
   }
 }
 
-/* =========================
-   Carga / Recarga
-   ========================= */
+/* ============ Carga inicial ============ */
 async function reloadData(){
   try{ const data=await apiList(window.currentCategory); recientes=Array.isArray(data)?data:[]; }
   catch(e){ console.error("[reload posts]", e); recientes=[]; }
   renderRow();
   renderHeroCarousel();
 }
-
 async function initData(){
-  try{ const data=await apiList(window.currentCategory); recientes=Array.isArray(data)?data:[]; }
-  catch(e){ console.error("[initData posts]", e); recientes=[]; }
-  try{ socials=await socialsList(); }
-  catch(e){ console.error("[initData socials]", e); socials=[]; }
+  try{ const data=await apiList(window.currentCategory); recientes=Array.isArray(data)?data:[];
+  }catch(e){ console.error("[initData posts]", e); recientes=[]; }
+  try{ socials=await socialsList(); }catch(e){ console.error("[initData socials]", e); socials=[]; }
 
   renderRow();
   setupSearch();
@@ -898,6 +877,4 @@ async function initData(){
   ensureSidebarChannelBadge();
   setupSideNav();
 }
-
-/* === GO === */
 initData();
