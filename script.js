@@ -1,5 +1,5 @@
 /* =========================
-   TROGH — script.js (Grid + Paginación + Admin Keys + Categorías)
+   TROGH — script.js (Grid + Paginación + Admin Keys + Crear Usuario)
    ========================= */
 
 /* ------- Templates del HTML ------- */
@@ -606,7 +606,7 @@ function openNewGameModal(){
     if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
 
     let coverDataUrl;
-    try { coverDataUrl = await compressImage(imageFile, {maxW:960,maxH:960,quality:0.8}); }
+    try { coverDataUrl = await compressImage(imageFile, {maxW=960,maxH=960,quality:0.8}); }
     catch { alert("No se pudo compactar la portada."); return; }
 
     let previewSrc=null;
@@ -825,7 +825,7 @@ function setupSideNav(){
 }
 
 /* =========================
-   Admin: Token y Login con llave
+   Admin: Token y Login / Crear Usuario
    ========================= */
 function ensureAuthTokenPrompt(){
   try{
@@ -833,6 +833,7 @@ function ensureAuthTokenPrompt(){
     if(!t){ t = prompt("Pega tu AUTH_TOKEN de Netlify (requerido para publicar/editar/borrar):"); if(t) localStorage.setItem(k, t.trim()); }
   }catch{}
 }
+
 function openAdminLoginModal(){
   const modal = adminLoginModalTemplate.content.cloneNode(true);
   const node  = modal.querySelector(".tw-modal");
@@ -843,27 +844,45 @@ function openAdminLoginModal(){
   const submitBtn     = form.querySelector('button[type="submit"]');
   const modalClose    = modal.querySelector(".tw-modal-close");
 
-  const imgDecor = node.querySelector(".tw-modal-image"); // por si la plantilla la trae
-  if (imgDecor) imgDecor.style.display = "none";
+  const imgDecor = node.querySelector(".tw-modal-image"); if (imgDecor) imgDecor.style.display = "none";
 
+  // Campo: llave de acceso
   const accessWrap = document.createElement("label");
   accessWrap.innerHTML = `Llave de acceso <input type="password" class="admin-access" required>
-    <span class="input-hint">La llave puede revocarse desde Admin Center</span>`;
+    <span class="input-hint">Se valida contra el servidor y puede revocarse</span>`;
   form.insertBefore(accessWrap, form.querySelector(".tw-modal-actions") || form.lastElementChild);
+
+  // Botón “Crear usuario”
+  const actions = form.querySelector(".tw-modal-actions") || form;
+  const createBtn = document.createElement("button");
+  createBtn.type = "button";
+  createBtn.className = "tw-btn-secondary";
+  createBtn.textContent = "Crear usuario";
+  actions.appendChild(createBtn);
+
+  // Campo oculto: confirmar PIN (para crear usuario)
+  const confirmWrap = document.createElement("label");
+  confirmWrap.style.display = "none";
+  confirmWrap.innerHTML = `Confirmar PIN <input type="password" class="admin-pin2">
+    <span class="input-hint">4 a 6 dígitos</span>`;
+  form.insertBefore(confirmWrap, actions);
 
   const savedHash = localStorage.getItem(LS_ADMIN_HASH);
   const savedSalt = localStorage.getItem(LS_ADMIN_SALT);
   const savedUser = localStorage.getItem(LS_ADMIN_USER);
-  const isFirstRun = !(savedHash && savedSalt && savedUser);
 
-  if(isFirstRun){
-    if(h2) h2.textContent="Entrar como administrador";
-    if(submitBtn) submitBtn.textContent="Entrar";
-    const confirmLabel=document.createElement("label");
-    confirmLabel.innerHTML=`Confirmar PIN <input type="password" class="admin-pin2" required>
-      <span class="input-hint">Sólo para tu dispositivo (4 a 6 dígitos)</span>`;
-    form.insertBefore(confirmLabel, form.querySelector(".tw-modal-actions") || form.lastElementChild);
+  const isCreateMode = { value: false };
+  function setModeCreate(flag){
+    isCreateMode.value = !!flag;
+    confirmWrap.style.display = flag ? "block" : "none";
+    if (h2) h2.textContent = flag ? "Crear usuario administrador" : "Entrar como administrador";
+    if (submitBtn) submitBtn.textContent = flag ? "Crear y entrar" : "Entrar";
   }
+
+  // Si no hay usuario local, sugerimos crear
+  if (!savedHash || !savedSalt || !savedUser) setModeCreate(true);
+
+  createBtn.addEventListener("click", ()=> setModeCreate(!isCreateMode.value));
 
   const removeTrap=trapFocus(node);
   const onEscape=(e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
@@ -874,15 +893,15 @@ function openAdminLoginModal(){
     const user=(usernameInput.value||"").trim();
     const pin =(pinInput.value||"").trim();
     const accessPlain = node.querySelector(".admin-access")?.value?.trim();
-
     if(!user || !pin || !accessPlain){ alert("Usuario, PIN y Llave son obligatorios."); return; }
     if(!/^[0-9]{4,6}$/.test(pin)){ alert("PIN debe ser 4 a 6 dígitos."); return; }
 
+    // validar llave contra servidor
     const accessHash = await sha256(accessPlain);
     const res = await adminLoginByKeyHash(accessHash);
     if(!res?.ok){ alert("Llave inválida o revocada."); return; }
 
-    if(isFirstRun){
+    if(isCreateMode.value){
       const pin2 = node.querySelector(".admin-pin2")?.value?.trim();
       if(pin!==pin2){ alert("Los PIN no coinciden."); return; }
       const salt=genSaltHex(16);
@@ -902,11 +921,12 @@ function openAdminLoginModal(){
     closeModal(node, removeTrap, onEscape);
     renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
     ensureAuthTokenPrompt();
-    alert("¡Admin verificado!");
+    alert(isCreateMode.value ? "Usuario creado y sesión iniciada" : "¡Admin verificado!");
   });
 
   openModalFragment(node);
 }
+
 function setupAdminButton(){
   const btn=document.querySelector(".user-pill");
   if(!btn) return;
@@ -1018,7 +1038,7 @@ function openAdminCenter(){
 }
 
 /* =========================
-   Badge lateral → Admin Center
+   Badge lateral → Admin Center (sin link)
    ========================= */
 function ensureSidebarChannelBadge(){
   const rail = document.querySelector(".side-nav");
@@ -1026,18 +1046,15 @@ function ensureSidebarChannelBadge(){
 
   let el = rail.querySelector(".yt-channel-badge");
 
-  // Si ya existe y es <a>, lo convertimos en <button> sin perder la imagen/hijos
   if (el && el.tagName === "A") {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = el.className;  // conserva estilos .yt-channel-badge
-    // mover los hijos (la imagen) al nuevo botón
+    btn.className = el.className;
     while (el.firstChild) btn.appendChild(el.firstChild);
     el.replaceWith(btn);
     el = btn;
   }
 
-  // Si no existía, lo creamos
   if (!el) {
     el = document.createElement("button");
     el.type = "button";
@@ -1049,7 +1066,6 @@ function ensureSidebarChannelBadge(){
     rail.appendChild(el);
   }
 
-  // Click: sólo admins abren Admin Center. No hay navegación a ningún link.
   el.onclick = () => { if (isAdmin) openAdminCenter(); };
 }
 
@@ -1076,4 +1092,3 @@ async function initData(){
   setupSideNav();
 }
 initData();
-
