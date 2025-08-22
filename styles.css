@@ -840,3 +840,54 @@ body.modal-open{ overflow:hidden; }
           url("/assets/cursor/hand.png") 10 2,
           pointer;
 }
+
+/* ===== Modales: alto responsive y scroll interno ===== */
+.tw-modal .tw-modal-content{
+  width: min(920px, 96vw);
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+/* Cuerpo con scroll: ver-publicación */
+.tw-modal .tw-modal-description{
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 8px 20px 20px 20px;
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Cuerpo con scroll: crear/editar (el <form>) */
+.tw-modal .new-game-form{
+  flex: 1 1 auto;
+  overflow: auto;
+  padding-right: 6px; /* evita tapar el contenido con la barra */
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Bloquea scroll del documento cuando hay modal abierto (tu JS ya añade .modal-open) */
+body.modal-open{ overflow:hidden; }
+
+/* ===== Scrollbar fino y sutil (WebKit/Blink) ===== */
+.tw-modal .tw-modal-description::-webkit-scrollbar,
+.tw-modal .new-game-form::-webkit-scrollbar{ width: 8px; }
+.tw-modal .tw-modal-description::-webkit-scrollbar-track,
+.tw-modal .new-game-form::-webkit-scrollbar-track{ background: transparent; }
+.tw-modal .tw-modal-description::-webkit-scrollbar-thumb,
+.tw-modal .new-game-form::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,.18);
+  border-radius: 8px;
+}
+.tw-modal .tw-modal-description::-webkit-scrollbar-thumb:hover,
+.tw-modal .new-game-form::-webkit-scrollbar-thumb:hover{
+  background: rgba(255,255,255,.28);
+}
+
+/* Firefox */
+.tw-modal .tw-modal-description,
+.tw-modal .new-game-form{
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.18) transparent;
+}
