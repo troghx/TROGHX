@@ -779,8 +779,6 @@ function openEditGame(original){
       await apiUpdate(original.id, patch, token);
       const data = await apiList(window.currentCategory);
       recientes = Array.isArray(data)?data:[];
-      const idx = recientes.findIndex(p=>p.id===original.id);
-      if(idx>0){ const [item]=recientes.splice(idx,1); recientes.unshift(item); }
       closeModal(node, removeTrap, onEscape);
       page = 1;
       renderRow(); renderHeroCarousel();
