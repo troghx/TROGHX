@@ -121,7 +121,7 @@ export async function handler(event) {
             ORDER BY COALESCE(updated_at, created_at) DESC
             LIMIT ${limit}␊
           `;
-          return json(200, rows, cacheHdr(60));
+          return json(200, rows, { "Cache-Control": "public, max-age=0, must-revalidate" });
         } else {
           const rows = await sql`␊
             SELECT id, title, category, image, description, preview_video,␊
@@ -266,3 +266,4 @@ export async function handler(event) {
     return json(500, { error: "Internal Server Error", detail: String(err.message || err) });
   }
 }
+
