@@ -423,47 +423,82 @@ function updatePager(totalPages){
   pager.style.display = (totalPages>1) ? "flex" : "none";
 }
 function attachHoverVideo(tile, g, vidEl){
-  // Crea video si el template no lo trae
+  // Respeta ahorro de datos
+  if (navigator.connection?.saveData) return;
+
+  // Asegura elemento <video> SIN precarga
   if (!vidEl) {
     vidEl = document.createElement("video");
     vidEl.className = "tile-video";
     vidEl.muted = true;
     vidEl.playsInline = true;
-    vidEl.preload = "metadata";
+    vidEl.preload = "none";
+    vidEl.disablePictureInPicture = true;
     tile.appendChild(vidEl);
   }
 
-  let once = false;
-  const ensureVideo = async () => {
-    if (once) return true;
-    const src = await apiGetVideo(g.id);
+  let loaded = false;
+
+  async function ensureVideo(){
+    if (loaded) return true;
+    const src = await apiGetVideo(g.id); // devuelve dataURL o URL
     if (!src) return false;
     vidEl.src = src;
     try { vidEl.load(); } catch {}
-    once = true;
+    loaded = true;
     return true;
-  };
+  }
+
+  // Cancela descargas cuando sale de pantalla / hover
+  function cancelDownload(){
+    try { vidEl.pause(); } catch {}
+    // Si es URL (no dataURL), vaciamos src para cortar la conexión
+    if (!/^data:/i.test(vidEl.src)) {
+      vidEl.removeAttribute("src");
+      while (vidEl.firstChild) vidEl.removeChild(vidEl.firstChild);
+      loaded = false;
+      try { vidEl.load(); } catch {}
+    }
+    vidEl.classList.remove("playing");
+  }
+
+  // Limitar a 1 preview reproduciéndose
+  vidEl.addEventListener("playing", () => {
+    if (window.__tgxCurrentVideo && window.__tgxCurrentVideo !== vidEl) {
+      try { window.__tgxCurrentVideo.pause(); } catch {}
+    }
+    window.__tgxCurrentVideo = vidEl;
+    vidEl.classList.add("playing");
+  });
+  ["pause", "ended", "error"].forEach(ev =>
+    vidEl.addEventListener(ev, () => vidEl.classList.remove("playing"))
+  );
 
   const start = async () => {
     const ok = await ensureVideo();
     if (!ok) return;
     vidEl.currentTime = 0;
-    const p = vidEl.play();
-    if (p && p.catch) p.catch(()=>{ /* autoplay blocked */ });
+    vidEl.play().catch(()=>{});
   };
-  const stop  = () => { try{ vidEl.pause(); vidEl.currentTime=0; }catch{} };
-  const show  = () => vidEl.classList.add("playing");
-  const hide  = () => vidEl.classList.remove("playing");
+  const stop = () => cancelDownload();
 
-  vidEl.addEventListener("playing", show);
-  vidEl.addEventListener("pause", hide);
-  vidEl.addEventListener("ended", hide);
-  vidEl.addEventListener("error", hide);
-
+  // Hover/teclado
   tile.addEventListener("pointerenter", start);
   tile.addEventListener("pointerleave", stop);
   tile.addEventListener("focus", start);
   tile.addEventListener("blur", stop);
+
+  // Además: si sale del viewport, corta descarga
+  if (!window.__tgxVidIO) {
+    window.__tgxVidIO = new IntersectionObserver((entries)=>{
+      for (const e of entries) {
+        const v = e.target;
+        if (!e.isIntersecting && v.__cancel) v.__cancel();
+      }
+    }, { rootMargin: "200px", threshold: 0.25 });
+  }
+  vidEl.__cancel = cancelDownload;
+  window.__tgxVidIO.observe(vidEl);
 }
 function renderRow(keepScroll=false){
   const grid = document.getElementById("gridRecientes");
