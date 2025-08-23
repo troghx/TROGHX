@@ -28,6 +28,23 @@ let isAdmin = false;
 let recientes = [];
 let socials  = [];
 window.currentCategory = "game";
+const TOPBAR_LOGOS = {
+  game: "assets/images/logotopbar.png",
+  app: "assets/images/trogh-app.png",
+  movie: "assets/images/trogh-movies.png"
+};
+function updateTopbarLogo(cat){
+  const logoEl = document.querySelector('.topbar .logo');
+  if(!logoEl) return;
+  const src = TOPBAR_LOGOS[cat] || TOPBAR_LOGOS.game;
+  logoEl.src = src;
+  const altMap = {
+    game: 'Logo de TROGH GAMES',
+    app: 'Logo de TROGH APPS',
+    movie: 'Logo de TROGH MOVIES'
+  };
+  logoEl.alt = altMap[cat] || altMap.game;
+}
 let PAGE_SIZE = 12;
 let page = 1;
 let searchQuery = "";
@@ -841,7 +858,10 @@ function setupSideNav(){
   const btns = Array.from(document.querySelectorAll('.side-nav .nav-btn'));
   if(!btns.length) return;
 
-  function setActive(cat){ btns.forEach(b=> b.classList.toggle("active", (b.dataset.cat||"game")===cat)); }
+  function setActive(cat){
+    btns.forEach(b=> b.classList.toggle("active", (b.dataset.cat||"game")===cat));
+    updateTopbarLogo(cat);
+  }
 
   btns.forEach(btn=>{
     btn.addEventListener("click", async ()=>{
