@@ -714,6 +714,12 @@ main, .main, .page, .app, .content {
   padding: 8px 6px 16px;
 }
 
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
 /* Tarjetas 16:9 (se adaptan al zoom/alto) */
 .grid .tile, .grid .add-game-tile {
   aspect-ratio: 16 / 9;
