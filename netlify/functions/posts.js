@@ -82,7 +82,8 @@ async function ensureSchema() {
     category       TEXT DEFAULT 'game',
     first_link     TEXT,
     link_ok        BOOLEAN,
-    created_at     TIMESTAMPTZ DEFAULT now()
+    created_at     TIMESTAMPTZ DEFAULT now(),
+    updated_at     TIMESTAMPTZ DEFAULT now()
   )`;
   await sql`ALTER TABLE IF EXISTS posts
     ADD COLUMN IF NOT EXISTS image_thumb TEXT,
@@ -90,8 +91,9 @@ async function ensureSchema() {
     ADD COLUMN IF NOT EXISTS first_link TEXT,
     ADD COLUMN IF NOT EXISTS link_ok BOOLEAN,
     ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'game',
-    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_posts_cat_created ON posts (category, created_at DESC)`;
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now(),
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_posts_cat_updated ON posts (category, COALESCE(updated_at, created_at) DESC)`;
 }
 
 export async function handler(event) {
@@ -113,20 +115,20 @@ export async function handler(event) {
           const rows = await sql`
             SELECT id, title, category,
                    COALESCE(image_thumb, image) AS image_thumb,
-                   created_at, link_ok, first_link
-            FROM posts
-            WHERE category = ${category}
-            ORDER BY created_at DESC
-            LIMIT ${limit}
+                   created_at, link_ok, first_link␊
+           FROM posts
+           WHERE category = ${category}
+            ORDER BY COALESCE(updated_at, created_at) DESC
+            LIMIT ${limit}␊
           `;
           return json(200, rows, cacheHdr(60));
         } else {
-          const rows = await sql`
-            SELECT id, title, category, image, description, preview_video,
-                   created_at, link_ok, first_link
-            FROM posts
-            WHERE category = ${category}
-            ORDER BY created_at DESC
+          const rows = await sql`␊
+            SELECT id, title, category, image, description, preview_video,␊
+                   created_at, link_ok, first_link␊
+            FROM posts␊
+            WHERE category = ${category}␊
+            ORDER BY COALESCE(updated_at, created_at) DESC
             LIMIT ${limit}
           `;
           return json(200, rows, cacheHdr(20));
@@ -230,7 +232,8 @@ export async function handler(event) {
             image_thumb   = COALESCE(${vThumb}, image_thumb),
             preview_video = COALESCE(${vPrev}, preview_video),
             link_ok       = COALESCE(${vLinkOk}, link_ok),
-            first_link    = COALESCE(${vFirst}, first_link)
+            first_link    = COALESCE(${vFirst}, first_link),
+            updated_at    = now()
           WHERE id = ${id}
         `;
         return json(200, { ok: true });
