@@ -71,6 +71,20 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   display: block;
 }
 
+.site-footer {
+  position: fixed;
+  left: 76px;
+  right: 0;
+  bottom: 0;
+  text-align: center;
+  padding: 8px 0;
+  background: rgba(17,20,25,.4);
+  backdrop-filter: blur(4px);
+  font-size: .85rem;
+  color: var(--muted);
+}
+
+
 /* ---------- Barra de redes sociales en el hero ---------- */
 .socials { margin-top: 8px; }
 .social-bar {
@@ -567,9 +581,9 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   display: inline-flex;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 8px 20px rgba(0,0,0,.45);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0);
   border: 1px solid rgba(255,255,255,.07);
-  background: #000;
+  background: #00000000;
 }
 .yt-channel-badge img {
   display: block;
