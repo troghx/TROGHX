@@ -95,7 +95,7 @@ async function hashCreds(user,pin,salt){ const key=`${user}::${pin}::${salt}`; r
    ========================= */
 async function apiList(category = window.currentCategory) {
   const qs = new URLSearchParams({ lite: "1", limit: "200", category });
-  const r = await fetch(`${API_POSTS}?${qs.toString()}`);
+  const r = await fetch(`${API_POSTS}?${qs.toString()}`, { cache: "no-store" });
   if (!r.ok) throw new Error("No se pudo listar posts");
   return r.json();
 }
@@ -1165,3 +1165,4 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
