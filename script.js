@@ -51,6 +51,26 @@ let searchQuery = "";
 const fullCache = new Map();
 const videoCache = new Map();
 
+// Recalcula el tamaño de página en función del espacio disponible en la cuadrícula
+function recalcPageSize(){
+  const grid = document.querySelector('.grid');
+  if(!grid) return;
+
+  const styles = getComputedStyle(grid);
+  const colGap = parseFloat(styles.columnGap) || 0;
+  const rowGap = parseFloat(styles.rowGap) || 0;
+  const gridW  = grid.clientWidth;
+  const gridH  = grid.clientHeight;
+  const minTileW = 260; // coincide con minmax del CSS
+
+  const cols = Math.max(1, Math.floor((gridW + colGap) / (minTileW + colGap)));
+  const tileW = (gridW - colGap * (cols - 1)) / cols;
+  const tileH = tileW * 9 / 16; // aspect-ratio 16:9
+  const rows = Math.max(1, Math.floor((gridH + rowGap) / (tileH + rowGap)));
+
+  PAGE_SIZE = rows * cols;
+}
+
 /* =========================
    Utilidades base
    ========================= */
@@ -448,6 +468,7 @@ function attachHoverVideo(tile, g, vidEl){
 function renderRow(keepScroll=false){
   const grid = document.getElementById("gridRecientes");
   if(!grid) return;
+  recalcPageSize();
 
   const list = getFilteredList();
   const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
@@ -1143,4 +1164,6 @@ async function initData(){
   ensureSidebarChannelBadge();
   setupSideNav();
 }
+recalcPageSize();
+window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
