@@ -14,11 +14,13 @@ const dmcaTexts = {
   es: `
     <p>Este sitio no aloja archivos con derechos de autor.</p>
     <p>Los enlaces son aportados por usuarios y se brindan solo con fines informativos.</p>
+    <p>Formulario (recomendado): use el <a href="/dmca.html" class="tw-modal-download">formulario que le proporcionamos</a>.</p>
     <p>Si eres titular de derechos y deseas que retiremos algún contenido, escríbenos a <a href="mailto:troghgames@gmail.com">troghgames@gmail.com</a>.</p>
   `,
   en: `
     <p>This site does not host copyrighted files.</p>
     <p>Links are submitted by users and provided for informational purposes only.</p>
+    <p>Form (recommended): use the <a href="/dmca.html" class="tw-modal-download">form we provide</a>.</p>
     <p>If you are a copyright holder and want us to remove any content, contact us at <a href="mailto:troghgames@gmail.com">troghgames@gmail.com</a>.</p>
   `
 };
@@ -1250,6 +1252,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
