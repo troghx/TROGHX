@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DMCA - TROGH GAMES</title>
+  <link rel="icon" href="assets/images/logo.png" type="image/x-icon" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a href="index.html"><img src="assets/images/logotopbar.png" alt="Logo de TROGH GAMES" class="logo" /></a>
+    </div>
+  </header>
+  <main class="main">
+    <section class="card" aria-label="Formulario DMCA">
+      <h1>Solicitud de retiro DMCA</h1>
+      <form class="dmca-form new-game-form" name="dmca" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+        <input type="hidden" name="form-name" value="dmca" />
+        <p hidden>
+          <label>¿No llenar? <input name="bot-field" /></label>
+        </p>
+        <label>
+          Nombre
+          <input type="text" name="name" required />
+        </label>
+        <label>
+          Correo electrónico
+          <input type="email" name="email" required />
+        </label>
+        <label>
+          URL del contenido a retirar
+          <input type="url" name="url" required />
+        </label>
+        <label>
+          Detalles de la solicitud
+          <textarea name="message" required></textarea>
+        </label>
+        <div class="tw-modal-actions">
+          <button type="submit" class="tw-modal-download">Enviar</button>
+          <a href="index.html" class="tw-modal-secondary">Volver</a>
+        </div>
+      </form>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
