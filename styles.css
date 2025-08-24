@@ -247,6 +247,15 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .tw-modal-description{
   margin: 0 0 16px; color: var(--muted); font-size: 1rem; line-height: 1.5;
 }
+.dmca-header{ display:flex; align-items:center; gap:8px; }
+.dmca-lang-toggle{
+  padding:4px 10px; border:none; border-radius:8px;
+  background:linear-gradient(45deg,#ff00ff,#00ffff);
+  color:#0b0d10; font-weight:700; cursor:pointer;
+  transition:transform .2s, box-shadow .2s;
+}
+.dmca-lang-toggle:hover{ transform:translateY(-2px); box-shadow:0 4px 10px rgba(0,255,255,.25); }
+.dmca-lang-toggle:active{ transform:translateY(0); box-shadow:none; }
 .tw-modal-actions{ display: flex; gap: 12px; flex-wrap: wrap; }
 .tw-modal-download, .tw-modal-secondary{
   padding: 12px 24px; font-size: 1rem; text-transform: uppercase; border: none;
