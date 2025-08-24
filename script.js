@@ -8,6 +8,20 @@ const modalTemplate = document.getElementById("game-modal-template");
 const adminLoginModalTemplate = document.getElementById("admin-login-modal-template");
 const newGameModalTemplate = document.getElementById("new-game-modal-template");
 const newSocialModalTemplate = document.getElementById("new-social-modal-template");
+const dmcaModalTemplate = document.getElementById("dmca-modal-template");
+
+const dmcaTexts = {
+  es: `
+    <p>Este sitio no aloja archivos con derechos de autor.</p>
+    <p>Los enlaces son aportados por usuarios y se brindan solo con fines informativos.</p>
+    <p>Si eres titular de derechos y deseas que retiremos algún contenido, escríbenos a <a href="mailto:troghgames@gmail.com">troghgames@gmail.com</a>.</p>
+  `,
+  en: `
+    <p>This site does not host copyrighted files.</p>
+    <p>Links are submitted by users and provided for informational purposes only.</p>
+    <p>If you are a copyright holder and want us to remove any content, contact us at <a href="mailto:troghgames@gmail.com">troghgames@gmail.com</a>.</p>
+  `
+};
 
 /* ------- LocalStorage keys ------- */
 const LS_RECENTES   = "tgx_recientes";
@@ -897,6 +911,33 @@ function renderSocialBar(){
 }
 
 /* =========================
+   DMCA Modal
+   ========================= */
+function openDmcaModal(){
+  const modal = dmcaModalTemplate.content.cloneNode(true);
+  const node  = modal.querySelector('.tw-modal');
+  const desc  = modal.querySelector('.tw-modal-description');
+  const btnToggle = modal.querySelector('.dmca-lang-toggle');
+  const modalClose = modal.querySelector('.tw-modal-close');
+
+  let current = 'es';
+  if(desc) desc.innerHTML = dmcaTexts[current];
+  if(btnToggle) btnToggle.textContent = 'EN';
+
+  btnToggle?.addEventListener('click', ()=>{
+    current = current === 'es' ? 'en' : 'es';
+    if(desc) desc.innerHTML = dmcaTexts[current];
+    if(btnToggle) btnToggle.textContent = current === 'es' ? 'EN' : 'ES';
+  });
+
+  const removeTrap = trapFocus(node);
+  const onEscape = (e)=>{ if(e.key==='Escape') closeModal(node, removeTrap, onEscape); };
+  modalClose?.addEventListener('click', ()=> closeModal(node, removeTrap, onEscape));
+
+  openModalFragment(node);
+}
+
+/* =========================
    Búsqueda + SideNav
    ========================= */
 function setupSearch(){
@@ -1209,5 +1250,6 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
