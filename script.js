@@ -908,6 +908,14 @@ function setupSearch(){
     renderRow();
   });
 }
+
+function setupDmcaButton(){
+  const btn=document.querySelector('.dmca-btn');
+  if(!btn) return;
+  btn.addEventListener('click', ()=>{
+    if(typeof openDmcaModal==='function') openDmcaModal();
+  });
+}
 function setupSideNav(){
   const btns = Array.from(document.querySelectorAll('.side-nav .nav-btn'));
   if(!btns.length) return;
@@ -1191,6 +1199,7 @@ async function initData(){
 
   renderRow();
   setupSearch();
+  setupDmcaButton();
   setupAdminButton();
   renderHeroCarousel();
   renderSocialBar();
@@ -1200,4 +1209,5 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
