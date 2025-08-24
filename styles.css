@@ -256,18 +256,12 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 }
 .dmca-lang-toggle:hover{ transform:translateY(-2px); box-shadow:0 4px 10px rgba(0,255,255,.25); }
 .dmca-lang-toggle:active{ transform:translateY(0); box-shadow:none; }
+.dmca-form-link{ color:#1e90ff; text-decoration:none; font-weight:600; }
+.dmca-form-link:hover{ text-decoration:underline; }
 .tw-modal-actions{ display: flex; gap: 12px; flex-wrap: wrap; }
-.tw-modal-download, .tw-modal-secondary{
+.tw-modal-secondary{
   padding: 12px 24px; font-size: 1rem; text-transform: uppercase; border: none;
   border-radius: 50px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
-}
-.tw-modal-download{
-  background: linear-gradient(45deg, #ff00ff, #00ffff);
-  color: #0b0d10; font-weight: 700;
-}
-.tw-modal-download:hover{ transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,255,255,.25); }
-.tw-modal-download:active{ transform: translateY(0); box-shadow: none; }
-.tw-modal-secondary{
   background: transparent; color: #cfe7ff; border: 1px solid rgba(255,255,255,.18); font-weight: 600;
 }
 .tw-modal-secondary:hover{ background: rgba(255,255,255,.05); transform: translateY(-2px); }
