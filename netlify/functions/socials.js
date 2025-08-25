@@ -1,11 +1,9 @@
 // netlify/functions/socials.js
 import { neon } from '@neondatabase/serverless';
+import { json as baseJson } from './utils.js';
 
-const json = (s, d, h={}) => ({
-  statusCode: s,
-  headers: {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store', ...h},
-  body: JSON.stringify(d),
-});
+const json = (s, d, h = {}) =>
+  baseJson(s, d, { 'Cache-Control': 'no-store', ...h });
 
 function getDbUrl() {
   const raw = process.env.DATABASE_URL || process.env.NETLIFY_DATABASE_URL || process.env.NETLIFY_DATABASE_URL_UNPOOLED || '';
