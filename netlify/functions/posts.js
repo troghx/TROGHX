@@ -1,5 +1,6 @@
 // netlify/functions/posts.js
 import { neon, neonConfig } from "@neondatabase/serverless";
+import { json as baseJson } from "./utils.js";
 
 neonConfig.fetchConnectionCache = true;
 
@@ -10,17 +11,13 @@ const DB_URL =
 
 const sql = DB_URL ? neon(DB_URL) : null;
 
-const json = (status, data, extra = {}) => ({
-  statusCode: status,
-  headers: {
-    "Content-Type": "application/json; charset=utf-8",
+const json = (status, data, extra = {}) =>
+  baseJson(status, data, {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     ...extra,
-  },
-  body: JSON.stringify(data),
-});
+  });
 
 const cacheHdr = (sec = 60) => ({
   "Cache-Control": `public, max-age=${sec}, stale-while-revalidate=30`,
@@ -263,3 +260,4 @@ export async function handler(event) {
     return json(500, { error: "Internal Server Error", detail: String(err.message || err) });
   }
 }
+
