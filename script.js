@@ -12,16 +12,58 @@ const dmcaModalTemplate = document.getElementById("dmca-modal-template");
 
 const dmcaTexts = {
   es: `
-    <p>Este sitio no aloja archivos con derechos de autor.</p>
-    <p>Los enlaces son aportados por usuarios y se brindan solo con fines informativos.</p>
-    <p>Formulario (recomendado): use el <a href="/dmca.html" class="dmca-form-link">formulario que le proporcionamos</a>.</p>
-    <p>Si eres titular de derechos y deseas que retiremos algún contenido, escríbenos a <a href="mailto:troghgames@gmail.com">troghgames@gmail.com</a>.</p>
+    <p><strong>TROGH GAMES</strong> no aloja archivos ni juegos con derechos de autor. Este sitio solo muestra metadatos y <em>enlaces</em> hacia servicios de terceros que alojan los contenidos bajo sus propios términos.</p>
+
+    <p>Si eres titular de derechos y consideras que un enlace publicado aquí apunta a material que infringe tus derechos, retiraremos los <em>enlaces</em> del sitio al recibir un <strong>Aviso DMCA válido</strong>.</p>
+
+    <h4 style="margin-top:1rem">Cómo enviar un aviso de retirada (DMCA)</h4>
+    <p>Para procesarlo, incluye lo siguiente:</p>
+    <ol>
+      <li>Identificación de la obra protegida (título, descripción y, si aplica, registro).</li>
+      <li>URL(s) exacta(s) de <strong>TROGH GAMES</strong> donde aparece el/los enlace(s) a retirar.</li>
+      <li>URL(s) de origen en el servicio de terceros (si las conoces).</li>
+      <li>Datos de contacto: nombre, cargo (si actúas en representación), organización, país y correo electrónico.</li>
+      <li>Declaración de buena fe de que el uso no está autorizado por el titular, su agente o la ley.</li>
+      <li>Declaración, bajo protesta de decir verdad, de que la información es exacta y que estás autorizado a actuar en nombre del titular.</li>
+      <li>Firma física o electrónica (nombre completo basta como firma electrónica).</li>
+    </ol>
+
+    <p>Envíanos tu aviso a través del <a href="/dmca.html" class="dmca-form-link">formulario DMCA</a> (recomendado) o por correo a <a href="mailto:troghgames@gmail.com">troghgames@gmail.com</a>.</p>
+
+    <p class="muted" style="opacity:.8">Nota: si el archivo está alojado por un tercero (p. ej., MEGA, Google Drive, YouTube, etc.), también deberás contactar a ese servicio para la retirada del material en su plataforma.</p>
+
+    <h4 style="margin-top:1rem">Contra-aviso</h4>
+    <p>Si eres el publicador del enlace retirado y crees que hubo un error o cuentas con autorización, puedes enviar un <strong>contra-aviso</strong> con tus datos de contacto, la URL retirada y una declaración bajo protesta de decir verdad indicando que la retirada fue por error. Tras recibir un contra-aviso válido, podremos restituir el contenido salvo que el denunciante nos informe de acciones legales.</p>
+
+    <h4 style="margin-top:1rem">Reincidencia</h4>
+    <p>Podemos limitar publicaciones o accesos de usuarios/colaboradores que incurran reiteradamente en infracciones.</p>
   `,
   en: `
-    <p>This site does not host copyrighted files.</p>
-    <p>Links are submitted by users and provided for informational purposes only.</p>
-    <p>Form (recommended): use the <a href="/dmca.html" class="dmca-form-link">form we provide</a>.</p>
-    <p>If you are a copyright holder and want us to remove any content, contact us at <a href="mailto:troghgames@gmail.com">troghgames@gmail.com</a>.</p>
+    <p><strong>TROGH GAMES</strong> does not host copyrighted files. We only display metadata and <em>links</em> to third-party services that host the content under their own terms.</p>
+
+    <p>If you are a copyright owner and believe a link on our site points to infringing material, we will remove such <em>links</em> upon receiving a <strong>valid DMCA Notice</strong>.</p>
+
+    <h4 style="margin-top:1rem">How to file a DMCA Notice</h4>
+    <p>Please include:</p>
+    <ol>
+      <li>Identification of the copyrighted work (title, description, and registration if applicable).</li>
+      <li>Exact <strong>TROGH GAMES</strong> URL(s) where the link(s) appear.</li>
+      <li>Source hosting URL(s) on the third-party service (if known).</li>
+      <li>Contact info: name, role (if acting on behalf), organization, country, and email.</li>
+      <li>A good-faith statement that the use is not authorized by the owner, its agent, or the law.</li>
+      <li>A statement under penalty of perjury that the notice is accurate and you are authorized to act on behalf of the owner.</li>
+      <li>Your physical or electronic signature (full name is acceptable as an electronic signature).</li>
+    </ol>
+
+    <p>Send your notice via our <a href="/dmca.html" class="dmca-form-link">DMCA form</a> (recommended) or email <a href="mailto:troghgames@gmail.com">troghgames@gmail.com</a>.</p>
+
+    <p class="muted" style="opacity:.8">Note: if the file is hosted by a third party (e.g., MEGA, Google Drive, YouTube, etc.), you should also contact that service to remove the file from their platform.</p>
+
+    <h4 style="margin-top:1rem">Counter-Notice</h4>
+    <p>If you are the publisher of a removed link and believe it was taken down in error or you are authorized, you may submit a <strong>counter-notice</strong> including your contact details, the removed URL, and a statement under penalty of perjury that the removal was in error. Upon a valid counter-notice, we may restore the content unless the claimant informs us of legal action.</p>
+
+    <h4 style="margin-top:1rem">Repeat Infringement</h4>
+    <p>We may limit postings or access for users/contributors who repeatedly infringe.</p>
   `
 };
 
@@ -1252,6 +1294,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
