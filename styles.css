@@ -201,7 +201,19 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   text-align:center;
 }
 
-.ad-slot {
+.ad-slot-left {
+  display:flex;
+  align-items: center; /* Align content to the bottom */
+  justify-content: center;
+  padding: 10px;
+  border: 1px dashed rgba(255,255,255,.15);
+  background: rgba(255,255,255,.03);
+  border-radius: 14px;
+  font-weight: 700;
+  text-align: left;
+  flex-direction: column; /* Stack h2 and p vertically */
+}
+.ad-slot-right {
   display:flex;
   align-items:center;
   justify-content:center;
@@ -210,12 +222,8 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   background:rgba(255,255,255,.03);
   border-radius:14px;
   font-weight:700;
-  text-align:center;
-}
-
-.ad-slot-left,
-.ad-slot-right {
-  flex: 0 0 200px;
+  text-align:right;
+  flex-direction: column;
 }
 
 #hero button{
