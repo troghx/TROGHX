@@ -530,9 +530,12 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 /* Badge dentro de .tile-info (reemplaza el texto fijo) */
 .tile .tile-info .badge.badge-status{
-  display:inline-flex; align-items:center; gap:.45rem;
-  padding:.32rem .66rem; border-radius:999px;
-  border:0.1px solid var(--status-color, #f50b0b);
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .32rem .66rem;
+  border-radius: 999px;
+  border: 1px solid var(--status-color, #f50b0b);
 }
 .tile .tile-info .badge .pill-icon{ display:inline-flex; align-items:center; color:var(--platform-color, currentColor); }
 .tile .tile-info .badge .pill-text{ line-height:1; }
