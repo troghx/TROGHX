@@ -32,6 +32,7 @@ export async function handler(event) {
       url = (body.url || "").trim();
     }
     if (!url) return json(400, { error: "Missing url" });
+    if (!/^https?:\/\//i.test(url)) return json(400, { error: "Invalid URL scheme" });
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
