@@ -990,7 +990,7 @@ function setupDmcaButton(){
   const btn=document.querySelector('.dmca-btn');
   if(!btn) return;
   btn.addEventListener('click', ()=>{
-    if(typeof openDmcaModal==='function') openDmcaModal();
+    openDmcaModal();
   });
 }
 function setupSideNav(){
@@ -1286,6 +1286,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
