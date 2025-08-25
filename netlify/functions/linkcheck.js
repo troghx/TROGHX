@@ -1,16 +1,14 @@
 // netlify/functions/linkcheck.js
 // Checa el estado de un enlace (HEAD con fallback GET de 1 byte) para evitar CORS desde el cliente.
 
-const json = (s, d, extra = {}) => ({
-  statusCode: s,
-  headers: {
-    "Content-Type": "application/json; charset=utf-8",
+import { json as baseJson } from "./utils.js";
+
+const json = (s, d, extra = {}) =>
+  baseJson(s, d, {
     "Access-Control-Allow-Origin": "*",
     "Cache-Control": "no-store",
     ...extra,
-  },
-  body: JSON.stringify(d),
-});
+  });
 
 export async function handler(event) {
   try {
