@@ -614,7 +614,7 @@ function renderRow(keepScroll=false){
 function renderHeroCarousel(){
   const hero = document.querySelector(".hero");
   if(!hero) return;
-  const sideAds = document.querySelectorAll(".ad-slot-left, .ad-slot-right");
+  const sideAds = document.querySelectorAll(".business-slot-left, .business-slot-right");
   if(sideAds.length === 0) hero.classList.add("hero--simple");
   const heroArt = hero.querySelector(".hero-art");
   const heroCarousel = hero.querySelector(".hero-carousel");
@@ -1295,6 +1295,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
