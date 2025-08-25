@@ -541,9 +541,8 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 /* estados */
 .status-ok{ --pill-color:#22c55e; color:#dcfce7; }
-.status-warn{ --pill-color:#f59e0b; color:#fff7ed; }
 .status-down{ --pill-color:#ef4444; color:#fee2e2; }
-.status-checking{ --pill-color:#94a3b8; color:#e2e8f0; }
+.status-checking { --pill-color:#f59e0b; color:#fff7ed; }
 
 /* color por plataforma (borde/punto) */
 .pill-mediafire{ --pill-color:#0ea5e9; }
@@ -576,9 +575,8 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 }
 .status-pill .pill-icon { display:inline-flex; align-items:center; }
 .status-ok{ border-color: #22c55e; color:#dcfce7; }
-.status-warn{ border-color: #f59e0b; color:#fff7ed; }
 .status-down{ border-color: #ef4444; color:#fee2e2; }
-.status-checking{ border-color:#94a3b8; color:#e2e8f0; }
+.status-checking { border-color:#f59e0b; color:#fff7ed; }
 
 /* ===== Chips de enlaces (Editor) ===== */
 .link-chip{
