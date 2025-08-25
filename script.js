@@ -856,17 +856,16 @@ function openEditGame(original){
     }else if(data.previewSrc){
       patch.previewVideo = data.previewSrc;
     }
+    patch.bump = true;
 
     const token=localStorage.getItem("tgx_admin_token")||"";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
     try{
       await apiUpdate(original.id, patch, token);
-      const data = await apiList(window.currentCategory);
-      recientes = Array.isArray(data)?data:[];
-      closeModal(node, removeTrap, onEscape);
       page = 1;
-      renderRow(); renderHeroCarousel();
+      await reloadData();
+      closeModal(node, removeTrap, onEscape);
       alert("¡Publicación actualizada!");
     }catch(err){ console.error(err); alert("Error al actualizar. Revisa consola."); }
   });
@@ -1286,6 +1285,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
