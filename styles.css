@@ -201,7 +201,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   text-align:center;
 }
 
-.ad-slot-left {
+.business-slot-left {
   display:flex;
   align-items: center; /* Align content to the bottom */
   justify-content: center;
@@ -213,7 +213,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   text-align: left;
   flex-direction: column; /* Stack h2 and p vertically */
 }
-.ad-slot-right {
+.business-slot-right {
   display:flex;
   align-items:center;
   justify-content:center;
