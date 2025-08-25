@@ -225,7 +225,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 }
 
 #hero button{
-  padding: 15px 30px; font-size: 1.2rem; text-transform: uppercase;
+  text-transform: uppercase;
   background: linear-gradient(45deg, #ff00ff, #00ffff);
   border: none; border-radius: 50px; cursor: pointer;
   transition: transform 0.3s, box-shadow 0.3s;
