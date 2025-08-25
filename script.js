@@ -713,20 +713,20 @@ function makeCategorySelect(current="game"){
 /* =========================
    Nuevo / Editar (genera thumb + link_ok)
    ========================= */
-function openNewGameModal(){
-  const modal = newGameModalTemplate.content.cloneNode(true);
-  const node  = modal.querySelector(".tw-modal");
-  const form  = modal.querySelector(".new-game-form");
-  const titleInput= modal.querySelector(".new-game-title");
-  const imageInput= modal.querySelector(".new-game-image-file");
-  const trailerFileInput = modal.querySelector(".new-game-trailer-file");
-  const trailerUrlInput  = modal.querySelector(".new-game-trailer-url");
-  const modalClose= modal.querySelector(".tw-modal-close");
+function initGameModal(initial = {}){
+  const fragment = newGameModalTemplate.content.cloneNode(true);
+  const node  = fragment.querySelector(".tw-modal");
+  const form  = fragment.querySelector(".new-game-form");
+  const titleInput = fragment.querySelector(".new-game-title");
+  const imageInput = fragment.querySelector(".new-game-image-file");
+  const trailerFileInput = fragment.querySelector(".new-game-trailer-file");
+  const trailerUrlInput  = fragment.querySelector(".new-game-trailer-url");
+  const modalClose = fragment.querySelector(".tw-modal-close");
 
-  const editorRoot= modal.querySelector(".rich-editor");
-  const editorAPI = initRichEditor(editorRoot);
+  const editorRoot = fragment.querySelector(".rich-editor");
+  const editorAPI  = initRichEditor(editorRoot);
 
-  const catSel = makeCategorySelect("game");
+  const catSel = makeCategorySelect(initial.category || "game");
   form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
 
   if(trailerUrlInput){
@@ -734,54 +734,83 @@ function openNewGameModal(){
     const label=trailerUrlInput.closest("label"); if(label) label.style.display="none";
   }
 
+  if(titleInput) titleInput.value = initial.title || "";
+  if(initial.description) editorAPI.setHTML(initial.description);
+  if(imageInput && initial.image !== undefined) imageInput.required=false;
+
+  return { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel };
+}
+
+async function compressCoverAndThumb(imageFile){
+  const cover = await compressImage(imageFile, { maxW: 960, maxH: 960, quality: 0.78, mime: "image/webp" });
+  const thumb = await compressImage(imageFile, { maxW: 320, maxH: 320, quality: 0.7, mime: "image/webp" });
+  return { cover, thumb };
+}
+
+async function readTrailerFile(trailerFile){
+  if(!/^video\/(mp4|webm)$/i.test(trailerFile.type)){ alert("El trailer debe ser MP4 o WEBM."); return null; }
+  if(trailerFile.size > 6*1024*1024){ alert("Trailer >6MB. Usa uno más ligero."); return null; }
+  try{ return await readAsDataURL(trailerFile); }
+  catch(err){ console.error("[trailer read]", err); alert("No se pudo leer el trailer."); return null; }
+}
+
+async function gatherGameData(refs, { requireImage=true } = {}){
+  const { titleInput, imageInput, trailerFileInput, editorAPI, catSel } = refs;
+
+  const title=(titleInput?.value||"").trim();
+  const descHTML=editorAPI.getHTML();
+  const imageFile=imageInput?.files?.[0] || null;
+  const trailerFile=trailerFileInput?.files?.[0] || null;
+  const category = catSel.querySelector(".cat-select")?.value || "game";
+
+  if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return null; }
+  if(requireImage && !imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return null; }
+  if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return null; }
+
+  let coverDataUrl, thumbDataUrl;
+  if(imageFile){
+    try{
+      ({ cover: coverDataUrl, thumb: thumbDataUrl } = await compressCoverAndThumb(imageFile));
+    }catch(err){ console.error("[cover compress]", err); alert("No se pudo compactar la portada."); return null; }
+  }
+
+  let previewSrc=null;
+  if(trailerFile){
+    previewSrc = await readTrailerFile(trailerFile);
+    if(!previewSrc) return null;
+  }
+
+  const first_link = extractFirstLink(descHTML);
+  const link_ok = first_link ? await fetchLinkOk(first_link) : null;
+
+  return { title, descHTML, coverDataUrl, thumbDataUrl, previewSrc, category, first_link, link_ok };
+}
+
+function openNewGameModal(){
+  const refs = initGameModal();
+  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel } = refs;
+
   const removeTrap=trapFocus(node);
   const onEscape=(e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
   modalClose.addEventListener("click", ()=> closeModal(node, removeTrap, onEscape));
 
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
-    const title=(titleInput?.value||"").trim();
-    const descHTML=editorAPI.getHTML();
-    const imageFile=imageInput?.files?.[0] || null;
-    const trailerFile=trailerFileInput?.files?.[0] || null;
-    const category = catSel.querySelector(".cat-select")?.value || "game";
-
-    if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return; }
-    if(!imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return; }
-    if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
-
-    let coverDataUrl, thumbDataUrl;
-    try {
-      coverDataUrl = await compressImage(imageFile, { maxW: 960, maxH: 960, quality: 0.78, mime: "image/webp" });
-      thumbDataUrl = await compressImage(imageFile, { maxW: 320, maxH: 320, quality: 0.7, mime: "image/webp" });
-    } catch (err) {
-      console.error("[cover compress]", err);
-      alert("No se pudo compactar la portada.");
-      return;
-    }
-
-    let previewSrc=null;
-    if(trailerFile){
-      if(!/^video\/(mp4|webm)$/i.test(trailerFile.type)){ alert("El trailer debe ser MP4 o WEBM."); return; }
-      if(trailerFile.size > 6*1024*1024){ alert("Trailer >6MB. Usa uno más ligero."); return; }
-      try{ previewSrc = await readAsDataURL(trailerFile); }catch (err){ console.error("[trailer read]", err); alert("No se pudo leer el trailer."); return; }
-    }
-
-    const first_link = extractFirstLink(descHTML);
-    const link_ok = first_link ? await fetchLinkOk(first_link) : null;
+    const data = await gatherGameData(refs);
+    if(!data) return;
 
     const token=localStorage.getItem("tgx_admin_token")||"";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
     const newGame = {
-      title,
-      image: coverDataUrl,
-      image_thumb: thumbDataUrl,
-      description: descHTML,
-      previewVideo: previewSrc,
-      category,
-      first_link,
-      link_ok
+      title: data.title,
+      image: data.coverDataUrl,
+      image_thumb: data.thumbDataUrl,
+      description: data.descHTML,
+      previewVideo: data.previewSrc,
+      category: data.category,
+      first_link: data.first_link,
+      link_ok: data.link_ok
     };
 
     try{
@@ -795,26 +824,8 @@ function openNewGameModal(){
   openModalFragment(node);
 }
 function openEditGame(original){
-  const modal = newGameModalTemplate.content.cloneNode(true);
-  const node  = modal.querySelector(".tw-modal");
-  const form  = modal.querySelector(".new-game-form");
-  const titleInput = modal.querySelector(".new-game-title");
-  const imageInput = modal.querySelector(".new-game-image-file");
-  const trailerFileInput = modal.querySelector(".new-game-trailer-file");
-  const trailerUrlInput  = modal.querySelector(".new-game-trailer-url");
-  const modalClose = modal.querySelector(".tw-modal-close");
-
-  const editorRoot = modal.querySelector(".rich-editor");
-  const editorAPI  = initRichEditor(editorRoot);
-
-  if(titleInput) titleInput.value = original.title || "";
-  editorAPI.setHTML(original.description || "");
-
-  const catSel = makeCategorySelect(original.category || "game");
-  form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
-
-  if(trailerUrlInput){ trailerUrlInput.value=""; trailerUrlInput.disabled=true; const label=trailerUrlInput.closest("label"); if(label) label.style.display="none"; }
-  if(imageInput) imageInput.required=false;
+  const refs = initGameModal(original);
+  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel } = refs;
 
   let clearTrailerCb=null;
   {
@@ -831,39 +842,20 @@ function openEditGame(original){
 
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
+    const data = await gatherGameData(refs, { requireImage: false });
+    if(!data) return;
 
-    const title=(titleInput?.value||"").trim();
-    const descHTML=editorAPI.getHTML();
-    const imageFile=imageInput?.files?.[0] || null;
-    const trailerFile=trailerFileInput?.files?.[0] || null;
-    const category = catSel.querySelector(".cat-select")?.value || "game";
+    const patch={ title: data.title, description: data.descHTML, category: data.category, first_link: data.first_link, link_ok: data.link_ok };
 
-    if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return; }
-    if(!descHTML || !descHTML.replace(/<[^>]*>/g,'').trim()){ alert("Escribe una descripción."); return; }
-
-    const patch={ title, description: descHTML, category };
-
-    if(imageFile){
-      try{
-        patch.image = await compressImage(imageFile, { maxW: 960, maxH: 960, quality: 0.78, mime: "image/webp" });
-        patch.image_thumb = await compressImage(imageFile, { maxW: 320, maxH: 320, quality: 0.7, mime: "image/webp" });
-      } catch (err) {
-        console.error("[edit cover compress]", err);
-        alert("No se pudo compactar la portada.");
-        return;
-      }
+    if(data.coverDataUrl){
+      patch.image = data.coverDataUrl;
+      patch.image_thumb = data.thumbDataUrl;
     }
     if(clearTrailerCb?.checked){
       patch.previewVideo=null;
-    }else if(trailerFile){
-      if(!/^video\/(mp4|webm)$/i.test(trailerFile.type)){ alert("Archivo del trailer debe ser MP4/WEBM."); return; }
-      if(trailerFile.size > 6*1024*1024){ alert("Trailer >6MB. Usa uno más ligero."); return; }
-      try{ patch.previewVideo = await readAsDataURL(trailerFile); }catch (err){ console.error("[edit trailer read]", err); alert("No se pudo leer el trailer."); return; }
+    }else if(data.previewSrc){
+      patch.previewVideo = data.previewSrc;
     }
-
-    const first_link = extractFirstLink(descHTML);
-    patch.first_link = first_link || null;
-    patch.link_ok = first_link ? await fetchLinkOk(first_link) : null;
 
     const token=localStorage.getItem("tgx_admin_token")||"";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
@@ -1294,6 +1286,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
