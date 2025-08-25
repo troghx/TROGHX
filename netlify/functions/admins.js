@@ -1,5 +1,6 @@
 // netlify/functions/admins.js
 import { neon } from "@neondatabase/serverless";
+import { json as baseJson } from "./utils.js";
 
 const DB_URL =
   process.env.DATABASE_URL ||
@@ -8,17 +9,13 @@ const DB_URL =
 
 const sql = DB_URL ? neon(DB_URL) : null;
 
-const json = (status, data, extra = {}) => ({
-  statusCode: status,
-  headers: {
-    "Content-Type": "application/json; charset=utf-8",
+const json = (status, data, extra = {}) =>
+  baseJson(status, data, {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     ...extra,
-  },
-  body: JSON.stringify(data),
-});
+  });
 
 async function ensureSchema() {
   await sql`CREATE TABLE IF NOT EXISTS admin_keys (
