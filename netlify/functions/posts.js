@@ -11,6 +11,8 @@ const DB_URL =
 
 const sql = DB_URL ? neon(DB_URL) : null;
 
+let schemaReady = false;
+
 const json = (status, data, extra = {}) =>
   baseJson(status, data, {
     "Access-Control-Allow-Origin": "*",
@@ -96,7 +98,10 @@ export async function handler(event) {
     if (event.httpMethod === "OPTIONS") return json(204, {}, cacheHdr(300));
     if (!sql) return json(500, { error: "DB not configured" });
 
-    await ensureSchema();
+    if (!schemaReady) {
+      await ensureSchema();
+      schemaReady = true;
+    }
 
     // ---------- LIST ----------
     if (event.httpMethod === "GET" && event.path.endsWith("/posts")) {
@@ -260,4 +265,5 @@ export async function handler(event) {
     return json(500, { error: "Internal Server Error", detail: String(err.message || err) });
   }
 }
+
 
