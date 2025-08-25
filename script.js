@@ -576,7 +576,7 @@ function renderRow(keepScroll=false){
     const addTile = document.createElement("div");
     addTile.className = "add-game-tile";
     addTile.tabIndex = 0;
-    addTile.innerHTML = "<span>+ Añadir juego</span>";
+    addTile.innerHTML = "<span>+</span>";
     addTile.addEventListener("click", openNewGameModal);
     grid.appendChild(addTile);
   }
@@ -1294,6 +1294,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
