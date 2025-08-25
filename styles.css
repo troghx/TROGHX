@@ -172,6 +172,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 /* ---------- Hero ---------- */
 .card {
+  padding: 15px;
   background: var(--panel);
   border: 1px solid rgba(255,255,255,.06);
   border-radius: var(--radius-lg);
