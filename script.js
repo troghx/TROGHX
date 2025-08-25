@@ -391,13 +391,10 @@ function applyStatusBadge(tile, first_link, link_ok){
 
   if (link_ok === true) {
     badge.classList.add("status-ok");
-    badge.querySelector(".pill-text").textContent="Disponible";
-  } else if (link_ok === false) {
-    badge.classList.add("status-warn");
-    badge.querySelector(".pill-text").textContent="Revisar enlace";
+    badge.querySelector(".pill-text").textContent = "Disponible";
   } else {
     badge.classList.add("status-checking");
-    badge.querySelector(".pill-text").textContent="Comprobar";
+    badge.querySelector(".pill-text").textContent = "Verificar";
   }
 }
 
@@ -1295,6 +1292,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
