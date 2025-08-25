@@ -559,7 +559,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 /* estados */
 .status-ok{ --status-color:#22c55e; color:#dcfce7; }
 .status-down{ --status-color:#ef4444; color:#fee2e2; }
-.status-checking { --status-color:#f59e0b; color:#fff7ed; }
+.status-checking { --status-color:#f59e0b; color:#f50b0b; }
 
 /* ===== Estado (pill) sobre la tarjeta ===== */
 .status-pill{
