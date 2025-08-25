@@ -213,6 +213,7 @@ export async function handler(event) {
         const vThumb   = ("image_thumb"  in b || "imageThumb" in b) ? (b.image_thumb ?? b.imageThumb ?? null) : null;
         const vPrev    = ("previewVideo" in b || "preview_video" in b) ? (b.previewVideo ?? b.preview_video ?? null) : null;
         const vLinkOk  = ("link_ok"      in b) ? ((typeof b.link_ok === "boolean") ? b.link_ok : null) : null;
+        const vBump    = b.bump === true;
 
         let vFirst;
         if ("first_link" in b) {
@@ -232,7 +233,7 @@ export async function handler(event) {
             image_thumb   = COALESCE(${vThumb}, image_thumb),
             preview_video = COALESCE(${vPrev}, preview_video),
             link_ok       = COALESCE(${vLinkOk}, link_ok),
-            first_link    = COALESCE(${vFirst}, first_link)
+            first_link    = COALESCE(${vFirst}, first_link)${vBump ? sql`, created_at = now()` : sql``}
           WHERE id = ${id}
         `;
         return json(200, { ok: true });
@@ -265,5 +266,6 @@ export async function handler(event) {
     return json(500, { error: "Internal Server Error", detail: String(err.message || err) });
   }
 }
+
 
 
