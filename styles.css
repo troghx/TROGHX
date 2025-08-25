@@ -187,6 +187,30 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .hero-copy p { margin: 0 0 16px; color: var(--muted); }
 .hero .actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
+.hero-banner {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+}
+
+.hero-message {
+  flex:1;
+  text-align:center;
+}
+
+.ad-slot {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px;
+  border:1px dashed rgba(255,255,255,.15);
+  background:rgba(255,255,255,.03);
+  border-radius:14px;
+  font-weight:700;
+  text-align:center;
+}
+
 #hero button{
   padding: 15px 30px; font-size: 1.2rem; text-transform: uppercase;
   background: linear-gradient(45deg, #ff00ff, #00ffff);
