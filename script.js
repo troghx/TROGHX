@@ -155,7 +155,8 @@ async function apiList(category = window.currentCategory) {
   const qs = new URLSearchParams({ lite: "1", limit: "200", category });
   const r = await fetch(`${API_POSTS}?${qs.toString()}`, { cache: "no-store" });
   if (!r.ok) throw new Error("No se pudo listar posts");
-  return r.json();
+  const j = await r.json();
+  return Array.isArray(j)?j.map(g=>({...g,link_ok:Boolean(g.link_ok)})):j;
 }
 async function apiCreate(data, token){
   const r = await fetch(API_POSTS, {
@@ -171,6 +172,7 @@ async function apiGet(id){
   const r = await fetch(`${API_POSTS}/${id}`, { cache:"no-store" });
   if(!r.ok) throw new Error("No se pudo obtener post");
   const j = await r.json();
+  if(j&&typeof j==="object") j.link_ok=Boolean(j.link_ok);
   fullCache.set(id, j);
   return j;
 }
@@ -389,14 +391,14 @@ function applyStatusBadge(tile, first_link, link_ok){
   badge.innerHTML=`<span class="pill-icon"></span><span class="pill-text"></span>`;
   badge.querySelector(".pill-icon").innerHTML = platformIconSVG(plat);
 
-  if (link_ok === true) {
-    badge.classList.add("status-ok");
-    badge.querySelector(".pill-text").textContent = "Disponible";
-  } else {
-    badge.classList.add("status-checking");
-    badge.querySelector(".pill-text").textContent = "Verificar";
+    if (link_ok) {
+      badge.classList.add("status-ok");
+      badge.querySelector(".pill-text").textContent = "Disponible";
+    } else {
+      badge.classList.add("status-checking");
+      badge.querySelector(".pill-text").textContent = "Verificar";
+    }
   }
-}
 
 /* =========================
    Editor enriquecido (SIN duplicar botones)
@@ -1292,6 +1294,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
