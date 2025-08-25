@@ -190,7 +190,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .hero-banner {
   display:flex;
   align-items:center;
-  justify-content:space-between;
+  justify-content: space-between;
   gap:20px;
 }
 
@@ -209,6 +209,11 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   border-radius:14px;
   font-weight:700;
   text-align:center;
+}
+
+.ad-slot-left,
+.ad-slot-right {
+  flex: 0 0 200px;
 }
 
 #hero button{
