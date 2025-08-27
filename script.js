@@ -1234,8 +1234,59 @@ function ensureSidebarChannelBadge(){
     el.appendChild(img);
     rail.appendChild(el);
   }
+  return s;
+}
 
-  el.onclick = () => { if (isAdmin) openAdminCenter(); };
+function openDownloadsModal(){
+  const downloads = JSON.parse(localStorage.getItem('tgx_downloads') || '[]');
+  const node = document.createElement('div');
+  node.className = 'tw-modal downloads-modal';
+  node.innerHTML = `
+    <div class="tw-modal-backdrop"></div>
+    <div class="tw-modal-content">
+      <button class="tw-modal-close" aria-label="Cerrar">&times;</button>
+      <h2 class="tw-modal-title">Descargas</h2>
+      <div class="tw-modal-description"></div>
+    </div>`;
+
+  const desc = node.querySelector('.tw-modal-description');
+
+  if (downloads.length) {
+    const list = document.createElement('ul');
+    downloads.forEach(d => {
+      const li = document.createElement('li');
+      const name = document.createElement('strong');
+      name.textContent = d.name || 'Archivo';
+      const date = document.createElement('span');
+      date.textContent = d.date ? ` – ${new Date(d.date).toLocaleString()} – ` : ' ';
+      const link = document.createElement('a');
+      link.href = d.url || '#';
+      link.textContent = 'Descargar de nuevo';
+      link.addEventListener('click', ev => {
+        ev.preventDefault();
+        downloadFromGofile(d);
+      });
+      li.append(name, date, link);
+      list.appendChild(li);
+    });
+    desc.appendChild(list);
+  } else {
+    desc.textContent = 'No hay descargas.';
+  }
+
+  const close = node.querySelector('.tw-modal-close');
+  const removeTrap = trapFocus(node);
+  const onEscape = e => { if (e.key === 'Escape') closeModal(node, removeTrap, onEscape); };
+  close?.addEventListener('click', () => closeModal(node, removeTrap, onEscape));
+
+  openModalFragment(node);
+}
+
+async function downloadFromGofile(item){
+  // TODO: Integrar con la API de Gofile para obtener archivo y registrar descarga
+  window.open(item.url, '_blank');
+}
+  el.onclick = openDownloadsModal;
 }
 
 /* =========================
@@ -1245,8 +1296,7 @@ function randomKey(len=28){
   const chars="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
   let s=""; const a=new Uint8Array(len); crypto.getRandomValues(a);
   for(const n of a) s += chars[n % chars.length];
-  return s;
-}
+
 async function openAdminCenter(){
   if(!isAdmin){ return; }
   const token=localStorage.getItem("tgx_admin_token")||"";
@@ -1357,6 +1407,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
