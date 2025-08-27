@@ -610,7 +610,11 @@ function renderRow(keepScroll=false){
       const bubble = document.createElement('div');
       bubble.className = 'preview-bubble';
       bubble.textContent = '¿Quieres ver una preview del juego? ¡Pon el mouse sobre la portada!';
-      first.appendChild(bubble);
+      document.body.appendChild(bubble);
+      const rect = first.getBoundingClientRect();
+      bubble.style.left = `${rect.left + rect.width/2}px`;
+      bubble.style.top  = `${rect.top}px`;
+      bubble.style.transform = 'translate(-50%, -100%)';
       requestAnimationFrame(()=> bubble.classList.add('show'));
       const hide = ()=>{
         bubble.remove();
@@ -1303,6 +1307,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
