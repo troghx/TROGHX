@@ -603,26 +603,27 @@ function renderRow(keepScroll=false){
     attachHoverVideo(tile, g, vid);
   });
 
-  const first = grid.querySelector('.tile');
-  if(first && !window.__previewHintShown){
+  const tiles = grid.querySelectorAll('.tile');
+  const third = tiles[2];        // tercera portada (índice 2)
+  if(third && !window.__previewHintShown){
     window.__previewHintShown = true;
     setTimeout(()=>{
       const bubble = document.createElement('div');
       bubble.className = 'preview-bubble';
       bubble.textContent = '¿Quieres ver una preview del juego? ¡Pon el mouse sobre la portada!';
       document.body.appendChild(bubble);
-      const rect = first.getBoundingClientRect();
+      const rect = third.getBoundingClientRect();
       bubble.style.left = `${rect.left + rect.width/2}px`;
       bubble.style.top  = `${rect.top}px`;
       bubble.style.transform = 'translate(-50%, -100%)';
       requestAnimationFrame(()=> bubble.classList.add('show'));
       const hide = ()=>{
         bubble.remove();
-        first.removeEventListener('pointerenter', onEnter);
+        third.removeEventListener('pointerenter', onEnter);
       };
       const onEnter = ()=>{ hide(); clearTimeout(hideTimer); };
       const hideTimer = setTimeout(hide, 5000);
-      first.addEventListener('pointerenter', onEnter, { once: true });
+      third.addEventListener('pointerenter', onEnter, { once: true });
     }, 7000);
   }
   updatePager(totalPages);
@@ -1307,6 +1308,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
