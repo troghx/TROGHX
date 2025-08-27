@@ -933,7 +933,7 @@ body.modal-open { overflow: hidden; }
 body.modal-open{ overflow:hidden; }
 
 /* ===== Degradado en covers para legibilidad ===== */
-.tile{ position:relative; overflow:hidden; border-radius: var(--radius,16px); }
+.tile{ position:relative; overflow:visible; border-radius: var(--radius,16px); }
 .tile::after{
   content:""; position:absolute; inset:0; pointer-events:none; z-index:1;
   background: linear-gradient(to top,
