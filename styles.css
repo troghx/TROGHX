@@ -285,6 +285,10 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .tw-modal-description{
   margin: 0 0 16px; color: var(--muted); font-size: 1rem; line-height: 1.5;
 }
+
+.admin-menu-modal .tw-modal-content{
+  max-width: 400px;
+}
 .dmca-header{ display:flex; align-items:center; gap:8px; }
 .dmca-lang-toggle{
   padding:4px 10px; border:none; border-radius:8px;
