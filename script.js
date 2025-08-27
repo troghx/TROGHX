@@ -771,6 +771,7 @@ function initGameModal(initial = {}){
   const imageInput = fragment.querySelector(".new-game-image-file");
   const trailerFileInput = fragment.querySelector(".new-game-trailer-file");
   const trailerUrlInput  = fragment.querySelector(".new-game-trailer-url");
+  const gofileInput = fragment.querySelector(".new-game-gofile-id");
   const modalClose = fragment.querySelector(".tw-modal-close");
 
   const editorRoot = fragment.querySelector(".rich-editor");
@@ -786,9 +787,10 @@ function initGameModal(initial = {}){
 
   if(titleInput) titleInput.value = initial.title || "";
   if(initial.description) editorAPI.setHTML(initial.description);
+  if(gofileInput) gofileInput.value = initial.gofile_id || initial.gofileId || initial.gofile_folder || "";
   if(imageInput && initial.image !== undefined) imageInput.required=false;
 
-  return { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel };
+  return { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, gofileInput };
 }
 
 async function compressCoverAndThumb(imageFile){
@@ -805,13 +807,14 @@ async function readTrailerFile(trailerFile){
 }
 
 async function gatherGameData(refs, { requireImage=true } = {}){
-  const { titleInput, imageInput, trailerFileInput, editorAPI, catSel } = refs;
+  const { titleInput, imageInput, trailerFileInput, editorAPI, catSel, gofileInput } = refs;
 
   const title=(titleInput?.value||"").trim();
   const descHTML=editorAPI.getHTML();
   const imageFile=imageInput?.files?.[0] || null;
   const trailerFile=trailerFileInput?.files?.[0] || null;
   const category = catSel.querySelector(".cat-select")?.value || "game";
+  const gofile_id = (gofileInput?.value || "").trim() || null;
 
   if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return null; }
   if(requireImage && !imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return null; }
@@ -833,12 +836,12 @@ async function gatherGameData(refs, { requireImage=true } = {}){
   const first_link = extractFirstLink(descHTML);
   const link_ok = first_link ? await fetchLinkOk(first_link) : null;
 
-  return { title, descHTML, coverDataUrl, thumbDataUrl, previewSrc, category, first_link, link_ok };
+  return { title, descHTML, coverDataUrl, thumbDataUrl, previewSrc, category, first_link, link_ok, gofile_id };
 }
 
-function openNewGameModal(){
-  const refs = initGameModal();
-  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel } = refs;
+function openNewGameModal(){␊
+  const refs = initGameModal();␊
+  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, gofileInput } = refs;
 
   const removeTrap=trapFocus(node);
   const onEscape=(e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
@@ -860,7 +863,8 @@ function openNewGameModal(){
       previewVideo: data.previewSrc,
       category: data.category,
       first_link: data.first_link,
-      link_ok: data.link_ok
+      link_ok: data.link_ok,
+      gofile_id: data.gofile_id
     };
 
     try{
@@ -875,7 +879,7 @@ function openNewGameModal(){
 }
 function openEditGame(original){
   const refs = initGameModal(original);
-  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel } = refs;
+  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, gofileInput  } = refs;
 
   let clearTrailerCb=null;
   {
@@ -895,7 +899,7 @@ function openEditGame(original){
     const data = await gatherGameData(refs, { requireImage: false });
     if(!data) return;
 
-    const patch={ title: data.title, description: data.descHTML, category: data.category, first_link: data.first_link, link_ok: data.link_ok };
+    const patch={ title: data.title, description: data.descHTML, category: data.category, first_link: data.first_link, link_ok: data.link_ok, gofile_id: data.gofile_id };
 
     if(data.coverDataUrl){
       patch.image = data.coverDataUrl;
@@ -1238,8 +1242,16 @@ function ensureSidebarChannelBadge(){
   return el;
 }
 
-function openDownloadsModal(){
-  const downloads = JSON.parse(localStorage.getItem('tgx_downloads') || '[]');
+async function openDownloadsModal(){
+  let downloads = [];
+  try{
+    const r = await fetch('/.netlify/functions/gofile?history=1');
+    if(r.ok){ const j = await r.json(); downloads = Array.isArray(j.downloads)? j.downloads : []; }
+  }catch(err){ downloads = []; }
+  if(!downloads.length){
+    try{ downloads = JSON.parse(localStorage.getItem('tgx_downloads') || '[]'); }
+    catch(err){ downloads = []; }
+  }
   const node = document.createElement('div');
   node.className = 'tw-modal downloads-modal';
   node.innerHTML = `
@@ -1259,9 +1271,10 @@ function openDownloadsModal(){
       const name = document.createElement('strong');
       name.textContent = d.name || 'Archivo';
       const date = document.createElement('span');
-      date.textContent = d.date ? ` – ${new Date(d.date).toLocaleString()} – ` : ' ';
+      const dt = d.created_at || d.date;
+      date.textContent = dt ? ` – ${new Date(dt).toLocaleString()} – ` : ' ';
       const link = document.createElement('a');
-      link.href = d.url || '#';
+      link.href = '#';
       link.textContent = 'Descargar de nuevo';
       link.addEventListener('click', ev => {
         ev.preventDefault();
@@ -1283,8 +1296,24 @@ function openDownloadsModal(){
   openModalFragment(node);
 }
 async function downloadFromGofile(item){
-  // TODO: Integrar con la API de Gofile para obtener archivo y registrar descarga
-  window.open(item.url, '_blank');
+  try {
+    const r = await fetch(`/.netlify/functions/gofile?id=${encodeURIComponent(item.id)}`);
+    if(!r.ok) throw new Error('fetch failed');
+    const data = await r.json();
+    if(!data.url) throw new Error('no url');
+
+    try{
+      const hist = JSON.parse(localStorage.getItem('tgx_downloads') || '[]');
+      hist.unshift({ id:item.id, name:item.name||item.title||null, date:Date.now(), url:data.url });
+      hist.splice(50);
+      localStorage.setItem('tgx_downloads', JSON.stringify(hist));
+    }catch(err){ /* ignore */ }
+
+    window.open(data.url, '_blank');
+  } catch(err){
+    console.error('[downloadFromGofile]', err);
+    alert('No se pudo descargar');
+  }
 }
 
 /* =========================
@@ -1407,6 +1436,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
