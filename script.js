@@ -605,21 +605,22 @@ function renderRow(keepScroll=false){
 
   const first = grid.querySelector('.tile');
   if(first && !window.__previewHintShown){
-    const bubble = document.createElement('div');
-    bubble.className = 'preview-bubble';
-    bubble.textContent = '¿Quieres ver una preview del juego? ¡Pon el mouse sobre la portada!';
-    first.appendChild(bubble);
-    requestAnimationFrame(()=> bubble.classList.add('show'));
-    const hide = ()=>{
-      bubble.remove();
-      window.__previewHintShown = true;
-      first.removeEventListener('pointerenter', onEnter);
-    };
-    const onEnter = ()=>{ hide(); clearTimeout(timer); };
-    const timer = setTimeout(hide, 6000);
-    first.addEventListener('pointerenter', onEnter, { once: true });
+    window.__previewHintShown = true;
+    setTimeout(()=>{
+      const bubble = document.createElement('div');
+      bubble.className = 'preview-bubble';
+      bubble.textContent = '¿Quieres ver una preview del juego? ¡Pon el mouse sobre la portada!';
+      first.appendChild(bubble);
+      requestAnimationFrame(()=> bubble.classList.add('show'));
+      const hide = ()=>{
+        bubble.remove();
+        first.removeEventListener('pointerenter', onEnter);
+      };
+      const onEnter = ()=>{ hide(); clearTimeout(hideTimer); };
+      const hideTimer = setTimeout(hide, 5000);
+      first.addEventListener('pointerenter', onEnter, { once: true });
+    }, 7000);
   }
-
   updatePager(totalPages);
   if(!keepScroll) grid.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -1302,6 +1303,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
