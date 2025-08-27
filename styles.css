@@ -109,7 +109,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .social-tile, .add-social-tile{
   width: 64px; height: 64px;
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.0);
   background: #131920;
   display: grid; place-items: center;
   box-shadow: var(--shadow-soft);
