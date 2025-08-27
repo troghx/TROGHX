@@ -624,7 +624,7 @@ function renderRow(keepScroll=false){
       const onEnter = ()=>{ hide(); clearTimeout(hideTimer); };
       const hideTimer = setTimeout(hide, 8000);
       third.addEventListener('pointerenter', onEnter, { once: true });
-    }, 5000);
+    }, 3000);
   }
   updatePager(totalPages);
   if(!keepScroll) grid.scrollTo({ top: 0, behavior: "smooth" });
@@ -1334,6 +1334,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
