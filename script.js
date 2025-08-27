@@ -622,9 +622,9 @@ function renderRow(keepScroll=false){
         third.removeEventListener('pointerenter', onEnter);
       };
       const onEnter = ()=>{ hide(); clearTimeout(hideTimer); };
-      const hideTimer = setTimeout(hide, 5000);
+      const hideTimer = setTimeout(hide, 8000);
       third.addEventListener('pointerenter', onEnter, { once: true });
-    }, 7000);
+    }, 5000);
   }
   updatePager(totalPages);
   if(!keepScroll) grid.scrollTo({ top: 0, behavior: "smooth" });
@@ -1308,6 +1308,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
