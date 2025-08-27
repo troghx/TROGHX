@@ -491,12 +491,14 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 /* ---------- Tarjetas de juego ---------- */
 .tile{
   flex: 0 0 clamp(200px, 28vw, 350px);
-  aspect-ratio: 16 / 9; border-radius: var(--radius-xl);
-  background: #131920; position: relative; overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-xl);
+  background: #131920;
+  position: relative;
+  overflow: visible;
   scroll-snap-align: start;
   transition: transform .18s, box-shadow .18s, outline .18s;
   outline: 1px solid rgba(255,255,255,.06);
-  position:relative; overflow:hidden; border-radius:1rem;
 }
 .tile:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
 .tile:focus-visible { outline: 2px solid var(--ring); }
@@ -519,7 +521,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 }
 .tile .tile-video{
   position:absolute; inset:0; width:100%; height:100%;
-  object-fit:cover; border-radius:inherit; display:block;
+  object-fit:cover; border-radius:inherit; overflow:hidden; display:block;
   opacity: 0; transition: opacity .25s ease; pointer-events: none;
   z-index: 2;
 }
