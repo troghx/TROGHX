@@ -1234,7 +1234,8 @@ function ensureSidebarChannelBadge(){
     el.appendChild(img);
     rail.appendChild(el);
   }
-  return s;
+  el.onclick = openDownloadsModal;
+  return el;
 }
 
 function openDownloadsModal(){
@@ -1281,12 +1282,9 @@ function openDownloadsModal(){
 
   openModalFragment(node);
 }
-
 async function downloadFromGofile(item){
   // TODO: Integrar con la API de Gofile para obtener archivo y registrar descarga
   window.open(item.url, '_blank');
-}
-  el.onclick = openDownloadsModal;
 }
 
 /* =========================
@@ -1296,6 +1294,8 @@ function randomKey(len=28){
   const chars="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
   let s=""; const a=new Uint8Array(len); crypto.getRandomValues(a);
   for(const n of a) s += chars[n % chars.length];
+  return s;
+}
 
 async function openAdminCenter(){
   if(!isAdmin){ return; }
@@ -1407,7 +1407,6 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
-
 
 
 
