@@ -839,8 +839,8 @@ async function gatherGameData(refs, { requireImage=true } = {}){
   return { title, descHTML, coverDataUrl, thumbDataUrl, previewSrc, category, first_link, link_ok, gofile_id };
 }
 
-function openNewGameModal(){␊
-  const refs = initGameModal();␊
+function openNewGameModal(){
+  const refs = initGameModal();
   const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, gofileInput } = refs;
 
   const removeTrap=trapFocus(node);
@@ -1436,6 +1436,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
