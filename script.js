@@ -6,6 +6,7 @@
 const template = document.getElementById("tile-template");
 const modalTemplate = document.getElementById("game-modal-template");
 const adminLoginModalTemplate = document.getElementById("admin-login-modal-template");
+const adminMenuModalTemplate = document.getElementById("admin-menu-modal-template");
 const newGameModalTemplate = document.getElementById("new-game-modal-template");
 const newSocialModalTemplate = document.getElementById("new-social-modal-template");
 const dmcaModalTemplate = document.getElementById("dmca-modal-template");
@@ -1165,17 +1166,39 @@ function openAdminLoginModal(){
   openModalFragment(node);
 }
 
+function openAdminMenuModal(){
+  const modal = adminMenuModalTemplate.content.cloneNode(true);
+  const node = modal.querySelector(".tw-modal");
+  const btnLogout = modal.querySelector(".admin-menu-logout");
+  const btnKeys = modal.querySelector(".admin-menu-keys");
+  const modalClose = modal.querySelector(".tw-modal-close");
+
+  const removeTrap = trapFocus(node);
+  const onEscape = (e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
+  if(modalClose) modalClose.addEventListener("click", ()=> closeModal(node, removeTrap, onEscape));
+
+  if(btnLogout) btnLogout.addEventListener("click", ()=>{
+    isAdmin=false; persistAdmin(false);
+    renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
+    alert("Sesión cerrada.");
+    closeModal(node, removeTrap, onEscape);
+  });
+
+  if(btnKeys) btnKeys.addEventListener("click", ()=>{
+    openAdminCenter();
+    closeModal(node, removeTrap, onEscape);
+  });
+
+  openModalFragment(node);
+}
+
 function setupAdminButton(){
   const btn=document.querySelector(".user-pill");
   if(!btn) return;
   btn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
   btn.onclick = ()=>{
     if(isAdmin){
-      if(confirm("¿Cerrar sesión de administrador?")){
-        isAdmin=false; persistAdmin(false);
-        renderRow(); renderHeroCarousel(); renderSocialBar();
-        alert("Sesión cerrada.");
-      }
+      openAdminMenuModal();
     } else {
       openAdminLoginModal();
     }
@@ -1334,6 +1357,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
