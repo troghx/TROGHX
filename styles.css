@@ -526,6 +526,38 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .tile .tile-video.playing { opacity: 1; }
 .tile .tile-video:not(.playing){ opacity:0; pointer-events:none; }
 
+.preview-bubble{
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, 10px);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  padding: 8px 12px;
+  font-size: .85rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, transform .25s;
+  z-index: 5;
+}
+
+.preview-bubble::after{
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--panel-2);
+}
+
+.preview-bubble.show{
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 /* Badge dentro de .tile-info (reemplaza el texto fijo) */
 .tile .tile-info .badge.badge-status{
   display: inline-flex;
