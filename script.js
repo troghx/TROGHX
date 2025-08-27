@@ -610,7 +610,7 @@ function renderRow(keepScroll=false){
     setTimeout(()=>{
       const bubble = document.createElement('div');
       bubble.className = 'preview-bubble';
-      bubble.textContent = '¿Quieres ver una preview del juego? ¡Pon el mouse sobre la portada!';
+      bubble.innerHTML = '<span class="preview-bubble-text">¿Quieres ver una preview del juego? ¡Pon el mouse sobre la portada!</span>';
       document.body.appendChild(bubble);
       const rect = third.getBoundingClientRect();
       bubble.style.left = `${rect.left + rect.width/2}px`;
@@ -1334,6 +1334,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
