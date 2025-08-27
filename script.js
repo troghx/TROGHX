@@ -719,7 +719,7 @@ function openGame(game){
 
     const bubble = document.createElement("div");
     bubble.className = "discord-bubble";
-    bubble.textContent = "Tienes preguntas o comentarios? pásate por el Discord";
+    bubble.textContent = "Preguntas?🤨 pásate por el Discord";
     modalContent.appendChild(bubble);
 
     requestAnimationFrame(()=>{
@@ -1334,6 +1334,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
