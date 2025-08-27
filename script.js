@@ -703,6 +703,32 @@ function openGame(game){
   const onEscape   = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
   if(modalClose) modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
   openModalFragment(modalNode);
+
+  const discord = socials.find(s => /discord/i.test(s.name || s.url));
+  if(discord && modalContent){
+    const link = document.createElement("a");
+    link.className = "discord-link";
+    link.href = discord.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    const img = document.createElement("img");
+    img.src = discord.image;
+    img.alt = discord.name || "Discord";
+    link.appendChild(img);
+    modalContent.appendChild(link);
+
+    const bubble = document.createElement("div");
+    bubble.className = "discord-bubble";
+    bubble.textContent = "Tienes preguntas o comentarios? pásate por el Discord";
+    modalContent.appendChild(bubble);
+
+    requestAnimationFrame(()=>{
+      bubble.classList.add("show");
+      const hide = ()=> bubble.classList.remove("show");
+      const t = setTimeout(hide, 5000);
+      link.addEventListener("mouseenter", ()=>{ hide(); clearTimeout(t); });
+    });
+  }
 }
 function deleteGame(game){
   if(!game.id){ alert("No se encontró ID."); return; }
@@ -1308,6 +1334,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
