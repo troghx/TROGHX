@@ -81,6 +81,7 @@ async function ensureSchema() {
     category       TEXT DEFAULT 'game',
     first_link     TEXT,
     link_ok        BOOLEAN,
+    gofile_id      TEXT,
     created_at     TIMESTAMPTZ DEFAULT now()
   )`;
   await sql`ALTER TABLE IF EXISTS posts
@@ -89,6 +90,7 @@ async function ensureSchema() {
     ADD COLUMN IF NOT EXISTS first_link TEXT,
     ADD COLUMN IF NOT EXISTS link_ok BOOLEAN,
     ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'game',
+    ADD COLUMN IF NOT EXISTS gofile_id TEXT,
     ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`;
   await sql`CREATE INDEX IF NOT EXISTS idx_posts_cat_created ON posts (category, created_at DESC)`;
 }
@@ -113,24 +115,24 @@ export async function handler(event) {
 
         if (lite) {
           const rows = await sql`
-            SELECT id, title, category,
-                   COALESCE(image_thumb, image) AS image_thumb,
-                   created_at, link_ok, first_link
-            FROM posts
-            WHERE category = ${category}
-            ORDER BY created_at DESC
-            LIMIT ${limit}
-          `;
+          SELECT id, title, category,
+                 COALESCE(image_thumb, image) AS image_thumb,
+                 created_at, link_ok, first_link, gofile_id
+          FROM posts
+          WHERE category = ${category}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `;
           return json(200, rows, cacheHdr(60));
         } else {
           const rows = await sql`
-            SELECT id, title, category, image, description, preview_video,
-                   created_at, link_ok, first_link
-            FROM posts
-            WHERE category = ${category}
-            ORDER BY created_at DESC
-            LIMIT ${limit}
-          `;
+          SELECT id, title, category, image, description, preview_video,
+                 created_at, link_ok, first_link, gofile_id
+          FROM posts
+          WHERE category = ${category}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `;
           return json(200, rows, cacheHdr(20));
         }
       } catch (err) {
@@ -152,7 +154,7 @@ export async function handler(event) {
           return json(200, { previewVideo: rows[0].preview_video || null }, cacheHdr(300));
         }
         const rows = await sql`
-          SELECT id, title, category, image, description, created_at, link_ok, first_link
+          SELECT id, title, category, image, description, created_at, link_ok, first_link, gofile_id
           FROM posts WHERE id=${id} LIMIT 1
         `;
         if (!rows.length) return json(404, { error: "not found" });
@@ -178,14 +180,15 @@ export async function handler(event) {
         const previewVideo = b.previewVideo || b.preview_video || null;
         const first_link   = b.first_link || firstLinkFrom(description) || null;
         const link_ok      = (typeof b.link_ok === "boolean") ? b.link_ok : null;
+        const gofile_id    = b.gofile_id || b.gofileId || b.gofile_folder || b.gofileFolder || null;
 
         if (!title || !image || !image_thumb || !description) {
           return json(400, { error: "missing fields" });
         }
 
         const rows = await sql`
-          INSERT INTO posts (title, category, image, image_thumb, description, preview_video, link_ok, first_link)
-          VALUES (${title}, ${category}, ${image}, ${image_thumb}, ${description}, ${previewVideo}, ${link_ok}, ${first_link})
+          INSERT INTO posts (title, category, image, image_thumb, description, preview_video, link_ok, first_link, gofile_id)
+          VALUES (${title}, ${category}, ${image}, ${image_thumb}, ${description}, ${previewVideo}, ${link_ok}, ${first_link}, ${gofile_id})
           RETURNING id
         `;
         return json(200, { id: rows[0].id });
@@ -213,6 +216,9 @@ export async function handler(event) {
         const vThumb   = ("image_thumb"  in b || "imageThumb" in b) ? (b.image_thumb ?? b.imageThumb ?? null) : null;
         const vPrev    = ("previewVideo" in b || "preview_video" in b) ? (b.previewVideo ?? b.preview_video ?? null) : null;
         const vLinkOk  = ("link_ok"      in b) ? ((typeof b.link_ok === "boolean") ? b.link_ok : null) : null;
+        const vGofile  = ("gofile_id"    in b || "gofileId" in b || "gofile_folder" in b || "gofileFolder" in b)
+                          ? (b.gofile_id ?? b.gofileId ?? b.gofile_folder ?? b.gofileFolder ?? null)
+                          : null;
         const vBump    = b.bump === true;
 
         let vFirst;
@@ -233,7 +239,8 @@ export async function handler(event) {
             image_thumb   = COALESCE(${vThumb}, image_thumb),
             preview_video = COALESCE(${vPrev}, preview_video),
             link_ok       = COALESCE(${vLinkOk}, link_ok),
-            first_link    = COALESCE(${vFirst}, first_link)${vBump ? sql`, created_at = now()` : sql``}
+            first_link    = COALESCE(${vFirst}, first_link),
+            gofile_id     = COALESCE(${vGofile}, gofile_id)${vBump ? sql`, created_at = now()` : sql``}
           WHERE id = ${id}
         `;
         return json(200, { ok: true });
@@ -266,6 +273,7 @@ export async function handler(event) {
     return json(500, { error: "Internal Server Error", detail: String(err.message || err) });
   }
 }
+
 
 
 
