@@ -529,10 +529,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .tile .tile-video:not(.playing){ opacity:0; pointer-events:none; }
 
 .preview-bubble{
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translate(-50%, 10px);
+  position: fixed;
   background: var(--panel-2);
   color: var(--text);
   border-radius: var(--radius);
@@ -542,7 +539,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   opacity: 0;
   pointer-events: none;
   transition: opacity .25s, transform .25s;
-  z-index: 5;
+  z-index: 9999;
 }
 
 .preview-bubble::after{
@@ -557,7 +554,6 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 .preview-bubble.show{
   opacity: 1;
-  transform: translate(-50%, 0);
 }
 
 /* Badge dentro de .tile-info (reemplaza el texto fijo) */
