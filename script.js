@@ -674,7 +674,20 @@ function openGame(game){
   const modalClose   = modal.querySelector(".tw-modal-close");
 
   if(modalTitle) modalTitle.textContent = game?.title || "Sin título";
-  if(modalDesc)  modalDesc.innerHTML    = game?.description || "Sin descripción";
+  if(modalDesc){
+    modalDesc.innerHTML = game?.description || "Sin descripción";
+    modalDesc.querySelectorAll("a.chip-gofile").forEach(a => {
+      const id = extractGofileId(a.getAttribute("href"));
+      if(id){
+        a.addEventListener("click", ev => {
+          ev.preventDefault();
+          openGofileFolder(id, game?.title || "");
+        });
+        a.removeAttribute("target");
+        a.href = "#";
+      }
+    });
+  }
 
   if(isAdmin){
     const kebabBtn=document.createElement("button");
@@ -1301,6 +1314,55 @@ async function openDownloadsModal(){
 
   openModalFragment(node);
 }
+async function openGofileFolder(id, title){
+  if(!id) return;
+  let files = [];
+  try{
+    const r = await fetch('/.netlify/functions/gofile?list=' + encodeURIComponent(id));
+    if(r.ok){
+      const j = await r.json();
+      files = Array.isArray(j.files) ? j.files : [];
+    }
+  }catch(err){ files = []; }
+
+  const node = document.createElement('div');
+  node.className = 'tw-modal gofile-modal';
+  node.innerHTML = `
+    <div class="tw-modal-backdrop"></div>
+    <div class="tw-modal-content">
+      <button class="tw-modal-close" aria-label="Cerrar">&times;</button>
+      <h2 class="tw-modal-title"></h2>
+      <div class="tw-modal-description"></div>
+    </div>`;
+  const titleEl = node.querySelector('.tw-modal-title');
+  if(titleEl) titleEl.textContent = title || 'Archivos';
+  const desc = node.querySelector('.tw-modal-description');
+  if(files.length){
+    const list = document.createElement('ul');
+    files.forEach(file => {
+      const li = document.createElement('li');
+      const link = document.createElement('a');
+      link.href = '#';
+      link.textContent = file.name || 'Archivo';
+      link.addEventListener('click', ev => {
+        ev.preventDefault();
+        downloadFromGofile({ id: file.id, name: file.name });
+      });
+      li.appendChild(link);
+      list.appendChild(li);
+    });
+    desc.appendChild(list);
+  } else {
+    desc.textContent = 'No hay archivos.';
+  }
+
+  const close = node.querySelector('.tw-modal-close');
+  const removeTrap = trapFocus(node);
+  const onEscape = e => { if (e.key === 'Escape') closeModal(node, removeTrap, onEscape); };
+  close?.addEventListener('click', () => closeModal(node, removeTrap, onEscape));
+
+  openModalFragment(node);
+}
 async function downloadFromGofile(item){
   try {
     const r = await fetch(`/.netlify/functions/gofile?id=${encodeURIComponent(item.id)}`);
@@ -1442,6 +1504,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
