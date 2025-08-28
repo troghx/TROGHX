@@ -58,6 +58,11 @@ function firstLinkFrom(html = "") {
   return m ? m[0] : null;
 }
 
+function gofileIdFrom(url = "") {
+  const m = String(url).match(/gofile\.io\/(?:download|d)\/([^/?#]+)/i);
+  return m ? m[1] : null;
+}
+
 function auth(event) {
   const auth = event.headers?.authorization || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
@@ -180,7 +185,7 @@ export async function handler(event) {
         const previewVideo = b.previewVideo || b.preview_video || null;
         const first_link   = b.first_link || firstLinkFrom(description) || null;
         const link_ok      = (typeof b.link_ok === "boolean") ? b.link_ok : null;
-        const gofile_id    = b.gofile_id || b.gofileId || b.gofile_folder || b.gofileFolder || null;
+        const gofile_id    = b.gofile_id || gofileIdFrom(first_link);
 
         if (!title || !image || !image_thumb || !description) {
           return json(400, { error: "missing fields" });
@@ -216,9 +221,6 @@ export async function handler(event) {
         const vThumb   = ("image_thumb"  in b || "imageThumb" in b) ? (b.image_thumb ?? b.imageThumb ?? null) : null;
         const vPrev    = ("previewVideo" in b || "preview_video" in b) ? (b.previewVideo ?? b.preview_video ?? null) : null;
         const vLinkOk  = ("link_ok"      in b) ? ((typeof b.link_ok === "boolean") ? b.link_ok : null) : null;
-        const vGofile  = ("gofile_id"    in b || "gofileId" in b || "gofile_folder" in b || "gofileFolder" in b)
-                          ? (b.gofile_id ?? b.gofileId ?? b.gofile_folder ?? b.gofileFolder ?? null)
-                          : null;
         const vBump    = b.bump === true;
 
         let vFirst;
@@ -228,6 +230,17 @@ export async function handler(event) {
           vFirst = firstLinkFrom(b.description || "") || null;
         } else {
           vFirst = null; // no cambia
+        }
+
+        let vGofile;
+        if ("gofile_id" in b) {
+          vGofile = b.gofile_id ?? null;
+        } else {
+          vGofile = null;
+        }
+        if (vGofile === null && vFirst) {
+          const gId = gofileIdFrom(vFirst);
+          if (gId) vGofile = gId;
         }
 
         await sql`
@@ -273,6 +286,7 @@ export async function handler(event) {
     return json(500, { error: "Internal Server Error", detail: String(err.message || err) });
   }
 }
+
 
 
 
