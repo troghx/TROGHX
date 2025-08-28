@@ -347,6 +347,12 @@ function extractFirstLink(html){
   return a ? a.getAttribute("href") : "";
 }
 
+function extractGofileId(url){
+  if(!url) return null;
+  const m=url.match(/gofile\.io\/(?:download|d)\/([^/?#]+)/i);
+  return m ? m[1] : null;
+}
+
 /* =========================
    Linkcheck (sólo al crear/editar)
    ========================= */
@@ -772,7 +778,6 @@ function initGameModal(initial = {}){
   const imageInput = fragment.querySelector(".new-game-image-file");
   const trailerFileInput = fragment.querySelector(".new-game-trailer-file");
   const trailerUrlInput  = fragment.querySelector(".new-game-trailer-url");
-  const gofileInput = fragment.querySelector(".new-game-gofile-id");
   const modalClose = fragment.querySelector(".tw-modal-close");
 
   const editorRoot = fragment.querySelector(".rich-editor");
@@ -788,10 +793,9 @@ function initGameModal(initial = {}){
 
   if(titleInput) titleInput.value = initial.title || "";
   if(initial.description) editorAPI.setHTML(initial.description);
-  if(gofileInput) gofileInput.value = initial.gofile_id || initial.gofileId || initial.gofile_folder || "";
   if(imageInput && initial.image !== undefined) imageInput.required=false;
 
-  return { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, gofileInput };
+  return { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel };
 }
 
 async function compressCoverAndThumb(imageFile){
@@ -808,14 +812,13 @@ async function readTrailerFile(trailerFile){
 }
 
 async function gatherGameData(refs, { requireImage=true } = {}){
-  const { titleInput, imageInput, trailerFileInput, editorAPI, catSel, gofileInput } = refs;
+  const { titleInput, imageInput, trailerFileInput, editorAPI, catSel } = refs;
 
   const title=(titleInput?.value||"").trim();
   const descHTML=editorAPI.getHTML();
   const imageFile=imageInput?.files?.[0] || null;
   const trailerFile=trailerFileInput?.files?.[0] || null;
   const category = catSel.querySelector(".cat-select")?.value || "game";
-  const gofile_id = (gofileInput?.value || "").trim() || null;
 
   if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return null; }
   if(requireImage && !imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return null; }
@@ -835,6 +838,8 @@ async function gatherGameData(refs, { requireImage=true } = {}){
   }
 
   const first_link = extractFirstLink(descHTML);
+  const plat = platformFromUrl(first_link || "");
+  const gofile_id = plat === "gofile" ? extractGofileId(first_link) : null;
   const link_ok = first_link ? await fetchLinkOk(first_link) : null;
 
   return { title, descHTML, coverDataUrl, thumbDataUrl, previewSrc, category, first_link, link_ok, gofile_id };
@@ -842,7 +847,7 @@ async function gatherGameData(refs, { requireImage=true } = {}){
 
 function openNewGameModal(){
   const refs = initGameModal();
-  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, gofileInput } = refs;
+  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel } = refs;
 
   const removeTrap=trapFocus(node);
   const onEscape=(e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
@@ -880,7 +885,7 @@ function openNewGameModal(){
 }
 function openEditGame(original){
   const refs = initGameModal(original);
-  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, gofileInput  } = refs;
+  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel  } = refs;
 
   let clearTrailerCb=null;
   {
@@ -1437,6 +1442,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
