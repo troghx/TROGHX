@@ -334,6 +334,7 @@ function insertLinkChip(editorArea){
   if(!text) return;
   let url=(prompt("Pega la URL del enlace:")||"").trim();
   if(!url) return;
+  if(!/^[a-z]+:\/\//i.test(url) && /^[A-Za-z0-9]{5,}$/.test(url)) url=`https://gofile.io/d/${url}`;
   if(!/^https?:\/\//i.test(url) && !url.startsWith("magnet:")) url="https://"+url;
   const plat=platformFromUrl(url);
   const html=`<a href="${url.replace(/"/g,"&quot;")}" target="_blank" rel="noopener" class="link-chip chip-${plat}"><span class="chip-dot"></span>${text.replace(/[<>]/g,"")}</a>`;
@@ -1436,6 +1437,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
