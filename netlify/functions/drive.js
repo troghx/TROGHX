@@ -1,3 +1,4 @@
+import { PassThrough } from "stream";
 import { GoogleAuth } from "google-auth-library";
 import { google } from "googleapis";
 import { neon, neonConfig } from "@neondatabase/serverless";
@@ -99,7 +100,9 @@ export async function handler(event) {
         };
         if (res.headers["content-length"]) headers["Content-Length"] = res.headers["content-length"];
         if (res.headers["content-range"]) headers["Content-Range"] = res.headers["content-range"];
-        return new Response(res.data, { status: res.status, headers });
+        const pass = new PassThrough();
+        res.data.pipe(pass);
+        return new Response(pass, { status: res.status, headers });
       } catch (err) {
         console.error("[drive dl]", err.message);
         return json(500, {
