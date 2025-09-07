@@ -1307,6 +1307,8 @@ function toggleDownloadsPanel(){
     document.body.appendChild(panel);
   }
 
+  const badge = document.querySelector('.yt-channel-badge');
+
   const render = () => {
     const desc = panel.querySelector('.downloads-content');
     desc.innerHTML = '';
@@ -1408,13 +1410,29 @@ function toggleDownloadsPanel(){
     render();
   };
 
+  const onOutside = ev => {
+    if(panel.contains(ev.target) || (badge && badge.contains(ev.target))) return;
+    panel.classList.remove('open');
+    document.removeEventListener('click', onOutside);
+    panel._outsideHandler = null;
+  };
+
   if(panel.classList.contains('open')){
     panel.classList.remove('open');
+    if(panel._outsideHandler) document.removeEventListener('click', panel._outsideHandler);
+    panel._outsideHandler = null;
     return;
   }
 
   render();
+  if(badge){
+    const rect = badge.getBoundingClientRect();
+    panel.style.left = (rect.right + 8) + 'px';
+    panel.style.bottom = (window.innerHeight - rect.bottom) + 'px';
+  }
   panel.classList.add('open');
+  panel._outsideHandler = onOutside;
+  document.addEventListener('click', onOutside);
 }
 ensureDownloadsBadge();
 async function openGofileFolder(id, title){
@@ -1730,6 +1748,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
