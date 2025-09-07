@@ -328,14 +328,14 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   width:300px;
   max-height:60vh;
   overflow:auto;
-  background: linear-gradient(135deg, #000000cb 0%, #2f1a30a9 100%);
+  background: linear-gradient(135deg, #00121dd8 0%, #2f1a30a9 100%);
   box-shadow:0 0 10px rgba(0, 0, 0, 0.555);
   transform-origin: bottom left;
   transform: scaleY(0);
   transition:transform .3s;
   padding:10px;
   border-top-right-radius:8px;
-  z-index:1000;
+  z-index:1200;
 }
 .downloads-panel.open{ transform: scaleY(1); }
 .downloads-panel .clear-history{
