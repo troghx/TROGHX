@@ -1470,11 +1470,16 @@ async function downloadFromDrive(input){
       const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
       if(!meta.ok) throw new Error('meta failed');
       const m = await meta.json();
-      if(!m.url) throw new Error('no url');
       const total = parseInt(m.size || '0', 10);
       const chunk = 2 * 1024 * 1024; // 2MB
       const count = total ? Math.ceil(total/chunk) : 1;
-      parts = Array.from({length:count}, (_,i)=>({ url:m.url, start:i*chunk, end: total?Math.min(total-1,(i+1)*chunk-1):undefined }));
+      parts = Array.from({length:count}, (_,i)=>{
+        const start = i*chunk;
+        const end = total ? Math.min(total-1,(i+1)*chunk-1) : undefined;
+        const qs = new URLSearchParams({ dl:id, start:String(start) });
+        if(end!=null) qs.set('end', String(end));
+        return { url:`/.netlify/functions/drive?${qs.toString()}`, start, end };
+      });
     }
 
     const controller = new AbortController();
@@ -1497,9 +1502,7 @@ async function downloadFromDrive(input){
 
     async function fetchPart(part, idx){
       if(dl.completed[idx]) return;
-      const headers={};
-      if(part.end!=null) headers.Range=`bytes=${part.start}-${part.end}`;
-      const res = await fetch(part.url, { headers, signal: controller.signal }).catch(err=>{ if(err.name==='AbortError') return null; throw err; });
+      const res = await fetch(part.url, { signal: controller.signal }).catch(err=>{ if(err.name==='AbortError') return null; throw err; });
       if(!res) return;
       const reader = res.body.getReader();
       const chunks=[];
@@ -1655,6 +1658,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
