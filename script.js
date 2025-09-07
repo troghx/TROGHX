@@ -1295,6 +1295,7 @@ function ensureDownloadsBadge(){
   return el;
 }
 function toggleDownloadsPanel(){
+  document.querySelector('.dl-tip')?.remove();
   let panel = document.getElementById('downloads-panel');
   if(!panel){
     panel = document.createElement('aside');
@@ -1538,6 +1539,19 @@ async function downloadFromDrive(input){
       if (i >= 0) activeDownloads.splice(i, 1);
     };
     activeDownloads.push(dl);
+    const badge = document.querySelector('.yt-channel-badge');
+    if (badge) {
+      document.querySelector('.dl-tip')?.remove();
+      const tip = document.createElement('div');
+      tip.className = 'dl-tip';
+      tip.textContent = 'Tu descarga ya está en progreso';
+      document.body.appendChild(tip);
+      const rect = badge.getBoundingClientRect();
+      const tipRect = tip.getBoundingClientRect();
+      tip.style.left = `${rect.right + 8}px`;
+      tip.style.top = `${rect.top + rect.height / 2 - tipRect.height / 2}px`;
+      setTimeout(() => tip.remove(), 4000);
+    }
 
     const stateKey = `tgx_drive_${id}`;
     try{
@@ -1748,6 +1762,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
