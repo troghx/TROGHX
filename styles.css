@@ -37,6 +37,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   background: rgba(17,20,25,.8); backdrop-filter: blur(12px);
   border-right: 1px solid rgba(255,255,255,.06);
   display: flex; flex-direction: column; gap: 12px; padding: 14px 10px;
+  z-index: 1100;
 }
 .nav-btn {
   appearance: none; border: 0; width: 52px; height: 52px;
@@ -812,6 +813,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0);
   border: 1px solid rgba(255,255,255,.07);
   background: #00000000;
+  z-index: 1200;
 }
 .yt-channel-badge img {
   display: block;
@@ -819,6 +821,28 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   height: 44px;
   object-fit: cover;
   pointer-events: none;
+}
+
+.dl-tip {
+  position: fixed;
+  padding: 6px 10px;
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 8px;
+  font-size: .9rem;
+  box-shadow: var(--shadow-soft);
+  pointer-events: none;
+  z-index: 1300;
+}
+.dl-tip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -6px;
+  transform: translateY(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: transparent var(--panel) transparent transparent;
 }
 
 /* ---------- Responsivo ---------- */
