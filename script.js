@@ -1327,12 +1327,21 @@ function renderDownloadsPanel(panel){
       speedEl.className = 'download-speed';
       speedEl.textContent = '0 MB/s';
       let shownSpeed = 0;
-      const cancelBtn = document.createElement('button');
-      cancelBtn.type = 'button';
-      cancelBtn.classList.add('cancel-btn');
-      cancelBtn.textContent = 'Cancelar';
-      cancelBtn.addEventListener('click', () => { dl.cancel && dl.cancel(); li.remove(); });
-      status.append(pct, speedEl, cancelBtn);
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      if (dl.status === 'paused') {
+        actionBtn.classList.add('resume-btn');
+        actionBtn.textContent = 'Continuar';
+        actionBtn.addEventListener('click', () => {
+          downloadFromDrive({ id: dl.id, name: dl.name, dl, resume: true });
+          renderDownloadsPanel();
+        });
+      } else {
+        actionBtn.classList.add('cancel-btn');
+        actionBtn.textContent = 'Cancelar';
+        actionBtn.addEventListener('click', () => { dl.cancel && dl.cancel(); li.remove(); });
+      }
+      status.append(pct, speedEl, actionBtn);
       li.append(name, prog, status);
       aList.appendChild(li);
       dl.onupdate = () => {
@@ -1444,7 +1453,6 @@ function toggleDownloadsPanel(){
 }
 document.addEventListener('DOMContentLoaded', resumeDriveDownloads);
 function resumeDriveDownloads(){
-  const pending = [];
   for(let i=0; i<localStorage.length; i++){
     const key = localStorage.key(i);
     if(!key || !key.startsWith('tgx_drive_')) continue;
@@ -1460,18 +1468,16 @@ function resumeDriveDownloads(){
         loaded: state.loaded || 0,
         progress: state.total ? state.loaded / state.total : 0,
         completed: state.completed.slice(),
-        status: 'downloading',
+        status: 'paused',
         speed: 0,
         onupdate: null,
         cancel: null
       };
       activeDownloads.push(dl);
-      pending.push({ id, name, dl });
     }catch(err){ /* ignore */ }
   }
-  if(pending.length){
+  if(activeDownloads.length){
     renderDownloadsPanel();
-    pending.forEach(it => downloadFromDrive({ id: it.id, name: it.name, dl: it.dl, resume:true }));
   }
 }
 ensureDownloadsBadge();
@@ -1587,12 +1593,12 @@ async function downloadFromDrive(input){
     const controller = new AbortController();
     const existing = input?.dl;
     const dl = existing || { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', speed:0, onupdate:null };
+    dl.status = 'downloading';
     dl.cancel = () => {
       controller.abort();
       if (writer && !writerClosed) try { writer.abort(); writerClosed = true; } catch (err) {}
-      dl.status = 'canceled';
-      const i = activeDownloads.indexOf(dl);
-      if (i >= 0) activeDownloads.splice(i, 1);
+      dl.status = 'paused';
+      persist();
       renderDownloadsPanel();
     };
     if(!existing) activeDownloads.push(dl);
@@ -1913,6 +1919,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
