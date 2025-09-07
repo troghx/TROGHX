@@ -81,11 +81,12 @@ export async function handler(event) {
       const fileId = String(p.dl).trim();
       const start = parseInt(p.start || "0", 10);
       const end = p.end != null ? parseInt(p.end, 10) : undefined;
+      const range = end != null ? `bytes=${start}-${end}` : `bytes=${start}-`;
       try {
         const res = await drive.files.get(
           { fileId, alt: "media" },
           {
-            headers: { Range: `bytes=${start}-${end}` },
+            headers: { Range: range },
             responseType: "stream",
           }
         );
