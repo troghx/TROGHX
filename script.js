@@ -1481,10 +1481,16 @@ async function downloadFromDrive(input){
         return { url:`/.netlify/functions/drive?${qs.toString()}`, start, end };
       });
     }
-
     const controller = new AbortController();
+    let writer;
     const dl = { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', onupdate:null };
-    dl.cancel = () => { controller.abort(); dl.status='canceled'; const i=activeDownloads.indexOf(dl); if(i>=0) activeDownloads.splice(i,1); };
+    dl.cancel = () => {
+      controller.abort();
+      if (writer) try { writer.abort(); } catch (err) {}
+      dl.status = 'canceled';
+      const i = activeDownloads.indexOf(dl);
+      if (i >= 0) activeDownloads.splice(i, 1);
+    };
     activeDownloads.push(dl);
 
     const stateKey = `tgx_drive_${id}`;
@@ -1495,7 +1501,8 @@ async function downloadFromDrive(input){
     }catch(err){ /* ignore */ }
 
     dl.total = parts.reduce((s,p)=> s + ((p.end!=null?p.end:p.start) - (p.start||0) + 1),0);
-    const buffers = new Array(parts.length);
+    const fileStream = streamSaver.createWriteStream(name, { size: dl.total });
+    writer = fileStream.getWriter();
 
     const persist=()=>{ try{ localStorage.setItem(stateKey, JSON.stringify({ completed: dl.completed, loaded: dl.loaded })); }catch(err){} };
     const emit=()=>{ dl.progress = dl.total ? dl.loaded / dl.total : 0; dl.onupdate && dl.onupdate(dl); };
@@ -1505,29 +1512,21 @@ async function downloadFromDrive(input){
       const res = await fetch(part.url, { signal: controller.signal }).catch(err=>{ if(err.name==='AbortError') return null; throw err; });
       if(!res) return;
       const reader = res.body.getReader();
-      const chunks=[];
       while(true){
         const {done,value} = await reader.read();
         if(done) break;
-        chunks.push(value);
+        await writer.write(value);
         dl.loaded += value.length;
         persist();
         emit();
       }
-      buffers[idx] = new Blob(chunks);
       dl.completed[idx] = true;
       persist();
     }
-
-    await Promise.all(parts.map(fetchPart));
-    const blob = new Blob(buffers.filter(Boolean), { type:'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 100);
+    for (let i = 0; i < parts.length; i++) {
+      await fetchPart(parts[i], i);
+    }
+    await writer.close();
     localStorage.removeItem(stateKey);
     dl.status='done';
     const idx = activeDownloads.indexOf(dl);
@@ -1658,6 +1657,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
