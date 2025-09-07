@@ -82,27 +82,30 @@ export async function handler(event) {
       const start = parseInt(p.start || "0", 10);
       const end = p.end != null ? parseInt(p.end, 10) : undefined;
       try {
-        const token = await auth.getAccessToken();
-        const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-        const range = `bytes=${start}-${end}`;
-        const res = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Range: range,
-          },
-        });
-        return new Response(res.body, {
+        const res = await drive.files.get(
+          { fileId, alt: "media" },
+          {
+            headers: { Range: `bytes=${start}-${end}` },
+            responseType: "stream",
+          }
+        );
+        if (res.status !== 206)
+          return json(res.status, { error: "download failed" });
+        return new Response(res.data, {
           status: res.status,
           headers: {
             "Access-Control-Allow-Origin": "*",
             "Content-Type": "application/octet-stream",
+            "Content-Length": res.headers["content-length"],
+            "Content-Range": res.headers["content-range"],
+            "Accept-Ranges": "bytes",
           },
         });
       } catch (err) {
-        console.error("[drive dl]", err);
+        console.error("[drive dl]", err.message);
         return json(500, {
           error: "download failed",
-          detail: String(err.message || err),
+          detail: err.message,
         });
       }
     }
