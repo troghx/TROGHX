@@ -82,7 +82,7 @@ export async function handler(event) {
       try {
         const file = await drive.files.get({
           fileId,
-          fields: "id,name",
+          fields: "id,name,size",
         });
         const name = file.data?.name || null;
         const token = await auth.getAccessToken();
@@ -103,7 +103,7 @@ export async function handler(event) {
           await sql`INSERT INTO downloads (file_id, name, ip) VALUES (${fileId}, ${name}, ${ip})`;
         }
 
-        return json(200, { url });
+        return json(200, { url, size: file.data.size });
       } catch (err) {
         console.error("[drive id]", err);
         return json(500, {
