@@ -1,6 +1,7 @@
 import { GoogleAuth } from "google-auth-library";
 import { google } from "googleapis";
 import { neon, neonConfig } from "@neondatabase/serverless";
+import { Readable } from "node:stream";
 import { json as baseJson } from "./utils.js";
 
 neonConfig.fetchConnectionCache = true;
@@ -76,7 +77,44 @@ export async function handler(event) {
       }
     }
 
-    // ---- GET DIRECT LINK ----
+    // ---- DOWNLOAD ----
+    if (p.dl) {
+      const fileId = String(p.dl).trim();
+      try {
+        const start = p.start != null ? parseInt(p.start, 10) : undefined;
+        const end = p.end != null ? parseInt(p.end, 10) : undefined;
+        const range =
+          start != null || end != null
+            ? `bytes=${start || 0}-${end != null ? end : ""}`
+            : undefined;
+        const res = await drive.files.get(
+          { fileId, alt: "media" },
+          {
+            responseType: "stream",
+            headers: range ? { Range: range } : undefined,
+          }
+        );
+        const headers = {
+          "Access-Control-Allow-Origin": "*",
+          "Content-Type": "application/octet-stream",
+        };
+        const len = res.headers["content-length"];
+        const crange = res.headers["content-range"];
+        if (len) headers["Content-Length"] = len;
+        if (crange) headers["Content-Range"] = crange;
+        // Convert Node stream to Web stream
+        const stream = Readable.toWeb(res.data);
+        return new Response(stream, { status: res.status, headers });
+      } catch (err) {
+        console.error("[drive dl]", err);
+        return json(500, {
+          error: "download failed",
+          detail: String(err.message || err),
+        });
+      }
+    }
+
+    // ---- GET FILE META ----
     if (p.id) {
       const fileId = String(p.id).trim();
       try {
@@ -85,12 +123,6 @@ export async function handler(event) {
           fields: "id,name,size",
         });
         const name = file.data?.name || null;
-        const token = await auth.getAccessToken();
-        if (!token) return json(500, { error: "auth failed" });
-        const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&access_token=${encodeURIComponent(
-          token
-        )}`;
-
         if (sql) {
           if (!schemaReady) {
             await ensureSchema();
@@ -103,7 +135,7 @@ export async function handler(event) {
           await sql`INSERT INTO downloads (file_id, name, ip) VALUES (${fileId}, ${name}, ${ip})`;
         }
 
-        return json(200, { url, size: file.data.size });
+        return json(200, { size: file.data.size });
       } catch (err) {
         console.error("[drive id]", err);
         return json(500, {
