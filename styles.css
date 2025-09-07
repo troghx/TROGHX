@@ -317,6 +317,8 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .download-item{ display:flex; flex-direction:column; gap:4px; }
 .download-progress{ width:100%; }
 .download-status{ display:flex; align-items:center; gap:8px; font-size:.9rem; }
+.download-status .download-speed{ font-size:.8rem; color:#aaa; }
+.download-status .cancel-btn{ padding:4px 10px; border:none; border-radius:8px; background:linear-gradient(45deg,#ff00ff,#00ffff); color:#0b0d10; font-weight:700; cursor:pointer; }
 .downloads-modal .active{ color:var(--ring); }
 .downloads-panel{
   position:fixed;
