@@ -1563,7 +1563,7 @@ async function downloadFromDrive(input){
       makeUrl = (start, end) =>
         `https://www.googleapis.com/drive/v3/files/${id}?alt=media`;
       const total = parseInt(m.size || '0', 10);
-      const chunk = 2 * 1024 * 1024; // 2MB
+      const chunk = 8 * 1024 * 1024; // 8MB
       const count = total ? Math.ceil(total/chunk) : 1;
       parts = Array.from({length:count}, (_,i)=>{
         const start = i*chunk;
@@ -1694,12 +1694,13 @@ async function downloadFromDrive(input){
           if(!res.ok) throw new Error(`HTTP ${res.status}`);
           const reader = res.body.getReader();
           const chunks = [];
+          let lastPersist = 0;
           while(true){
             const {done,value} = await reader.read();
             if(done) break;
             chunks.push(value);
             dl.loaded += value.length;
-            persist();
+            if (performance.now() - lastPersist > 1000) { persist(); lastPersist = performance.now(); }
             emit();
           }
           dl.completed[idx] = true;
@@ -1732,7 +1733,7 @@ async function downloadFromDrive(input){
       }
     }
     let pending = parts.map((_, i) => i).filter(i => !dl.completed[i]);
-    const concurrency = 4;
+    const concurrency = Math.min(8, navigator.hardwareConcurrency || 4);
     const maxRounds = 5;
     let round = 0;
     while (pending.length && round < maxRounds) {
@@ -1912,6 +1913,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
