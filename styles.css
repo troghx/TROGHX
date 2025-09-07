@@ -314,6 +314,10 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .gofile-modal .tw-modal-content{
   max-width: 600px;
 }
+.download-item{ display:flex; flex-direction:column; gap:4px; }
+.download-progress{ width:100%; }
+.download-status{ display:flex; align-items:center; gap:8px; font-size:.9rem; }
+.downloads-modal .active{ color:var(--ring); }
 .gofile-modal ul{
   list-style: none;
   padding: 0;
