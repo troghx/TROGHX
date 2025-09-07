@@ -1513,20 +1513,22 @@ async function downloadFromDrive(input){
     let parts = Array.isArray(input) ? input : input?.parts;
     let id    = Array.isArray(input) ? input[0]?.id : input?.id;
     const name = Array.isArray(input) ? (input[0]?.name || 'Archivo') : (input?.name || 'Archivo');
+    let token, makeUrl;
     if(!parts){
       if(!id) throw new Error('missing id');
       const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
       if(!meta.ok) throw new Error('meta failed');
       const m = await meta.json();
+      token = m.token;
+      makeUrl = (start, end) =>
+        `https://www.googleapis.com/drive/v3/files/${id}?alt=media`;
       const total = parseInt(m.size || '0', 10);
       const chunk = 2 * 1024 * 1024; // 2MB
       const count = total ? Math.ceil(total/chunk) : 1;
       parts = Array.from({length:count}, (_,i)=>{
         const start = i*chunk;
         const end = total ? Math.min(total-1,(i+1)*chunk-1) : undefined;
-        const endParam = end!=null ? `&end=${end}` : '';
-        const url = `/.netlify/functions/drive?dl=${encodeURIComponent(id)}&start=${start}${endParam}`;
-        return { url, start, end };
+        return { start, end };
       });
     }
     const controller = new AbortController();
@@ -1580,7 +1582,8 @@ async function downloadFromDrive(input){
       const maxRetries = 3;
       for(let attempt=0; attempt<maxRetries; attempt++){
         try{
-          const res = await fetch(part.url, { signal: controller.signal });
+          const headers = { Authorization: `Bearer ${token}`, Range: `bytes=${part.start}-${part.end}` };
+          const res = await fetch(makeUrl(part.start, part.end), { headers, signal: controller.signal });
           if(!res.ok) throw new Error(`HTTP ${res.status}`);
           const reader = res.body.getReader();
           const chunks = [];
@@ -1762,6 +1765,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
