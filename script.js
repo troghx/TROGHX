@@ -1778,8 +1778,10 @@ async function downloadFromDrive(input){
         await writer.write(chunk);
       }
     }
-      await writer.close();
-      writerClosed = true;
+      if (!writerClosed) {
+        await writer.close();
+        writerClosed = true;
+      }
       if (db) {
         try {
           await new Promise((resolve) => {
@@ -1803,7 +1805,7 @@ async function downloadFromDrive(input){
     renderDownloadsPanel();
   } catch(err){
     console.error('[downloadFromDrive]', err);
-    if(writer && !writerClosed){ try{ await writer.abort(); }catch(_){ } }
+    if(writer && !writerClosed){ try{ await writer.abort(); }catch(_){ } writerClosed = true; }
     alert('No se pudo descargar');
     renderDownloadsPanel();
   }
@@ -1928,6 +1930,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
