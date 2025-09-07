@@ -77,41 +77,6 @@ export async function handler(event) {
       }
     }
 
-        // ---- DOWNLOAD CHUNK ----
-    if (p.dl) {
-      const fileId = String(p.dl).trim();
-      const start = parseInt(p.start || "0", 10);
-      const end = p.end != null ? parseInt(p.end, 10) : undefined;
-      const range = end != null ? `bytes=${start}-${end}` : `bytes=${start}-`;
-      try {
-        const res = await drive.files.get(
-          { fileId, alt: "media" },
-          {
-            headers: { Range: range },
-            responseType: "stream",
-          }
-        );
-        if (res.status !== 206)
-          return json(res.status, { error: "download failed" });
-        const headers = {
-          "Access-Control-Allow-Origin": "*",
-          "Content-Type": "application/octet-stream",
-          "Accept-Ranges": "bytes",
-        };
-        if (res.headers["content-length"]) headers["Content-Length"] = res.headers["content-length"];
-        if (res.headers["content-range"]) headers["Content-Range"] = res.headers["content-range"];
-        const pass = new PassThrough();
-        res.data.pipe(pass);
-        return new Response(pass, { status: res.status, headers });
-      } catch (err) {
-        console.error("[drive dl]", err.message);
-        return json(500, {
-          error: "download failed",
-          detail: err.message,
-        });
-      }
-    }
-
     // ---- GET FILE META ----
     if (p.id) {
       const fileId = String(p.id).trim();
