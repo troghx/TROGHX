@@ -1290,104 +1290,109 @@ function ensureDownloadsBadge(){
     el.appendChild(img);
     rail.appendChild(el);
   }
-  el.onclick = openDownloadsModal;
+  el.onclick = toggleDownloadsPanel;
   return el;
 }
+function toggleDownloadsPanel(){
+  let panel = document.getElementById('downloads-panel');
+  if(!panel){
+    panel = document.createElement('aside');
+    panel.id = 'downloads-panel';
+    panel.className = 'downloads-panel';
+    panel.innerHTML = `
+      <h2>Descargas</h2>
+      <button type="button" class="clear-history">Limpiar historial</button>
+      <div class="downloads-content"></div>`;
+    document.body.appendChild(panel);
+  }
 
-async function openDownloadsModal(){
-  let downloads = [];
-  try{
-    const r = await fetch('/.netlify/functions/gofile?history=1');
-    if(r.ok){ const j = await r.json(); downloads = Array.isArray(j.downloads)? j.downloads : []; }
-  }catch(err){ downloads = []; }
-  if(!downloads.length){
+  const render = () => {
+    const desc = panel.querySelector('.downloads-content');
+    desc.innerHTML = '';
+    let downloads = [];
     try{ downloads = JSON.parse(localStorage.getItem('tgx_downloads') || '[]'); }
     catch(err){ downloads = []; }
-  }
-  const node = document.createElement('div');
-  node.className = 'tw-modal downloads-modal';
-  node.innerHTML = `
-    <div class="tw-modal-backdrop"></div>
-    <div class="tw-modal-content">
-      <button class="tw-modal-close" aria-label="Cerrar">&times;</button>
-      <h2 class="tw-modal-title">Descargas</h2>
-      <div class="tw-modal-description"></div>
-    </div>`;
 
-  const desc = node.querySelector('.tw-modal-description');
-  if (activeDownloads.length) {
-    const aTitle = document.createElement('h3');
-    aTitle.textContent = 'En progreso';
-    desc.appendChild(aTitle);
-    const aList = document.createElement('ul');
-    activeDownloads.forEach(dl => {
-      const li = document.createElement('li');
-      li.className = 'download-item active';
-      const name = document.createElement('strong');
-      name.textContent = dl.name || 'Archivo';
-      const prog = document.createElement('progress');
-      prog.className = 'download-progress';
-      prog.max = dl.total || 1;
-      prog.value = dl.loaded;
-      const status = document.createElement('div');
-      status.className = 'download-status';
-      const pct = document.createElement('span');
-      pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
-      const cancelBtn = document.createElement('button');
-      cancelBtn.type = 'button';
-      cancelBtn.textContent = 'Cancelar';
-      cancelBtn.addEventListener('click', () => { dl.cancel && dl.cancel(); li.remove(); });
-      status.append(pct, cancelBtn);
-      li.append(name, prog, status);
-      aList.appendChild(li);
-      dl.onupdate = () => {
+    if (activeDownloads.length) {
+      const aTitle = document.createElement('h3');
+      aTitle.textContent = 'En progreso';
+      desc.appendChild(aTitle);
+      const aList = document.createElement('ul');
+      activeDownloads.forEach(dl => {
+        const li = document.createElement('li');
+        li.className = 'download-item active';
+        const name = document.createElement('strong');
+        name.textContent = dl.name || 'Archivo';
+        const prog = document.createElement('progress');
+        prog.className = 'download-progress';
         prog.max = dl.total || 1;
         prog.value = dl.loaded;
+        const status = document.createElement('div');
+        status.className = 'download-status';
+        const pct = document.createElement('span');
         pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
-      };
-    });
-    desc.appendChild(aList);
-  }
-
-  if (downloads.length) {
-    if(activeDownloads.length){
-      const hTitle = document.createElement('h3');
-      hTitle.textContent = 'Historial';
-      desc.appendChild(hTitle);
-    }
-    const list = document.createElement('ul');
-    downloads.forEach(d => {
-      const li = document.createElement('li');
-      li.className = 'download-item';
-      const name = document.createElement('strong');
-      name.textContent = d.name || 'Archivo';
-      const date = document.createElement('span');
-      const dt = d.created_at || d.date;
-      date.textContent = dt ? ` – ${new Date(dt).toLocaleString()} – ` : ' ';
-      const status = document.createElement('div');
-      status.className = 'download-status';
-      const retry = document.createElement('button');
-      retry.type = 'button';
-      retry.textContent = 'Reintentar';
-      retry.addEventListener('click', ev => {
-        ev.preventDefault();
-        downloadFromGofile(d);
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = 'Cancelar';
+        cancelBtn.addEventListener('click', () => { dl.cancel && dl.cancel(); li.remove(); });
+        status.append(pct, cancelBtn);
+        li.append(name, prog, status);
+        aList.appendChild(li);
+        dl.onupdate = () => {
+          prog.max = dl.total || 1;
+          prog.value = dl.loaded;
+          pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
+        };
       });
-      status.appendChild(retry);
-      li.append(name, date, status);
-      list.appendChild(li);
-    });
-    desc.appendChild(list);
-  } else if(!activeDownloads.length) {
-    desc.textContent = 'No hay descargas.';
+      desc.appendChild(aList);
+    }
+
+    if (downloads.length) {
+      if(activeDownloads.length){
+        const hTitle = document.createElement('h3');
+        hTitle.textContent = 'Historial';
+        desc.appendChild(hTitle);
+      }
+      const list = document.createElement('ul');
+      downloads.forEach(d => {
+        const li = document.createElement('li');
+        li.className = 'download-item';
+        const name = document.createElement('strong');
+        name.textContent = d.name || 'Archivo';
+        const date = document.createElement('span');
+        const dt = d.created_at || d.date;
+        date.textContent = dt ? ` – ${new Date(dt).toLocaleString()} – ` : ' ';
+        const status = document.createElement('div');
+        status.className = 'download-status';
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.textContent = 'Reintentar';
+        retry.addEventListener('click', ev => {
+          ev.preventDefault();
+          downloadFromGofile(d);
+        });
+        status.appendChild(retry);
+        li.append(name, date, status);
+        list.appendChild(li);
+      });
+      desc.appendChild(list);
+    } else if(!activeDownloads.length) {
+      desc.textContent = 'No hay descargas.';
+    }
+  };
+
+  panel.querySelector('.clear-history').onclick = () => {
+    localStorage.removeItem('tgx_downloads');
+    render();
+  };
+
+  if(panel.classList.contains('open')){
+    panel.classList.remove('open');
+    return;
   }
 
-  const close = node.querySelector('.tw-modal-close');
-  const removeTrap = trapFocus(node);
-  const onEscape = e => { if (e.key === 'Escape') closeModal(node, removeTrap, onEscape); };
-  close?.addEventListener('click', () => closeModal(node, removeTrap, onEscape));
-
-  openModalFragment(node);
+  render();
+  panel.classList.add('open');
 }
 ensureDownloadsBadge();
 async function openGofileFolder(id, title){
@@ -1701,6 +1706,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
