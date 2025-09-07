@@ -1364,6 +1364,9 @@ function toggleDownloadsPanel(){
       items.forEach(d => {
         const li = document.createElement('li');
         li.className = 'download-item';
+        const platform = d.platform || (d.url ? 'gofile' : 'drive');
+        d.platform = platform;
+        li.dataset.platform = platform;
         const name = document.createElement('strong');
         name.textContent = d.name || 'Archivo';
         const date = document.createElement('span');
@@ -1376,7 +1379,8 @@ function toggleDownloadsPanel(){
         retry.textContent = 'Reintentar';
         retry.addEventListener('click', ev => {
           ev.preventDefault();
-          downloadFromGofile(d);
+          if (d.platform === 'drive') downloadFromDrive({ id: d.id, name: d.name });
+          else downloadFromGofile(d);
         });
         status.appendChild(retry);
         li.append(name, date, status);
@@ -1471,7 +1475,7 @@ async function downloadFromGofile(item){
 
     try{
       const hist = JSON.parse(localStorage.getItem('tgx_downloads') || '[]');
-      hist.unshift({ id:item.id, name:item.name||item.title||null, date:Date.now(), url:data.url });
+      hist.unshift({ id:item.id, name:item.name||item.title||null, date:Date.now(), url:data.url, platform:'gofile' });
       hist.splice(50);
       localStorage.setItem('tgx_downloads', JSON.stringify(hist));
     }catch(err){ /* ignore */ }
@@ -1593,7 +1597,7 @@ async function downloadFromDrive(input){
     writerClosed = true;
     localStorage.removeItem(stateKey);
     const hist = JSON.parse(localStorage.getItem('tgx_downloads')||'[]');
-    hist.unshift({ id, name, date: Date.now() });
+    hist.unshift({ id, name, date: Date.now(), platform:'drive' });
     hist.splice(50);
     localStorage.setItem('tgx_downloads', JSON.stringify(hist));
     dl.status='done';
@@ -1726,6 +1730,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
