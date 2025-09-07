@@ -99,7 +99,7 @@ export async function handler(event) {
         }
 
         const token = await auth.getAccessToken();
-        return json(200, { size: file.data.size, token });
+        return json(200, { name: file.data.name, size: file.data.size, token });
       } catch (err) {
         console.error("[drive id]", err);
         return json(500, {
