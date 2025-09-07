@@ -83,7 +83,7 @@ export async function handler(event) {
       try {
         const file = await drive.files.get({
           fileId,
-          fields: "id,name,size",
+          fields: "id,name,size,mimeType",
         });
         const name = file.data?.name || null;
         if (sql) {
@@ -99,7 +99,12 @@ export async function handler(event) {
         }
 
         const token = await auth.getAccessToken();
-        return json(200, { name: file.data.name, size: file.data.size, token });
+        return json(200, {
+          name: file.data.name,
+          size: file.data.size,
+          mimeType: file.data.mimeType,
+          token,
+        });
       } catch (err) {
         console.error("[drive id]", err);
         return json(500, {
