@@ -76,6 +76,37 @@ export async function handler(event) {
       }
     }
 
+        // ---- DOWNLOAD CHUNK ----
+    if (p.dl) {
+      const fileId = String(p.dl).trim();
+      const start = parseInt(p.start || "0", 10);
+      const end = p.end != null ? parseInt(p.end, 10) : undefined;
+      try {
+        const token = await auth.getAccessToken();
+        const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+        const range = `bytes=${start}-${end}`;
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Range: range,
+          },
+        });
+        return new Response(res.body, {
+          status: res.status,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "application/octet-stream",
+          },
+        });
+      } catch (err) {
+        console.error("[drive dl]", err);
+        return json(500, {
+          error: "download failed",
+          detail: String(err.message || err),
+        });
+      }
+    }
+
     // ---- GET FILE META ----
     if (p.id) {
       const fileId = String(p.id).trim();
