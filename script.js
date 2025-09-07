@@ -1620,13 +1620,16 @@ async function downloadFromDrive(input){
     dl.completed = Array(parts.length).fill(false);
     dl.loaded = 0;
     const results = new Array(parts.length);
+    let saved = {};
     try {
-      const saved = JSON.parse(localStorage.getItem(stateKey)||'{}');
+      saved = JSON.parse(localStorage.getItem(stateKey)||'{}');
       if (Array.isArray(saved.completed) && saved.partCount === parts.length) {
         dl.completed = saved.completed.slice(0, parts.length);
-        dl.loaded = saved.loaded || dl.loaded;
+      } else {
+        saved.completed = [];
       }
-    } catch (_) {}
+    } catch (_) { saved = { completed: [] }; }
+    dl.loaded = saved.loaded || 0;
     if (db) {
       for (let i = 0; i < parts.length; i++) {
         try {
@@ -1639,11 +1642,9 @@ async function downloadFromDrive(input){
           });
           if (rec && rec.chunks) {
             results[i] = rec.chunks.map(b => new Uint8Array(b));
-            dl.completed[i] = true;
-            dl.loaded += rec.size || results[i].reduce((s, ch) => s + ch.byteLength, 0);
-          } else {
-            dl.completed[i] = false;
           }
+          dl.completed[i] = !!rec;
+          dl.loaded += saved.completed[i] ? 0 : (rec?.size || 0);
         } catch (_) { dl.completed[i] = false; }
       }
     }
@@ -1919,6 +1920,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
