@@ -1563,6 +1563,14 @@ async function downloadFromDrive(input){
     const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
     if(!meta.ok) throw new Error('meta failed');
     const m = await meta.json();
+    if (m.mimeType === 'application/vnd.google-apps.folder') {
+      const r = await fetch(`/.netlify/functions/drive?list=${id}`);
+      const data = await r.json();
+      for (const f of data.files) {
+        await downloadFromDrive({ id: f.id, name: f.name });
+      }
+      return;
+    }
     const name = m.name || input?.name || 'archivo.bin';
     token = m.token;
     makeUrl = (start, end) =>
@@ -1920,6 +1928,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
