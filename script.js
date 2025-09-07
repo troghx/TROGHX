@@ -1338,6 +1338,7 @@ function toggleDownloadsPanel(){
         const speedEl = document.createElement('span');
         speedEl.className = 'download-speed';
         speedEl.textContent = '0 MB/s';
+        let shownSpeed = 0;
         const cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
         cancelBtn.classList.add('cancel-btn');
@@ -1350,7 +1351,9 @@ function toggleDownloadsPanel(){
           prog.max = dl.total || 1;
           prog.value = dl.loaded;
           pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
-          speedEl.textContent = (dl.speed/1_000_000).toFixed(2)+' MB/s';
+          const current = dl.speed / 1_000_000;
+          shownSpeed = shownSpeed ? (shownSpeed * 0.5 + current * 0.5) : current;
+          speedEl.textContent = shownSpeed.toFixed(2)+' MB/s';
         };
       });
       desc.appendChild(aList);
@@ -1567,11 +1570,25 @@ async function downloadFromDrive(input){
     writer = fileStream.getWriter();
 
     let lastTime = performance.now(), lastLoaded = dl.loaded;
+    const speeds = new Array(5).fill(0);
+    let speedIdx = 0;
+    let speedCount = 0;
+    let speedSum = 0;
     const persist=()=>{ try{ localStorage.setItem(stateKey, JSON.stringify({ completed: dl.completed, loaded: dl.loaded })); }catch(err){} };
     const emit=()=>{
       dl.progress = dl.total ? dl.loaded / dl.total : 0;
       const now = performance.now();
-      dl.speed = (dl.loaded - lastLoaded) / ((now - lastTime)/1000);
+      const delta = Math.max(now - lastTime, 1);
+      const current = (dl.loaded - lastLoaded) / (delta/1000);
+      if (speedCount < speeds.length) {
+        speedCount++;
+      } else {
+        speedSum -= speeds[speedIdx];
+      }
+      speeds[speedIdx] = current;
+      speedSum += current;
+      speedIdx = (speedIdx + 1) % speeds.length;
+      dl.speed = speedSum / speedCount;
       lastTime = now;
       lastLoaded = dl.loaded;
       dl.onupdate && dl.onupdate(dl);
@@ -1780,6 +1797,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
