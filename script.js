@@ -1489,10 +1489,11 @@ async function downloadFromDrive(input){
     }
     const controller = new AbortController();
     let writer;
+    let writerClosed = false;
     const dl = { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', onupdate:null };
     dl.cancel = () => {
       controller.abort();
-      if (writer) try { writer.abort(); } catch (err) {}
+      if (writer && !writerClosed) try { writer.abort(); writerClosed = true; } catch (err) {}
       dl.status = 'canceled';
       const i = activeDownloads.indexOf(dl);
       if (i >= 0) activeDownloads.splice(i, 1);
@@ -1519,21 +1520,36 @@ async function downloadFromDrive(input){
         Authorization: `Bearer ${token}`,
         Range: `bytes=${part.start}-${part.end}`
       };
-      const res = await fetch(part.url, { signal: controller.signal, headers }).catch(err=>{ if(err.name==='AbortError') return null; throw err; });
-      if(!res) return [];
-      const reader = res.body.getReader();
-      const chunks = [];
-      while(true){
-        const {done,value} = await reader.read();
-        if(done) break;
-        chunks.push(value);
-        dl.loaded += value.length;
-        persist();
-        emit();
+      const maxRetries = 3;
+      for(let attempt=0; attempt<maxRetries; attempt++){
+        try{
+          const res = await fetch(part.url, { signal: controller.signal, headers });
+          if(!res.ok) throw new Error(`HTTP ${res.status}`);
+          const reader = res.body.getReader();
+          const chunks = [];
+          while(true){
+            const {done,value} = await reader.read();
+            if(done) break;
+            chunks.push(value);
+            dl.loaded += value.length;
+            persist();
+            emit();
+          }
+          dl.completed[idx] = true;
+          persist();
+          return chunks;
+        }catch(err){
+          if(err.name === 'AbortError') return [];
+          if(attempt === maxRetries - 1){
+            dl.status = 'error';
+            try{ controller.abort(); }catch(_){ }
+            if(writer && !writerClosed){ try{ await writer.abort(); }catch(_){ } writerClosed = true; }
+            throw err;
+          }
+          const delay = Math.pow(2, attempt) * 500;
+          await new Promise(r => setTimeout(r, delay));
+        }
       }
-      dl.completed[idx] = true;
-      persist();
-      return chunks;
     }
     const concurrency = 4;
     let nextIndex = 0;
@@ -1553,6 +1569,7 @@ async function downloadFromDrive(input){
       }
     }
     await writer.close();
+    writerClosed = true;
     localStorage.removeItem(stateKey);
     dl.status='done';
     const idx = activeDownloads.indexOf(dl);
@@ -1560,6 +1577,7 @@ async function downloadFromDrive(input){
     emit();
   } catch(err){
     console.error('[downloadFromDrive]', err);
+    if(writer && !writerClosed){ try{ await writer.abort(); }catch(_){ } }
     alert('No se pudo descargar');
   }
 }
@@ -1683,6 +1701,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
