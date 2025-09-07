@@ -1465,21 +1465,27 @@ async function downloadFromDrive(input){
     let parts = Array.isArray(input) ? input : input?.parts;
     let id    = Array.isArray(input) ? input[0]?.id : input?.id;
     const name = Array.isArray(input) ? (input[0]?.name || 'Archivo') : (input?.name || 'Archivo');
+    let token = Array.isArray(input) ? input[0]?.token : input?.token;
     if(!parts){
       if(!id) throw new Error('missing id');
       const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
       if(!meta.ok) throw new Error('meta failed');
       const m = await meta.json();
       const total = parseInt(m.size || '0', 10);
+      token = m.token;
       const chunk = 2 * 1024 * 1024; // 2MB
       const count = total ? Math.ceil(total/chunk) : 1;
+      const baseUrl = `https://www.googleapis.com/drive/v3/files/${id}?alt=media`;
       parts = Array.from({length:count}, (_,i)=>{
         const start = i*chunk;
         const end = total ? Math.min(total-1,(i+1)*chunk-1) : undefined;
-        const qs = new URLSearchParams({ dl:id, start:String(start) });
-        if(end!=null) qs.set('end', String(end));
-        return { url:`/.netlify/functions/drive?${qs.toString()}`, start, end };
+        return { url: baseUrl, start, end };
       });
+    }
+    if(!token){
+      if(!id) throw new Error('missing token');
+      const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
+      if(meta.ok){ const m2 = await meta.json(); token = m2.token; }
     }
     const controller = new AbortController();
     let writer;
@@ -1509,7 +1515,11 @@ async function downloadFromDrive(input){
 
     async function fetchPart(part, idx){
       if(dl.completed[idx]) return;
-      const res = await fetch(part.url, { signal: controller.signal }).catch(err=>{ if(err.name==='AbortError') return null; throw err; });
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        Range: `bytes=${part.start}-${part.end}`
+      };
+      const res = await fetch(part.url, { signal: controller.signal, headers }).catch(err=>{ if(err.name==='AbortError') return null; throw err; });
       if(!res) return;
       const reader = res.body.getReader();
       while(true){
@@ -1657,6 +1667,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
