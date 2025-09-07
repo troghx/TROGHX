@@ -1332,17 +1332,22 @@ function toggleDownloadsPanel(){
         status.className = 'download-status';
         const pct = document.createElement('span');
         pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
+        const speedEl = document.createElement('span');
+        speedEl.className = 'download-speed';
+        speedEl.textContent = '0 MB/s';
         const cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
+        cancelBtn.classList.add('cancel-btn');
         cancelBtn.textContent = 'Cancelar';
         cancelBtn.addEventListener('click', () => { dl.cancel && dl.cancel(); li.remove(); });
-        status.append(pct, cancelBtn);
+        status.append(pct, speedEl, cancelBtn);
         li.append(name, prog, status);
         aList.appendChild(li);
         dl.onupdate = () => {
           prog.max = dl.total || 1;
           prog.value = dl.loaded;
           pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
+          speedEl.textContent = (dl.speed/1_000_000).toFixed(2)+' MB/s';
         };
       });
       desc.appendChild(aList);
@@ -1508,7 +1513,7 @@ async function downloadFromDrive(input){
     const controller = new AbortController();
     let writer;
     let writerClosed = false;
-    const dl = { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', onupdate:null };
+    const dl = { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', speed:0, onupdate:null };
     dl.cancel = () => {
       controller.abort();
       if (writer && !writerClosed) try { writer.abort(); writerClosed = true; } catch (err) {}
@@ -1529,8 +1534,16 @@ async function downloadFromDrive(input){
     const fileStream = streamSaver.createWriteStream(name, { size: dl.total });
     writer = fileStream.getWriter();
 
+    let lastTime = performance.now(), lastLoaded = dl.loaded;
     const persist=()=>{ try{ localStorage.setItem(stateKey, JSON.stringify({ completed: dl.completed, loaded: dl.loaded })); }catch(err){} };
-    const emit=()=>{ dl.progress = dl.total ? dl.loaded / dl.total : 0; dl.onupdate && dl.onupdate(dl); };
+    const emit=()=>{
+      dl.progress = dl.total ? dl.loaded / dl.total : 0;
+      const now = performance.now();
+      dl.speed = (dl.loaded - lastLoaded) / ((now - lastTime)/1000);
+      lastTime = now;
+      lastLoaded = dl.loaded;
+      dl.onupdate && dl.onupdate(dl);
+    };
 
     async function fetchPart(part, idx){
       if(dl.completed[idx]) return [];
@@ -1719,6 +1732,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
