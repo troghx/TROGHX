@@ -1611,16 +1611,31 @@ async function downloadFromDrive(input){
         }
       }
     }
+    let pending = parts.map((_, i) => i).filter(i => !dl.completed[i]);
     const concurrency = 4;
-    let nextIndex = 0;
+    const maxRounds = 5;
     const results = new Array(parts.length);
-    const workers = Array.from({ length: concurrency }, async () => {
-      while(nextIndex < parts.length){
-        const idx = nextIndex++;
-        results[idx] = await fetchPart(parts[idx], idx);
-      }
-    });
-    await Promise.all(workers);
+    let round = 0;
+    while (pending.length && round < maxRounds) {
+      const current = pending;
+      pending = [];
+      await Promise.all(Array.from({ length: concurrency }, async () => {
+        while (current.length) {
+          const idx = current.shift();
+          try { results[idx] = await fetchPart(parts[idx], idx); }
+          catch { pending.push(idx); }
+        }
+      }));
+      round++;
+    }
+    if (pending.length) {
+      dl.status = 'error';
+      if(writer && !writerClosed){ try{ await writer.abort(); }catch(_){ } writerClosed = true; }
+      const i = activeDownloads.indexOf(dl);
+      if(i>=0) activeDownloads.splice(i,1);
+      emit();
+      return;
+    }
     for (let i = 0; i < results.length; i++) {
       const partChunks = results[i];
       if(!partChunks) continue;
@@ -1765,6 +1780,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
