@@ -1514,27 +1514,43 @@ async function downloadFromDrive(input){
     const emit=()=>{ dl.progress = dl.total ? dl.loaded / dl.total : 0; dl.onupdate && dl.onupdate(dl); };
 
     async function fetchPart(part, idx){
-      if(dl.completed[idx]) return;
+      if(dl.completed[idx]) return [];
       const headers = {
         Authorization: `Bearer ${token}`,
         Range: `bytes=${part.start}-${part.end}`
       };
       const res = await fetch(part.url, { signal: controller.signal, headers }).catch(err=>{ if(err.name==='AbortError') return null; throw err; });
-      if(!res) return;
+      if(!res) return [];
       const reader = res.body.getReader();
+      const chunks = [];
       while(true){
         const {done,value} = await reader.read();
         if(done) break;
-        await writer.write(value);
+        chunks.push(value);
         dl.loaded += value.length;
         persist();
         emit();
       }
       dl.completed[idx] = true;
       persist();
+      return chunks;
     }
-    for (let i = 0; i < parts.length; i++) {
-      await fetchPart(parts[i], i);
+    const concurrency = 4;
+    let nextIndex = 0;
+    const results = new Array(parts.length);
+    const workers = Array.from({ length: concurrency }, async () => {
+      while(nextIndex < parts.length){
+        const idx = nextIndex++;
+        results[idx] = await fetchPart(parts[idx], idx);
+      }
+    });
+    await Promise.all(workers);
+    for (let i = 0; i < results.length; i++) {
+      const partChunks = results[i];
+      if(!partChunks) continue;
+      for (const chunk of partChunks) {
+        await writer.write(chunk);
+      }
     }
     await writer.close();
     localStorage.removeItem(stateKey);
@@ -1667,6 +1683,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
