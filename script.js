@@ -1534,6 +1534,19 @@ async function downloadFromDrive(input){
         return { start, end };
       });
     }
+    const db = await new Promise((resolve) => {
+      try {
+        const req = indexedDB.open('tgx_drive_chunks', 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('chunks')) {
+            db.createObjectStore('chunks', { keyPath: ['id', 'partIndex'] });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      } catch (_) { resolve(null); }
+    });
     const controller = new AbortController();
     const dl = { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', speed:0, onupdate:null };
     dl.cancel = () => {
@@ -1559,11 +1572,35 @@ async function downloadFromDrive(input){
     }
 
     const stateKey = `tgx_drive_${id}`;
-    try{
+    dl.completed = Array(parts.length).fill(false);
+    dl.loaded = 0;
+    const results = new Array(parts.length);
+    try {
       const saved = JSON.parse(localStorage.getItem(stateKey)||'{}');
-      if(Array.isArray(saved.completed)) dl.completed = saved.completed;
-      if(typeof saved.loaded === 'number') dl.loaded = saved.loaded;
-    }catch(err){ /* ignore */ }
+      if (Array.isArray(saved.completed) && saved.partCount === parts.length) {
+        dl.completed = saved.completed.slice(0, parts.length);
+      }
+    } catch (_) {}
+    if (db) {
+      for (let i = 0; i < parts.length; i++) {
+        try {
+          const rec = await new Promise((resolve) => {
+            const tx = db.transaction('chunks', 'readonly');
+            const store = tx.objectStore('chunks');
+            const req = store.get([id, i]);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+          });
+          if (rec && rec.chunks) {
+            results[i] = rec.chunks.map(b => new Uint8Array(b));
+            dl.completed[i] = true;
+            dl.loaded += rec.size || results[i].reduce((s, ch) => s + ch.byteLength, 0);
+          } else {
+            dl.completed[i] = false;
+          }
+        } catch (_) { dl.completed[i] = false; }
+      }
+    }
 
     dl.total = parts.reduce((s,p)=> s + ((p.end!=null?p.end:p.start) - (p.start||0) + 1),0);
     const fileStream = streamSaver.createWriteStream(name, { size: dl.total });
@@ -1574,8 +1611,18 @@ async function downloadFromDrive(input){
     let speedIdx = 0;
     let speedCount = 0;
     let speedSum = 0;
-    const persist=()=>{ try{ localStorage.setItem(stateKey, JSON.stringify({ completed: dl.completed, loaded: dl.loaded })); }catch(err){} };
-    const emit=()=>{
+    const persist = () => {
+      try {
+        localStorage.setItem(stateKey, JSON.stringify({
+          completed: dl.completed,
+          loaded: dl.loaded,
+          partCount: parts.length,
+          name,
+          total: dl.total
+        }));
+      } catch (err) {}
+    };
+    const emit = () => {
       dl.progress = dl.total ? dl.loaded / dl.total : 0;
       const now = performance.now();
       const delta = Math.max(now - lastTime, 1);
@@ -1593,6 +1640,9 @@ async function downloadFromDrive(input){
       lastLoaded = dl.loaded;
       dl.onupdate && dl.onupdate(dl);
     };
+
+    persist();
+    emit();
 
     async function fetchPart(part, idx){
       if(dl.completed[idx]) return [];
@@ -1613,6 +1663,19 @@ async function downloadFromDrive(input){
             emit();
           }
           dl.completed[idx] = true;
+          if (db) {
+            try {
+              const buffers = chunks.map(c => c.buffer.slice(c.byteOffset, c.byteOffset + c.byteLength));
+              const size = buffers.reduce((s, b) => s + b.byteLength, 0);
+              await new Promise((resolve) => {
+                const tx = db.transaction('chunks', 'readwrite');
+                const store = tx.objectStore('chunks');
+                store.put({ id, partIndex: idx, chunks: buffers, size });
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+              });
+            } catch (_) {}
+          }
           persist();
           return chunks;
         }catch(err){
@@ -1631,7 +1694,6 @@ async function downloadFromDrive(input){
     let pending = parts.map((_, i) => i).filter(i => !dl.completed[i]);
     const concurrency = 4;
     const maxRounds = 5;
-    const results = new Array(parts.length);
     let round = 0;
     while (pending.length && round < maxRounds) {
       const current = pending;
@@ -1660,9 +1722,20 @@ async function downloadFromDrive(input){
         await writer.write(chunk);
       }
     }
-    await writer.close();
-    writerClosed = true;
-    localStorage.removeItem(stateKey);
+      await writer.close();
+      writerClosed = true;
+      if (db) {
+        try {
+          await new Promise((resolve) => {
+            const tx = db.transaction('chunks', 'readwrite');
+            const store = tx.objectStore('chunks');
+            for (let i = 0; i < parts.length; i++) store.delete([id, i]);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+          });
+        } catch (_) {}
+      }
+      localStorage.removeItem(stateKey);
     const hist = JSON.parse(localStorage.getItem('tgx_downloads')||'[]');
     hist.unshift({ id, name, date: Date.now(), platform:'drive' });
     hist.splice(50);
@@ -1797,6 +1870,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
