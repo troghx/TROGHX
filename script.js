@@ -1551,6 +1551,30 @@ async function downloadFromGofile(item){
   }
 }
 
+async function downloadSingleFile(f, dl){
+  const size = parseInt(f.size || '0', 10);
+  const stateKey = `tgx_drive_${dl.id}`;
+  const persist = () => {
+    try {
+      localStorage.setItem(stateKey, JSON.stringify({ loaded: dl.loaded, total: dl.total, name: dl.name }));
+    } catch (_) {}
+  };
+  const startLoaded = dl.loaded;
+  const subDl = { id: f.id, name: f.name, total: size, loaded: 0, progress: 0, completed: [], status: 'downloading', speed: 0, onupdate: (d) => {
+    dl.loaded = startLoaded + d.loaded;
+    dl.progress = dl.total ? dl.loaded / dl.total : 0;
+    persist();
+    dl.onupdate && dl.onupdate(dl);
+    renderDownloadsPanel();
+  }};
+  dl.cancel = () => subDl.cancel && subDl.cancel();
+  await downloadFromDrive({ id: f.id, name: f.name, dl: subDl, skipHistory: true });
+  dl.loaded = startLoaded + size;
+  dl.progress = dl.total ? dl.loaded / dl.total : 0;
+  persist();
+  renderDownloadsPanel();
+}
+
 async function downloadFromDrive(input){
   let writer;
   let writerClosed = false;
@@ -1558,6 +1582,7 @@ async function downloadFromDrive(input){
     let parts = Array.isArray(input) ? input : input?.parts;
     let id    = Array.isArray(input) ? input[0]?.id : input?.id;
     const resume = !!input?.resume;
+    const skipHistory = !!input?.skipHistory;
     let token, makeUrl;
     if(!id) throw new Error('missing id');
     const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
@@ -1566,9 +1591,27 @@ async function downloadFromDrive(input){
     if (m.mimeType === 'application/vnd.google-apps.folder') {
       const r = await fetch(`/.netlify/functions/drive?list=${id}`);
       const data = await r.json();
-      for (const f of data.files) {
-        await downloadFromDrive({ id: f.id, name: f.name });
+      const files = data.files || [];
+      const total = files.reduce((s,f)=>s + parseInt(f.size||0,10),0);
+      const existing = input?.dl;
+      const dl = existing || { id, name: m.name, total, loaded: 0, progress: 0, status: 'downloading', speed: 0, onupdate: null };
+      dl.total = total;
+      if(!existing) activeDownloads.push(dl);
+      renderDownloadsPanel();
+      for (const f of files) {
+        await downloadSingleFile(f, dl);
       }
+      dl.status = 'done';
+      const idx = activeDownloads.indexOf(dl);
+      if(idx>=0) activeDownloads.splice(idx,1);
+      try {
+        const hist = JSON.parse(localStorage.getItem('tgx_downloads')||'[]');
+        hist.unshift({ id, name: dl.name, date: Date.now(), platform: 'drive' });
+        hist.splice(50);
+        localStorage.setItem('tgx_downloads', JSON.stringify(hist));
+      } catch (_) {}
+      localStorage.removeItem(`tgx_drive_${dl.id}`);
+      renderDownloadsPanel();
       return;
     }
     const name = m.name || input?.name || 'archivo.bin';
@@ -1794,10 +1837,12 @@ async function downloadFromDrive(input){
         } catch (_) {}
       }
       localStorage.removeItem(stateKey);
-    const hist = JSON.parse(localStorage.getItem('tgx_downloads')||'[]');
-    hist.unshift({ id, name, date: Date.now(), platform:'drive' });
-    hist.splice(50);
-    localStorage.setItem('tgx_downloads', JSON.stringify(hist));
+    if(!skipHistory){
+      const hist = JSON.parse(localStorage.getItem('tgx_downloads')||'[]');
+      hist.unshift({ id, name, date: Date.now(), platform:'drive' });
+      hist.splice(50);
+      localStorage.setItem('tgx_downloads', JSON.stringify(hist));
+    }
     dl.status='done';
     const idx = activeDownloads.indexOf(dl);
     if(idx>=0) activeDownloads.splice(idx,1);
@@ -1930,6 +1975,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
