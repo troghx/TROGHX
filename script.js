@@ -90,6 +90,7 @@ window.currentCategory = "game";
 // Descargas en curso
 const activeDownloads = window.activeDownloads || [];
 window.activeDownloads = activeDownloads;
+let downloadsExpanded = false;
 const TOPBAR_LOGOS = {
   game: "assets/images/logotopbar.png",
   app: "assets/images/trogh-app.png",
@@ -1354,7 +1355,8 @@ function toggleDownloadsPanel(){
         desc.appendChild(hTitle);
       }
       const list = document.createElement('ul');
-      downloads.forEach(d => {
+      const items = downloadsExpanded ? downloads : downloads.slice(0,3);
+      items.forEach(d => {
         const li = document.createElement('li');
         li.className = 'download-item';
         const name = document.createElement('strong');
@@ -1376,6 +1378,17 @@ function toggleDownloadsPanel(){
         list.appendChild(li);
       });
       desc.appendChild(list);
+      if(downloads.length > 3){
+        const tBtn = document.createElement('button');
+        tBtn.type = 'button';
+        tBtn.className = 'toggle-history';
+        tBtn.textContent = downloadsExpanded ? 'Ver menos' : 'Ver todo';
+        tBtn.addEventListener('click', () => {
+          downloadsExpanded = !downloadsExpanded;
+          render();
+        });
+        desc.appendChild(tBtn);
+      }
     } else if(!activeDownloads.length) {
       desc.textContent = 'No hay descargas.';
     }
@@ -1706,6 +1719,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
