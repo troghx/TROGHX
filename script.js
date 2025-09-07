@@ -1471,8 +1471,7 @@ async function downloadFromDrive(input){
       if(!meta.ok) throw new Error('meta failed');
       const m = await meta.json();
       if(!m.url) throw new Error('no url');
-      const head = await fetch(m.url, { method:'HEAD' });
-      const total = parseInt(head.headers.get('content-length')||'0',10);
+      const total = parseInt(m.size || '0', 10);
       const chunk = 2 * 1024 * 1024; // 2MB
       const count = total ? Math.ceil(total/chunk) : 1;
       parts = Array.from({length:count}, (_,i)=>({ url:m.url, start:i*chunk, end: total?Math.min(total-1,(i+1)*chunk-1):undefined }));
@@ -1656,6 +1655,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
