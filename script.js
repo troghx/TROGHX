@@ -335,11 +335,20 @@ function insertLinkChip(editorArea){
   editorArea.focus();
   const text=(prompt("Nombre a mostrar del enlace:")||"").trim();
   if(!text) return;
-  let url=(prompt("Pega la URL del enlace:")||"").trim();
+  let url=(prompt("Pega la URL del enlace o el ID de Drive:")||"").trim();
   if(!url) return;
-  if(!/^[a-z]+:\/\//i.test(url) && /^[A-Za-z0-9]{5,}$/.test(url)) url=`https://gofile.io/d/${url}`;
+  let driveId=null;
+  if(!/^[a-z]+:\/\//i.test(url)){
+    if(/^[A-Za-z0-9_-]{10,}$/.test(url)){
+      driveId=url;
+    }else if(/^[A-Za-z0-9]{5,}$/.test(url)){
+      url=`https://gofile.io/d/${url}`;
+    }
+  }
+  if(!driveId) driveId=extractDriveId(url);
+  if(driveId) url=`https://drive.google.com/file/d/${driveId}`;
   if(!/^https?:\/\//i.test(url) && !url.startsWith("magnet:")) url="https://"+url;
-  const plat=platformFromUrl(url);
+  const plat=driveId ? "drive" : platformFromUrl(url);
   const html=`<a href="${url.replace(/"/g,"&quot;")}" target="_blank" rel="noopener" class="link-chip chip-${plat}"><span class="chip-dot"></span>${text.replace(/[<>]/g,"")}</a>`;
   document.execCommand("insertHTML", false, html);
 }
@@ -1647,6 +1656,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
