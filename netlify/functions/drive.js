@@ -92,16 +92,14 @@ export async function handler(event) {
         );
         if (res.status !== 206)
           return json(res.status, { error: "download failed" });
-        return new Response(res.data, {
-          status: res.status,
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Content-Type": "application/octet-stream",
-            "Content-Length": res.headers["content-length"],
-            "Content-Range": res.headers["content-range"],
-            "Accept-Ranges": "bytes",
-          },
-        });
+        const headers = {
+          "Access-Control-Allow-Origin": "*",
+          "Content-Type": "application/octet-stream",
+          "Accept-Ranges": "bytes",
+        };
+        if (res.headers["content-length"]) headers["Content-Length"] = res.headers["content-length"];
+        if (res.headers["content-range"]) headers["Content-Range"] = res.headers["content-range"];
+        return new Response(res.data, { status: res.status, headers });
       } catch (err) {
         console.error("[drive dl]", err.message);
         return json(500, {
