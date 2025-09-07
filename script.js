@@ -87,6 +87,9 @@ let isAdmin = false;
 let recientes = [];
 let socials  = [];
 window.currentCategory = "game";
+// Descargas en curso
+const activeDownloads = window.activeDownloads || [];
+window.activeDownloads = activeDownloads;
 const TOPBAR_LOGOS = {
   game: "assets/images/logotopbar.png",
   app: "assets/images/trogh-app.png",
@@ -157,7 +160,7 @@ async function apiList(category = window.currentCategory) {
   const r = await fetch(`${API_POSTS}?${qs.toString()}`, { cache: "no-store" });
   if (!r.ok) throw new Error("No se pudo listar posts");
   const j = await r.json();
-  return Array.isArray(j)?j.map(g=>({...g,link_ok:Boolean(g.link_ok)})):j;
+  return Array.isArray(j)?j.map(g=>({...g,link_ok:Boolean(g.link_ok),drive_id:g.drive_id||extractDriveId(g.first_link)})):j;
 }
 async function apiCreate(data, token){
   const r = await fetch(API_POSTS, {
@@ -173,7 +176,7 @@ async function apiGet(id){
   const r = await fetch(`${API_POSTS}/${id}`, { cache:"no-store" });
   if(!r.ok) throw new Error("No se pudo obtener post");
   const j = await r.json();
-  if(j&&typeof j==="object") j.link_ok=Boolean(j.link_ok);
+  if(j&&typeof j==="object"){ j.link_ok=Boolean(j.link_ok); if(!j.drive_id && j.first_link) j.drive_id=extractDriveId(j.first_link); }
   fullCache.set(id, j);
   return j;
 }
@@ -351,6 +354,14 @@ function extractGofileId(url){
   if(!url) return null;
   const m=url.match(/gofile\.io\/(?:download|d)\/([^/?#]+)/i);
   return m ? m[1] : null;
+}
+
+function extractDriveId(url){
+  if(!url) return null;
+  const m = String(url).match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?export=download&id=|uc\?id=|drive\/folders\/)([A-Za-z0-9_-]+)/i);
+  if(m) return m[1];
+  const m2 = String(url).match(/[?&]id=([A-Za-z0-9_-]+)/);
+  return m2 ? m2[1] : null;
 }
 
 /* =========================
@@ -687,6 +698,17 @@ function openGame(game){
         a.href = "#";
       }
     });
+    modalDesc.querySelectorAll("a.chip-drive").forEach(a => {
+      const id = extractDriveId(a.getAttribute("href"));
+      if(id){
+        a.addEventListener("click", ev => {
+          ev.preventDefault();
+          downloadFromDrive({ id, name: game?.title || a.textContent || "" });
+        });
+        a.removeAttribute("target");
+        a.href = "#";
+      }
+    });
   }
 
   if(isAdmin){
@@ -853,9 +875,10 @@ async function gatherGameData(refs, { requireImage=true } = {}){
   const first_link = extractFirstLink(descHTML);
   const plat = platformFromUrl(first_link || "");
   const gofile_id = plat === "gofile" ? extractGofileId(first_link) : null;
+  const drive_id = plat === "drive" ? extractDriveId(first_link) : null;
   const link_ok = first_link ? await fetchLinkOk(first_link) : null;
 
-  return { title, descHTML, coverDataUrl, thumbDataUrl, previewSrc, category, first_link, link_ok, gofile_id };
+  return { title, descHTML, coverDataUrl, thumbDataUrl, previewSrc, category, first_link, link_ok, gofile_id, drive_id };
 }
 
 function openNewGameModal(){
@@ -883,7 +906,8 @@ function openNewGameModal(){
       category: data.category,
       first_link: data.first_link,
       link_ok: data.link_ok,
-      gofile_id: data.gofile_id
+      gofile_id: data.gofile_id,
+      drive_id: data.drive_id
     };
 
     try{
@@ -918,7 +942,7 @@ function openEditGame(original){
     const data = await gatherGameData(refs, { requireImage: false });
     if(!data) return;
 
-    const patch={ title: data.title, description: data.descHTML, category: data.category, first_link: data.first_link, link_ok: data.link_ok, gofile_id: data.gofile_id };
+    const patch={ title: data.title, description: data.descHTML, category: data.category, first_link: data.first_link, link_ok: data.link_ok, gofile_id: data.gofile_id, drive_id: data.drive_id };
 
     if(data.coverDataUrl){
       patch.image = data.coverDataUrl;
@@ -1282,8 +1306,37 @@ async function openDownloadsModal(){
     </div>`;
 
   const desc = node.querySelector('.tw-modal-description');
+  if (activeDownloads.length) {
+    const aTitle = document.createElement('h3');
+    aTitle.textContent = 'En progreso';
+    desc.appendChild(aTitle);
+    const aList = document.createElement('ul');
+    activeDownloads.forEach(dl => {
+      const li = document.createElement('li');
+      const name = document.createElement('strong');
+      name.textContent = dl.name || 'Archivo';
+      const prog = document.createElement('progress');
+      prog.max = dl.total || 1;
+      prog.value = dl.loaded;
+      const pct = document.createElement('span');
+      pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
+      li.append(name, prog, pct);
+      aList.appendChild(li);
+      dl.onupdate = () => {
+        prog.max = dl.total || 1;
+        prog.value = dl.loaded;
+        pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
+      };
+    });
+    desc.appendChild(aList);
+  }
 
   if (downloads.length) {
+    if(activeDownloads.length){
+      const hTitle = document.createElement('h3');
+      hTitle.textContent = 'Historial';
+      desc.appendChild(hTitle);
+    }
     const list = document.createElement('ul');
     downloads.forEach(d => {
       const li = document.createElement('li');
@@ -1303,7 +1356,7 @@ async function openDownloadsModal(){
       list.appendChild(li);
     });
     desc.appendChild(list);
-  } else {
+  } else if(!activeDownloads.length) {
     desc.textContent = 'No hay descargas.';
   }
 
@@ -1380,6 +1433,78 @@ async function downloadFromGofile(item){
     window.open(data.url, '_blank');
   } catch(err){
     console.error('[downloadFromGofile]', err);
+    alert('No se pudo descargar');
+  }
+}
+
+async function downloadFromDrive(input){
+  try {
+    let parts = Array.isArray(input) ? input : input?.parts;
+    let id    = Array.isArray(input) ? input[0]?.id : input?.id;
+    const name = Array.isArray(input) ? (input[0]?.name || 'Archivo') : (input?.name || 'Archivo');
+    if(!parts){
+      if(!id) throw new Error('missing id');
+      const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
+      if(!meta.ok) throw new Error('meta failed');
+      const m = await meta.json();
+      if(!m.url) throw new Error('no url');
+      const head = await fetch(m.url, { method:'HEAD' });
+      const total = parseInt(head.headers.get('content-length')||'0',10);
+      const chunk = 2 * 1024 * 1024; // 2MB
+      const count = total ? Math.ceil(total/chunk) : 1;
+      parts = Array.from({length:count}, (_,i)=>({ url:m.url, start:i*chunk, end: total?Math.min(total-1,(i+1)*chunk-1):undefined }));
+    }
+
+    const dl = { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', onupdate:null };
+    activeDownloads.push(dl);
+
+    const stateKey = `tgx_drive_${id}`;
+    try{
+      const saved = JSON.parse(localStorage.getItem(stateKey)||'{}');
+      if(Array.isArray(saved.completed)) dl.completed = saved.completed;
+      if(typeof saved.loaded === 'number') dl.loaded = saved.loaded;
+    }catch(err){ /* ignore */ }
+
+    dl.total = parts.reduce((s,p)=> s + ((p.end!=null?p.end:p.start) - (p.start||0) + 1),0);
+    const buffers = new Array(parts.length);
+
+    const persist=()=>{ try{ localStorage.setItem(stateKey, JSON.stringify({ completed: dl.completed, loaded: dl.loaded })); }catch(err){} };
+    const emit=()=>{ dl.progress = dl.total ? dl.loaded / dl.total : 0; dl.onupdate && dl.onupdate(dl); };
+
+    async function fetchPart(part, idx){
+      if(dl.completed[idx]) return;
+      const headers={};
+      if(part.end!=null) headers.Range=`bytes=${part.start}-${part.end}`;
+      const res = await fetch(part.url, { headers });
+      const reader = res.body.getReader();
+      const chunks=[];
+      while(true){
+        const {done,value} = await reader.read();
+        if(done) break;
+        chunks.push(value);
+        dl.loaded += value.length;
+        persist();
+        emit();
+      }
+      buffers[idx] = new Blob(chunks);
+      dl.completed[idx] = true;
+      persist();
+    }
+
+    await Promise.all(parts.map(fetchPart));
+    const blob = new Blob(buffers.filter(Boolean), { type:'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 100);
+    localStorage.removeItem(stateKey);
+    dl.status='done';
+    emit();
+  } catch(err){
+    console.error('[downloadFromDrive]', err);
     alert('No se pudo descargar');
   }
 }
@@ -1504,6 +1629,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
