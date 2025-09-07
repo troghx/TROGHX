@@ -1557,17 +1557,17 @@ async function downloadFromDrive(input){
   try {
     let parts = Array.isArray(input) ? input : input?.parts;
     let id    = Array.isArray(input) ? input[0]?.id : input?.id;
-    const name = Array.isArray(input) ? (input[0]?.name || 'Archivo') : (input?.name || 'Archivo');
     const resume = !!input?.resume;
     let token, makeUrl;
+    if(!id) throw new Error('missing id');
+    const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
+    if(!meta.ok) throw new Error('meta failed');
+    const m = await meta.json();
+    const name = m.name || input?.name || 'archivo.bin';
+    token = m.token;
+    makeUrl = (start, end) =>
+      `https://www.googleapis.com/drive/v3/files/${id}?alt=media`;
     if(!parts){
-      if(!id) throw new Error('missing id');
-      const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
-      if(!meta.ok) throw new Error('meta failed');
-      const m = await meta.json();
-      token = m.token;
-      makeUrl = (start, end) =>
-        `https://www.googleapis.com/drive/v3/files/${id}?alt=media`;
       const total = parseInt(m.size || '0', 10);
       const chunk = 8 * 1024 * 1024; // 8MB
       const count = total ? Math.ceil(total/chunk) : 1;
@@ -1920,6 +1920,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
