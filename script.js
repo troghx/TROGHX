@@ -1252,16 +1252,16 @@ function setupAdminButton(){
   };
 }
 
-/* =========================
-   Badge lateral → Admin Center
+/* =========================␊
+   Badge lateral → Descargas
    ========================= */
-function ensureSidebarChannelBadge(){
+function ensureDownloadsBadge(){
   const rail = document.querySelector(".side-nav");
   if(!rail) return;
 
   let el = rail.querySelector(".yt-channel-badge");
 
-  // Si fuera <a>, lo convierto a <button> para Admin Center (sin romper estilos)
+  // Si fuera <a>, lo convierto a <button> para abrir Descargas (sin romper estilos)
   if (el && el.tagName === "A") {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -1277,7 +1277,7 @@ function ensureSidebarChannelBadge(){
     el.className = "yt-channel-badge";
     const img = document.createElement("img");
     img.src = "assets/images/youtube-channel.png";
-    img.alt = "Admin Center";
+    img.alt = "Descargas";
     el.appendChild(img);
     rail.appendChild(el);
   }
@@ -1313,14 +1313,23 @@ async function openDownloadsModal(){
     const aList = document.createElement('ul');
     activeDownloads.forEach(dl => {
       const li = document.createElement('li');
+      li.className = 'download-item active';
       const name = document.createElement('strong');
       name.textContent = dl.name || 'Archivo';
       const prog = document.createElement('progress');
+      prog.className = 'download-progress';
       prog.max = dl.total || 1;
       prog.value = dl.loaded;
+      const status = document.createElement('div');
+      status.className = 'download-status';
       const pct = document.createElement('span');
       pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
-      li.append(name, prog, pct);
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.textContent = 'Cancelar';
+      cancelBtn.addEventListener('click', () => { dl.cancel && dl.cancel(); li.remove(); });
+      status.append(pct, cancelBtn);
+      li.append(name, prog, status);
       aList.appendChild(li);
       dl.onupdate = () => {
         prog.max = dl.total || 1;
@@ -1340,19 +1349,23 @@ async function openDownloadsModal(){
     const list = document.createElement('ul');
     downloads.forEach(d => {
       const li = document.createElement('li');
+      li.className = 'download-item';
       const name = document.createElement('strong');
       name.textContent = d.name || 'Archivo';
       const date = document.createElement('span');
       const dt = d.created_at || d.date;
       date.textContent = dt ? ` – ${new Date(dt).toLocaleString()} – ` : ' ';
-      const link = document.createElement('a');
-      link.href = '#';
-      link.textContent = 'Descargar de nuevo';
-      link.addEventListener('click', ev => {
+      const status = document.createElement('div');
+      status.className = 'download-status';
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = 'Reintentar';
+      retry.addEventListener('click', ev => {
         ev.preventDefault();
         downloadFromGofile(d);
       });
-      li.append(name, date, link);
+      status.appendChild(retry);
+      li.append(name, date, status);
       list.appendChild(li);
     });
     desc.appendChild(list);
@@ -1367,6 +1380,7 @@ async function openDownloadsModal(){
 
   openModalFragment(node);
 }
+ensureDownloadsBadge();
 async function openGofileFolder(id, title){
   if(!id) return;
   let files = [];
@@ -1455,7 +1469,9 @@ async function downloadFromDrive(input){
       parts = Array.from({length:count}, (_,i)=>({ url:m.url, start:i*chunk, end: total?Math.min(total-1,(i+1)*chunk-1):undefined }));
     }
 
+    const controller = new AbortController();
     const dl = { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', onupdate:null };
+    dl.cancel = () => { controller.abort(); dl.status='canceled'; const i=activeDownloads.indexOf(dl); if(i>=0) activeDownloads.splice(i,1); };
     activeDownloads.push(dl);
 
     const stateKey = `tgx_drive_${id}`;
@@ -1475,7 +1491,8 @@ async function downloadFromDrive(input){
       if(dl.completed[idx]) return;
       const headers={};
       if(part.end!=null) headers.Range=`bytes=${part.start}-${part.end}`;
-      const res = await fetch(part.url, { headers });
+      const res = await fetch(part.url, { headers, signal: controller.signal }).catch(err=>{ if(err.name==='AbortError') return null; throw err; });
+      if(!res) return;
       const reader = res.body.getReader();
       const chunks=[];
       while(true){
@@ -1502,6 +1519,8 @@ async function downloadFromDrive(input){
     setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 100);
     localStorage.removeItem(stateKey);
     dl.status='done';
+    const idx = activeDownloads.indexOf(dl);
+    if(idx>=0) activeDownloads.splice(idx,1);
     emit();
   } catch(err){
     console.error('[downloadFromDrive]', err);
@@ -1623,12 +1642,12 @@ async function initData(){
   setupAdminButton();
   renderHeroCarousel();
   renderSocialBar();
-  ensureSidebarChannelBadge();
   setupSideNav();
 }
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
