@@ -85,7 +85,7 @@ export async function handler(event) {
           fields: "id,name",
         });
         const name = file.data?.name || null;
-        const { token } = await auth.getAccessToken();
+        const token = await auth.getAccessToken();
         if (!token) return json(500, { error: "auth failed" });
         const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&access_token=${encodeURIComponent(
           token
