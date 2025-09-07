@@ -1507,6 +1507,8 @@ async function downloadFromGofile(item){
 }
 
 async function downloadFromDrive(input){
+  let writer;
+  let writerClosed = false;
   try {
     let parts = Array.isArray(input) ? input : input?.parts;
     let id    = Array.isArray(input) ? input[0]?.id : input?.id;
@@ -1528,8 +1530,6 @@ async function downloadFromDrive(input){
       });
     }
     const controller = new AbortController();
-    let writer;
-    let writerClosed = false;
     const dl = { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', speed:0, onupdate:null };
     dl.cancel = () => {
       controller.abort();
@@ -1762,6 +1762,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
