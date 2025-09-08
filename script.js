@@ -1327,21 +1327,29 @@ function renderDownloadsPanel(panel){
       speedEl.className = 'download-speed';
       speedEl.textContent = '0 MB/s';
       let shownSpeed = 0;
-      const actionBtn = document.createElement('button');
-      actionBtn.type = 'button';
       if (dl.status === 'paused') {
-        actionBtn.classList.add('resume-btn');
-        actionBtn.textContent = 'Continuar';
-        actionBtn.addEventListener('click', () => {
+        const resumeBtn = document.createElement('button');
+        resumeBtn.type = 'button';
+        resumeBtn.classList.add('resume-btn');
+        resumeBtn.textContent = 'Continuar';
+        resumeBtn.addEventListener('click', () => {
           downloadFromDrive({ id: dl.id, name: dl.name, dl, resume: true });
           renderDownloadsPanel();
         });
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.classList.add('delete-btn');
+        deleteBtn.textContent = 'Eliminar';
+        deleteBtn.addEventListener('click', () => { dl.remove && dl.remove(); li.remove(); });
+        status.append(pct, speedEl, resumeBtn, deleteBtn);
       } else {
+        const actionBtn = document.createElement('button');
+        actionBtn.type = 'button';
         actionBtn.classList.add('cancel-btn');
         actionBtn.textContent = 'Cancelar';
         actionBtn.addEventListener('click', () => { dl.cancel && dl.cancel(); li.remove(); });
+        status.append(pct, speedEl, actionBtn);
       }
-      status.append(pct, speedEl, actionBtn);
       li.append(name, prog, status);
       aList.appendChild(li);
       dl.onupdate = () => {
@@ -1642,6 +1650,7 @@ async function downloadFromDrive(input){
       } catch (_) { resolve(null); }
     });
     const controller = new AbortController();
+    const stateKey = `tgx_drive_${id}`;
     const existing = input?.dl;
     const dl = existing || { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', speed:0, onupdate:null };
     dl.status = 'downloading';
@@ -1652,6 +1661,7 @@ async function downloadFromDrive(input){
       persist();
       renderDownloadsPanel();
     };
+    dl.remove = () => { controller.abort(); localStorage.removeItem(stateKey); activeDownloads.splice(activeDownloads.indexOf(dl),1); renderDownloadsPanel(); };
     if(!existing) activeDownloads.push(dl);
     const badge = document.querySelector('.yt-channel-badge');
     if (badge && !resume) {
@@ -1667,7 +1677,6 @@ async function downloadFromDrive(input){
       setTimeout(() => tip.remove(), 4000);
     }
 
-    const stateKey = `tgx_drive_${id}`;
     dl.completed = Array(parts.length).fill(false);
     dl.loaded = 0;
     const results = new Array(parts.length);
@@ -1975,6 +1984,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
