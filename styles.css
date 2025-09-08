@@ -334,7 +334,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   width:300px;
   max-height:60vh;
   overflow:auto;
-  background: linear-gradient(135deg, #00121dd8 0%, #2f1a30a9 100%);
+  background: linear-gradient(135deg, #00121de7 0%, #2f1a30c0 100%);
   box-shadow:0 0 10px rgba(0, 0, 0, 0.555);
   transform-origin: bottom left;
   transform: scaleY(0);
