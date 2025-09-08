@@ -1323,10 +1323,10 @@ function renderDownloadsPanel(panel){
       status.className = 'download-status';
       const pct = document.createElement('span');
       pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
-      const speedEl = document.createElement('span');
-      speedEl.className = 'download-speed';
-      speedEl.textContent = '0 MB/s';
-      let shownSpeed = 0;
+      const speedEl = document.createElement('span');␊
+      speedEl.className = 'download-speed';␊
+      let shownSpeed = dl.speed ? dl.speed / 1_000_000 : 0;
+      speedEl.textContent = shownSpeed.toFixed(2) + ' MB/s';
       if (dl.status === 'paused') {
         const resumeBtn = document.createElement('button');
         resumeBtn.type = 'button';
@@ -1361,7 +1361,7 @@ function renderDownloadsPanel(panel){
         prog.value = dl.loaded;
         pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
         const current = dl.speed / 1_000_000;
-        shownSpeed = shownSpeed ? (shownSpeed * 0.5 + current * 0.5) : current;
+        shownSpeed = shownSpeed ? shownSpeed * 0.8 + current * 0.2 : current;
         speedEl.textContent = shownSpeed.toFixed(2)+' MB/s';
       };
     });
@@ -1584,6 +1584,7 @@ async function downloadSingleFile(f, dl){
 async function downloadFromDrive(input){
   let writer;
   let writerClosed = false;
+  let speedTimer;
   try {
     let parts = Array.isArray(input) ? input : input?.parts;
     let id    = Array.isArray(input) ? input[0]?.id : input?.id;
@@ -1654,12 +1655,13 @@ async function downloadFromDrive(input){
     dl.status = 'downloading';
     dl.cancel = () => {
       controller.abort();
+      if (speedTimer) clearInterval(speedTimer);
       if (writer && !writerClosed) try { writer.abort(); writerClosed = true; } catch (err) {}
       dl.status = 'paused';
       persist();
       renderDownloadsPanel();
     };
-    dl.remove = () => { controller.abort(); localStorage.removeItem(stateKey); activeDownloads.splice(activeDownloads.indexOf(dl),1); renderDownloadsPanel(); };
+    dl.remove = () => { controller.abort(); if (speedTimer) clearInterval(speedTimer); localStorage.removeItem(stateKey); activeDownloads.splice(activeDownloads.indexOf(dl),1); renderDownloadsPanel(); };
     if(!existing) activeDownloads.push(dl);
     const badge = document.querySelector('.yt-channel-badge');
     if (badge && !resume) {
@@ -1711,7 +1713,7 @@ async function downloadFromDrive(input){
     const fileStream = streamSaver.createWriteStream(name, { size: dl.total });
     writer = fileStream.getWriter();
 
-    let lastTime = performance.now(), lastLoaded = dl.loaded;
+    let lastTime = performance.now(), lastLoaded = dl.loaded, lastSpeedTime = lastTime;
     const speeds = new Array(5).fill(0);
     let speedIdx = 0;
     let speedCount = 0;
@@ -1727,27 +1729,31 @@ async function downloadFromDrive(input){
         }));
       } catch (err) {}
     };
-    const emit = () => {
+    const emit = (force = false) => {
       dl.progress = dl.total ? dl.loaded / dl.total : 0;
       const now = performance.now();
-      const delta = Math.max(now - lastTime, 1);
-      const current = (dl.loaded - lastLoaded) / (delta/1000);
-      if (speedCount < speeds.length) {
-        speedCount++;
-      } else {
-        speedSum -= speeds[speedIdx];
+      if (force || now - lastSpeedTime >= 1000) {
+        const delta = Math.max(now - lastTime, 1);
+        const current = (dl.loaded - lastLoaded) / (delta/1000);
+        if (speedCount < speeds.length) {
+          speedCount++;
+        } else {
+          speedSum -= speeds[speedIdx];
+        }
+        speeds[speedIdx] = current;
+        speedSum += current;
+        speedIdx = (speedIdx + 1) % speeds.length;
+        dl.speed = speedSum / speedCount;
+        lastTime = now;
+        lastLoaded = dl.loaded;
+        lastSpeedTime = now;
       }
-      speeds[speedIdx] = current;
-      speedSum += current;
-      speedIdx = (speedIdx + 1) % speeds.length;
-      dl.speed = speedSum / speedCount;
-      lastTime = now;
-      lastLoaded = dl.loaded;
       dl.onupdate && dl.onupdate(dl);
     };
 
     persist();
-    emit();
+    emit(true);
+    speedTimer = setInterval(() => emit(true), 1000);
 
     async function fetchPart(part, idx){
       if(dl.completed[idx]) return [];
@@ -1818,7 +1824,8 @@ async function downloadFromDrive(input){
       if(writer && !writerClosed){ try{ await writer.abort(); }catch(_){ } writerClosed = true; }
       const i = activeDownloads.indexOf(dl);
       if(i>=0) activeDownloads.splice(i,1);
-      emit();
+      if (speedTimer) clearInterval(speedTimer);
+      emit(true);
       return;
     }
     for (let i = 0; i < results.length; i++) {
@@ -1853,11 +1860,13 @@ async function downloadFromDrive(input){
     dl.status='done';
     const idx = activeDownloads.indexOf(dl);
     if(idx>=0) activeDownloads.splice(idx,1);
-    emit();
+    if (speedTimer) clearInterval(speedTimer);
+    emit(true);
     renderDownloadsPanel();
   } catch(err){
     console.error('[downloadFromDrive]', err);
     if(writer && !writerClosed){ try{ await writer.abort(); }catch(_){ } writerClosed = true; }
+    if (speedTimer) clearInterval(speedTimer);
     alert('No se pudo descargar');
     renderDownloadsPanel();
   }
@@ -1982,6 +1991,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
