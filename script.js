@@ -1385,15 +1385,9 @@ function renderDownloadsPanel(panel){
       date.textContent = dt ? ` – ${new Date(dt).toLocaleString()} – ` : ' ';
       const status = document.createElement('div');
       status.className = 'download-status';
-      const retry = document.createElement('button');
-      retry.type = 'button';
-      retry.textContent = 'Reintentar';
-      retry.addEventListener('click', ev => {
-        ev.preventDefault();
-        if (d.platform === 'drive') downloadFromDrive({ id: d.id, name: d.name });
-        else downloadFromGofile(d);
-      });
-      status.appendChild(retry);
+      status.textContent = 'Descarga exitosa';
+      // TODO: si se desea reintentar en el futuro, almacenar un campo `status`
+      // y mostrar el botón solo para elementos fallidos.
       li.append(name, date, status);
       list.appendChild(li);
     });
@@ -1984,6 +1978,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
