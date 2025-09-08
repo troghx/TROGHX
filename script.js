@@ -1325,7 +1325,7 @@ function renderDownloadsPanel(panel){
       pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
       const speedEl = document.createElement('span');␊
       speedEl.className = 'download-speed';␊
-      let shownSpeed = dl.speed ? dl.speed / 1_000_000 : 0;
+      let shownSpeed = dl.speed / 1_000_000;
       speedEl.textContent = shownSpeed.toFixed(2) + ' MB/s';
       if (dl.status === 'paused') {
         const resumeBtn = document.createElement('button');
@@ -1361,8 +1361,8 @@ function renderDownloadsPanel(panel){
         prog.value = dl.loaded;
         pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
         const current = dl.speed / 1_000_000;
-        shownSpeed = shownSpeed ? shownSpeed * 0.8 + current * 0.2 : current;
-        speedEl.textContent = shownSpeed.toFixed(2)+' MB/s';
+        shownSpeed = shownSpeed * 0.8 + current * 0.2;
+        speedEl.textContent = shownSpeed.toFixed(2) + ' MB/s';
       };
     });
     desc.appendChild(aList);
@@ -1991,6 +1991,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
