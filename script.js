@@ -1340,7 +1340,11 @@ function renderDownloadsPanel(panel){
         deleteBtn.type = 'button';
         deleteBtn.classList.add('delete-btn');
         deleteBtn.textContent = 'Eliminar';
-        deleteBtn.addEventListener('click', () => { dl.remove && dl.remove(); li.remove(); });
+        deleteBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          dl.remove?.();
+          setTimeout(() => li.remove(), 0);
+        });
         status.append(pct, speedEl, resumeBtn, deleteBtn);
       } else {
         const actionBtn = document.createElement('button');
@@ -1978,6 +1982,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
