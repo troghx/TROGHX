@@ -1323,8 +1323,8 @@ function renderDownloadsPanel(panel){
       status.className = 'download-status';
       const pct = document.createElement('span');
       pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
-      const speedEl = document.createElement('span');␊
-      speedEl.className = 'download-speed';␊
+      const speedEl = document.createElement('span');
+      speedEl.className = 'download-speed';
       let shownSpeed = dl.speed / 1_000_000;
       speedEl.textContent = shownSpeed.toFixed(2) + ' MB/s';
       if (dl.status === 'paused') {
@@ -1991,6 +1991,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
