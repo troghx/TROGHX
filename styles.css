@@ -322,6 +322,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .download-status .cancel-btn{ padding:4px 10px; border:none; border-radius:8px; background:linear-gradient(45deg,#ff00ff,#00ffff); color:#0b0d10; font-weight:700; cursor:pointer; }
 .download-status .resume-btn,
 .download-status .delete-btn{ padding:4px 10px; border:none; border-radius:8px; background:linear-gradient(45deg,#ff00ff,#00ffff); color:#0b0d10; font-weight:700; cursor:pointer; }
+.download-status .delete-btn{ transition: filter .15s ease; }
 .download-status .delete-btn:hover {
   filter: brightness(1.1);
 }
