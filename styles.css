@@ -146,6 +146,13 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   background: var(--panel); padding: 10px 12px;
   border-radius: 16px; border: 1px solid rgba(255,255,255,.06);
 }
+.search:focus-within {
+  border: 1px solid transparent;
+  background: linear-gradient(var(--panel), var(--panel)) padding-box,
+              linear-gradient(45deg,#ff00ff,#00ffff) border-box;
+  box-shadow: 0 0 6px rgba(255,0,255,.4);
+  transition: background .2s, box-shadow .2s;
+}
 .search input {
   flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font-size: .95rem;
 }
