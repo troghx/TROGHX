@@ -29,6 +29,16 @@ body {
   background: linear-gradient(135deg, #00121d 0%, #22031a 100%);
   position: relative;
 }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 6px;
+  border: 1px solid #ff00ff;
+  border-radius: 12px;
+  box-shadow: 0 0 8px #ff00ff;
+  pointer-events: none;
+  z-index: 2000;
+}
 body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 /* ---------- Barra lateral ---------- */
