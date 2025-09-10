@@ -13,7 +13,7 @@ const dmcaModalTemplate = document.getElementById("dmca-modal-template");
 
 const dmcaTexts = {
   es: `
-    <p><strong>TROGH GAMES</strong> no aloja archivos ni juegos con derechos de autor. Este sitio solo muestra metadatos y <em>enlaces</em> hacia servicios de terceros que alojan los contenidos bajo sus propios términos.</p>
+    <p><strong>TROGH</strong> no aloja archivos ni juegos con derechos de autor. Este sitio solo muestra metadatos y <em>enlaces</em> hacia servicios de terceros que alojan los contenidos bajo sus propios términos.</p>
 
     <p>Si eres titular de derechos y consideras que un enlace publicado aquí apunta a material que infringe tus derechos, retiraremos los <em>enlaces</em> del sitio al recibir un <strong>Aviso DMCA válido</strong>.</p>
 
@@ -29,7 +29,7 @@ const dmcaTexts = {
       <li>Firma física o electrónica (nombre completo basta como firma electrónica).</li>
     </ol>
 
-    <p>Envíanos tu aviso a través del <a href="/dmca.html" class="dmca-form-link">formulario DMCA</a> (recomendado) o por correo a <a href="mailto:troghgames@gmail.com">troghgames@gmail.com</a>.</p>
+    <p>Envíanos tu aviso a través del <a href="/dmca.html" class="dmca-form-link">formulario DMCA</a> (recomendado) o por correo a <a href="mailto:troghx@gmail.com">troghx@gmail.com</a>.</p>
 
     <p class="muted" style="opacity:.8">Nota: si el archivo está alojado por un tercero (p. ej., MEGA, Google Drive, YouTube, etc.), también deberás contactar a ese servicio para la retirada del material en su plataforma.</p>
 
@@ -40,7 +40,7 @@ const dmcaTexts = {
     <p>Podemos limitar publicaciones o accesos de usuarios/colaboradores que incurran reiteradamente en infracciones.</p>
   `,
   en: `
-    <p><strong>TROGH GAMES</strong> does not host copyrighted files. We only display metadata and <em>links</em> to third-party services that host the content under their own terms.</p>
+    <p><strong>TROGH</strong> does not host copyrighted files. We only display metadata and <em>links</em> to third-party services that host the content under their own terms.</p>
 
     <p>If you are a copyright owner and believe a link on our site points to infringing material, we will remove such <em>links</em> upon receiving a <strong>valid DMCA Notice</strong>.</p>
 
@@ -56,7 +56,7 @@ const dmcaTexts = {
       <li>Your physical or electronic signature (full name is acceptable as an electronic signature).</li>
     </ol>
 
-    <p>Send your notice via our <a href="/dmca.html" class="dmca-form-link">DMCA form</a> (recommended) or email <a href="mailto:troghgames@gmail.com">troghgames@gmail.com</a>.</p>
+    <p>Send your notice via our <a href="/dmca.html" class="dmca-form-link">DMCA form</a> (recommended) or email <a href="mailto:troghx@gmail.com">troghx@gmail.com</a>.</p>
 
     <p class="muted" style="opacity:.8">Note: if the file is hosted by a third party (e.g., MEGA, Google Drive, YouTube, etc.), you should also contact that service to remove the file from their platform.</p>
 
@@ -1991,6 +1991,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
