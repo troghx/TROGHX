@@ -1568,6 +1568,7 @@ async function downloadSingleFile(f, dl){
   const startLoaded = dl.loaded;
   const subDl = { id: f.id, name: f.name, total: size, loaded: 0, progress: 0, completed: [], status: 'downloading', speed: 0, onupdate: (d) => {
     dl.loaded = startLoaded + d.loaded;
+    dl.speed = d.speed;
     dl.progress = dl.total ? dl.loaded / dl.total : 0;
     persist();
     dl.onupdate && dl.onupdate(dl);
@@ -1991,6 +1992,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
