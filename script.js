@@ -1362,7 +1362,7 @@ function renderDownloadsPanel(panel){
         pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
         const current = (dl.speed * 8) / 1_000_000;
         shownSpeed = shownSpeed * 0.8 + current * 0.2;
-        speedEl.textContent = shownSpeed.toFixed(2) + ' MB/s';
+        speedEl.textContent = shownSpeed.toFixed(2) + ' Mb/s';
       };
     });
     desc.appendChild(aList);
@@ -1991,6 +1991,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
