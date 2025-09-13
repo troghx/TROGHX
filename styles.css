@@ -79,9 +79,17 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   gap: 8px;
 }
 
+.search-box .info-btns {
+  display: flex;
+  gap: 8px;
+}
+
 .search-box .dmca-btn {
   align-self: flex-start;
   width: auto;
+}
+
+.faq-btn {
 }
 
 .site-footer {
