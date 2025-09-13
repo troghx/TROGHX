@@ -10,6 +10,7 @@ const adminMenuModalTemplate = document.getElementById("admin-menu-modal-templat
 const newGameModalTemplate = document.getElementById("new-game-modal-template");
 const newSocialModalTemplate = document.getElementById("new-social-modal-template");
 const dmcaModalTemplate = document.getElementById("dmca-modal-template");
+const faqModalTemplate = document.getElementById("faq-modal-template");
 
 const dmcaTexts = {
   es: `
@@ -1080,6 +1081,121 @@ function openDmcaModal(){
 }
 
 /* =========================
+   FAQ Modal
+   ========================= */
+async function openFaqModal(){
+  const modal = faqModalTemplate.content.cloneNode(true);
+  const node  = modal.querySelector('.tw-modal');
+  const content = modal.querySelector('.faq-content');
+  const modalClose = modal.querySelector('.tw-modal-close');
+
+  try{
+    const res = await fetch('/.netlify/functions/faq');
+    if(res.ok){
+      const data = await res.json();
+      if(content) content.innerHTML = data.content || '';
+    }else{
+      if(content) content.textContent = 'No se pudo cargar.';
+    }
+  }catch(err){
+    console.error(err);
+    if(content) content.textContent = 'No se pudo cargar.';
+  }
+
+  if(isAdmin){
+    const editBtn = document.createElement('button');
+    editBtn.className = 'dmca-btn';
+    editBtn.type = 'button';
+    editBtn.textContent = 'Editar';
+    editBtn.addEventListener('click', openFaqEditor);
+    modal.querySelector('.tw-modal-content')?.appendChild(editBtn);
+  }
+
+  const removeTrap = trapFocus(node);
+  const onEscape = (e)=>{ if(e.key==='Escape') closeModal(node, removeTrap, onEscape); };
+  modalClose?.addEventListener('click', ()=> closeModal(node, removeTrap, onEscape));
+
+  openModalFragment(node);
+}
+
+async function openFaqEditor(){
+  const tpl=document.createElement('template');
+  tpl.innerHTML=`
+    <div class="tw-modal" role="dialog" aria-label="Editar FAQ">
+      <div class="tw-modal-content">
+        <button class="tw-modal-close" aria-label="Cerrar">×</button>
+        <h2>Editar FAQ</h2>
+        <div class="rich-editor">
+          <div class="rich-toolbar" role="toolbar" aria-label="Editor de texto">
+            <button type="button" class="rtb-btn" data-cmd="bold"><b>B</b></button>
+            <button type="button" class="rtb-btn" data-cmd="italic"><i>I</i></button>
+            <button type="button" class="rtb-btn" data-cmd="underline"><u>U</u></button>
+            <span class="rtb-sep"></span>
+            <button type="button" class="rtb-btn" data-block="h2">H2</button>
+            <button type="button" class="rtb-btn" data-block="p">P</button>
+            <span class="rtb-sep"></span>
+            <label class="rtb-inline">
+              Fuente
+              <select class="rtb-font">
+                <option value="">Sistema</option>
+                <option value="Segoe UI">Segoe UI</option>
+                <option value="Roboto">Roboto</option>
+                <option value="Arial">Arial</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Courier New">Courier New</option>
+              </select>
+            </label>
+            <span class="rtb-sep"></span>
+            <button type="button" class="rtb-btn" data-list="ul">• Lista</button>
+            <span class="rtb-sep"></span>
+            <button type="button" class="rtb-btn rtb-link">🔗 Enlace</button>
+            <button type="button" class="rtb-btn rtb-color">🎨 Color</button>
+            <input type="color" class="rtb-color-input" value="#cfe3ff" hidden />
+          </div>
+          <div class="editor-area" contenteditable="true" aria-label="FAQ contenido"></div>
+        </div>
+        <button class="dmca-btn faq-save-btn" type="button">Guardar</button>
+      </div>
+    </div>`;
+
+  const frag = tpl.content.cloneNode(true);
+  const node = frag.querySelector('.tw-modal');
+  const modalClose = frag.querySelector('.tw-modal-close');
+  const saveBtn = frag.querySelector('.faq-save-btn');
+  const editorRoot = frag.querySelector('.rich-editor');
+  const editorAPI = initRichEditor(editorRoot);
+  const contentEl = document.querySelector('.faq-content');
+  if(contentEl) editorAPI.setHTML(contentEl.innerHTML);
+
+  saveBtn?.addEventListener('click', async ()=>{
+    const content = editorAPI.getHTML();
+    try{
+      const token=localStorage.getItem('tgx_admin_token')||'';
+      const res = await fetch('/.netlify/functions/faq', {
+        method:'PUT',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+        body:JSON.stringify({content})
+      });
+      if(res.ok){
+        if(contentEl) contentEl.innerHTML = content;
+        closeModal(node, removeTrap, onEscape);
+      }else{
+        alert('No se pudo guardar.');
+      }
+    }catch(err){
+      console.error(err);
+      alert('No se pudo guardar.');
+    }
+  });
+
+  const removeTrap = trapFocus(node);
+  const onEscape = (e)=>{ if(e.key==='Escape') closeModal(node, removeTrap, onEscape); };
+  modalClose?.addEventListener('click', ()=> closeModal(node, removeTrap, onEscape));
+
+  openModalFragment(node);
+}
+
+/* =========================
    Búsqueda + SideNav
    ========================= */
 function setupSearch(){
@@ -1093,10 +1209,18 @@ function setupSearch(){
 }
 
 function setupDmcaButton(){
-  const btn=document.querySelector('.dmca-btn');
+  const btn=document.querySelector('.dmca-btn:not(.faq-btn)');
   if(!btn) return;
   btn.addEventListener('click', ()=>{
     openDmcaModal();
+  });
+}
+
+function setupFaqButton(){
+  const btn=document.querySelector('.faq-btn');
+  if(!btn) return;
+  btn.addEventListener('click', ()=>{
+    openFaqModal();
   });
 }
 function setupSideNav(){
@@ -1984,6 +2108,7 @@ async function initData(){
   renderRow();
   setupSearch();
   setupDmcaButton();
+  setupFaqButton();
   setupAdminButton();
   renderHeroCarousel();
   renderSocialBar();
@@ -1992,6 +2117,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
