@@ -1360,6 +1360,12 @@ function openAdminMenuModal(){
 
   if(btnLogout) btnLogout.addEventListener("click", ()=>{
     isAdmin=false; persistAdmin(false);
+    try {
+      localStorage.removeItem("tgx_admin_token");
+      localStorage.removeItem(LS_ADMIN_HASH);
+      localStorage.removeItem(LS_ADMIN_SALT);
+      localStorage.removeItem(LS_ADMIN_USER);
+    } catch (err) {}
     renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
     alert("Sesión cerrada.");
     closeModal(node, removeTrap, onEscape);
@@ -2117,6 +2123,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
