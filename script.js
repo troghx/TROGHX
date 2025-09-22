@@ -2148,22 +2148,44 @@ async function reloadData(){
   renderHeroCarousel();
 }
 async function initData(){
-  try{ const data=await apiList(window.currentCategory); recientes=Array.isArray(data)?data:[];
-  }catch(e){ console.error("[initData posts]", e); recientes=[]; }
-  try{ socials=await socialsList(); }catch(e){ console.error("[initData socials]", e); socials=[]; }
+  const postsPromise = (async ()=>{
+    try{
+      const data = await apiList(window.currentCategory);
+      recientes = Array.isArray(data)?data:[];
+    }catch(e){
+      console.error("[initData posts]", e);
+      recientes = [];
+    }finally{
+      renderRow();
+      renderHeroCarousel();
+    }
+  })();
 
-  renderRow();
+  renderSocialBar();
+  const socialsPromise = (async ()=>{
+    try{
+      const data = await socialsList();
+      socials = Array.isArray(data)?data:[];
+    }catch(e){
+      console.error("[initData socials]", e);
+      socials = [];
+    }finally{
+      renderSocialBar();
+    }
+  })();
+
   setupSearch();
   setupDmcaButton();
   setupFaqButton();
   setupAdminButton();
-  renderHeroCarousel();
-  renderSocialBar();
   setupSideNav();
+
+  await Promise.allSettled([postsPromise, socialsPromise]);
 }
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
