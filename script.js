@@ -1482,7 +1482,7 @@ function renderDownloadsPanel(panel){
         actionBtn.type = 'button';
         actionBtn.classList.add('cancel-btn');
         actionBtn.textContent = 'Cancelar';
-        actionBtn.addEventListener('click', () => { dl.cancel && dl.cancel(); li.remove(); });
+        actionBtn.addEventListener('click', () => { dl.cancel?.({ purge: true }); li.remove(); });
         status.append(pct, speedEl, actionBtn);
       }
       li.append(name, prog, status);
@@ -1705,7 +1705,7 @@ async function downloadSingleFile(f, dl){
     dl.onupdate && dl.onupdate(dl);
     renderDownloadsPanel();
   }};
-  dl.cancel = () => subDl.cancel && subDl.cancel();
+  dl.cancel = (opts) => subDl.cancel?.(opts);
   await downloadFromDrive({ id: f.id, name: f.name, dl: subDl, skipHistory: true });
   dl.loaded = startLoaded + size;
   dl.progress = dl.total ? dl.loaded / dl.total : 0;
@@ -1784,16 +1784,56 @@ async function downloadFromDrive(input){
     const stateKey = `tgx_drive_${id}`;
     const existing = input?.dl;
     const dl = existing || { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', speed:0, onupdate:null };
-    dl.status = 'downloading';
-    dl.cancel = () => {
-      controller.abort();
+
+    const stopActiveDownload = () => {
+      try { controller.abort(); } catch (_) {}
       if (speedTimer) clearInterval(speedTimer);
-      if (writer && !writerClosed) try { writer.abort(); writerClosed = true; } catch (err) {}
+      if (writer && !writerClosed) {
+        try { writer.abort(); }
+        catch (_) {}
+        writerClosed = true;
+      }
+    };
+    const purgePersistedState = async () => {
+      try { localStorage.removeItem(stateKey); } catch (_) {}
+      if (db) {
+        try {
+          await new Promise((resolve) => {
+            const tx = db.transaction('chunks', 'readwrite');
+            const store = tx.objectStore('chunks');
+            for (let i = 0; i < parts.length; i++) store.delete([id, i]);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+          });
+        } catch (_) {}
+      }
+    };
+    const removeFromActive = () => {
+      const idx = activeDownloads.indexOf(dl);
+      if (idx >= 0) activeDownloads.splice(idx, 1);
+    };
+    const cleanupAndRemove = (status) => {
+      stopActiveDownload();
+      dl.status = status;
+      void purgePersistedState();
+      removeFromActive();
+      renderDownloadsPanel();
+    };
+
+    dl.status = 'downloading';
+    dl.cancel = (opts = {}) => {
+      if (opts?.purge) {
+        cleanupAndRemove('cancelled');
+        return;
+      }
+      stopActiveDownload();
       dl.status = 'paused';
       persist();
       renderDownloadsPanel();
     };
-    dl.remove = () => { controller.abort(); if (speedTimer) clearInterval(speedTimer); localStorage.removeItem(stateKey); activeDownloads.splice(activeDownloads.indexOf(dl),1); renderDownloadsPanel(); };
+    dl.remove = () => {
+      cleanupAndRemove('removed');
+    };
     if(!existing) activeDownloads.push(dl);
     const badge = document.querySelector('.yt-channel-badge');
     if (badge && !resume) {
@@ -2124,6 +2164,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
