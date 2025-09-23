@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-labelledby="title">
   <title>Modo un jugador</title>
   <g fill="none" stroke="none">
-    <rect width="48" height="48" rx="12" fill="#0f1722" />
     <circle cx="24" cy="18" r="9" fill="#4fc3f7" />
     <path d="M12 42c0-6.627 5.373-12 12-12s12 5.373 12 12" fill="#82e9ff" />
   </g>
