@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-labelledby="title">
+  <title>Modo multijugador</title>
+  <g fill="none" stroke="none">
+    <rect width="48" height="48" rx="12" fill="#0f1722" />
+    <circle cx="18" cy="18" r="8" fill="#ffb74d" />
+    <circle cx="30" cy="20" r="8" fill="#ff8a65" />
+    <path d="M10 42c0-5.523 4.477-10 10-10" fill="#ffe0b2" />
+    <path d="M38 42c0-6.627-5.373-12-12-12" fill="#ffccbc" />
+  </g>
+</svg>
