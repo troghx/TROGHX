@@ -1162,8 +1162,6 @@ body.modal-open{ overflow:hidden; }
   position:absolute;
   top:12px;
   right:12px;
-  width:48px;
-  height:48px;
   border-radius:18px;
   display:flex;
   align-items:center;
