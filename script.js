@@ -97,6 +97,14 @@ const TOPBAR_LOGOS = {
   app: "assets/images/trogh-app.png",
   movie: "assets/images/trogh-movies.png"
 };
+const PLAYER_MODE_ICONS = {
+  single: "assets/images/player-modes/single.svg",
+  multi: "assets/images/player-modes/multi.svg"
+};
+const PLAYER_MODE_LABELS = {
+  single: "Un jugador",
+  multi: "Multijugador"
+};
 function updateTopbarLogo(cat){
   const logoEl = document.querySelector('.topbar .logo');
   if(!logoEl) return;
@@ -390,6 +398,52 @@ async function fetchLinkOk(url){
 }
 
 /* =========================
+   Badges visuales en tarjetas
+   ========================= */
+function applyPlayerModeBadge(tile, game = {}){
+  if(!tile) return;
+  const badge = tile.querySelector(".player-mode-badge");
+  if(!badge) return;
+
+  const category = (game?.category || window.currentCategory || "").toLowerCase();
+  const rawMode = typeof game?.playerMode === "string" ? game.playerMode.trim() : "";
+  const mode = category === "game" ? rawMode.toLowerCase() : "";
+  const icon = PLAYER_MODE_ICONS[mode];
+  const label = PLAYER_MODE_LABELS[mode];
+  const img = badge.querySelector("img");
+
+  if(!icon || !label){
+    badge.hidden = true;
+    delete badge.dataset.mode;
+    delete badge.dataset.label;
+    badge.removeAttribute("title");
+    badge.removeAttribute("aria-label");
+    badge.removeAttribute("role");
+    badge.setAttribute("aria-hidden", "true");
+    badge.removeAttribute("tabindex");
+    if(img){
+      img.removeAttribute("src");
+      img.removeAttribute("alt");
+    }
+    return;
+  }
+
+  if(img){
+    if(img.getAttribute("src") !== icon) img.src = icon;
+    img.alt = label;
+    img.setAttribute("aria-hidden", "true");
+  }
+
+  badge.hidden = false;
+  badge.dataset.mode = mode;
+  badge.dataset.label = label;
+  badge.title = label;
+  badge.setAttribute("aria-label", label);
+  badge.setAttribute("role", "img");
+  badge.setAttribute("aria-hidden", "false");
+}
+
+/* =========================
    Badges de estado (sin red)
    ========================= */
 function platformIconSVG(plat){
@@ -628,6 +682,7 @@ function renderRow(keepScroll=false){
 
     // Badge de estado (usando first_link/link_ok del lite)
     applyStatusBadge(tile, g.first_link || "", g.link_ok);
+    applyPlayerModeBadge(tile, g);
 
     grid.appendChild(node);
     attachHoverVideo(tile, g, vid);
@@ -2268,6 +2323,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
