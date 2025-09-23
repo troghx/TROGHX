@@ -677,49 +677,76 @@ function renderHeroCarousel(){
 /* =========================
    Modal ver juego (carga detalle al abrir) — SIN imagen
    ========================= */
+function bindModalChipLinks(container, game){
+  if(!container) return;
+  container.querySelectorAll("a.chip-gofile").forEach(a => {
+    const id = extractGofileId(a.getAttribute("href"));
+    if(!id) return;
+    a.addEventListener("click", ev => {
+      ev.preventDefault();
+      openGofileFolder(id, game?.title || "");
+    });
+    a.removeAttribute("target");
+    a.href = "#";
+  });
+  container.querySelectorAll("a.chip-drive").forEach(a => {
+    const id = extractDriveId(a.getAttribute("href"));
+    if(!id) return;
+    a.addEventListener("click", ev => {
+      ev.preventDefault();
+      downloadFromDrive({ id, name: game?.title || a.textContent || "" });
+    });
+    a.removeAttribute("target");
+    a.href = "#";
+  });
+}
+function setModalDescription(descEl, html, game){
+  if(!descEl) return;
+  const finalHtml = (html === undefined || html === null || (typeof html === "string" && html.trim() === ""))
+    ? "Sin descripción"
+    : html;
+  descEl.innerHTML = finalHtml;
+  bindModalChipLinks(descEl, game);
+}
 async function openGameLazy(game){
-  let data = game;
+  const modal = openGame(game, { initialState: "loading" });
   try{
     const full = await apiGet(game.id);
-    data = { ...game, ...full };
+    const data = { ...game, ...full };
+    modal?.update?.(data);
   }catch(err){
     console.error("[openGameLazy] detalle falló", err);
+    modal?.showError?.("No se pudo cargar la información adicional. Revisa tu conexión.");
   }
-  openGame(data);
 }
-function openGame(game){
+function openGame(initialGame, options = {}){
   const modal = modalTemplate.content.cloneNode(true);
   const modalNode    = modal.querySelector(".tw-modal");
   const modalContent = modal.querySelector(".tw-modal-content");
   const modalTitle   = modal.querySelector(".tw-modal-title");
   const modalDesc    = modal.querySelector(".tw-modal-description");
   const modalClose   = modal.querySelector(".tw-modal-close");
+  const { initialState = null, initialMessage = null } = options || {};
+  let currentGame = { ...initialGame };
 
-  if(modalTitle) modalTitle.textContent = game?.title || "Sin título";
-  if(modalDesc){
-    modalDesc.innerHTML = game?.description || "Sin descripción";
-    modalDesc.querySelectorAll("a.chip-gofile").forEach(a => {
-      const id = extractGofileId(a.getAttribute("href"));
-      if(id){
-        a.addEventListener("click", ev => {
-          ev.preventDefault();
-          openGofileFolder(id, game?.title || "");
-        });
-        a.removeAttribute("target");
-        a.href = "#";
-      }
-    });
-    modalDesc.querySelectorAll("a.chip-drive").forEach(a => {
-      const id = extractDriveId(a.getAttribute("href"));
-      if(id){
-        a.addEventListener("click", ev => {
-          ev.preventDefault();
-          downloadFromDrive({ id, name: game?.title || a.textContent || "" });
-        });
-        a.removeAttribute("target");
-        a.href = "#";
-      }
-    });
+  const applyTitle = ()=>{ if(modalTitle) modalTitle.textContent = currentGame?.title || "Sin título"; };
+  const renderDescription = ()=> setModalDescription(modalDesc, currentGame?.description, currentGame);
+  const showLoading = (message = "Cargando…")=> setModalDescription(modalDesc, `<p class="modal-status modal-status--loading">${message}</p>`, currentGame);
+  const showError = (message = "No se pudo cargar la información adicional. Intenta nuevamente.")=> setModalDescription(modalDesc, `<p class="modal-status modal-status--error">${message}</p>`, currentGame);
+  const update = (data = {})=>{
+    currentGame = { ...currentGame, ...data };
+    applyTitle();
+    renderDescription();
+    return currentGame;
+  };
+
+  applyTitle();
+  if(initialState === "loading"){
+    showLoading(initialMessage || "Cargando…");
+  }else if(initialState === "error"){
+    showError(initialMessage || "No se pudo cargar la información adicional.");
+  }else{
+    renderDescription();
   }
 
   if(isAdmin){
@@ -740,10 +767,10 @@ function openGame(game){
 
     panel.addEventListener("click",(e)=>{
       const action=e.target?.dataset?.action;
-      if(action==="edit"){ panel.classList.remove("show"); openEditGame(game); }
+      if(action==="edit"){ panel.classList.remove("show"); openEditGame(currentGame); }
       if(action==="delete"){
         panel.classList.remove("show");
-        if(confirm("¿Eliminar esta publicación?")) deleteGame(game);
+        if(confirm("¿Eliminar esta publicación?")) deleteGame(currentGame);
       }
     });
 
@@ -783,6 +810,7 @@ function openGame(game){
       link.addEventListener("mouseenter", ()=>{ hide(); clearTimeout(t); });
     });
   }
+  return { update, showLoading, showError, get data(){ return currentGame; } };
 }
 function deleteGame(game){
   if(!game.id){ alert("No se encontró ID."); return; }
@@ -2185,6 +2213,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
