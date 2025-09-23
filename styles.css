@@ -682,25 +682,33 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
     opacity: 1;
   }
 
-  .discord-link{
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1001;
-  }
+.discord-cta{
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1001;
+}
+.discord-link{
+  position: static;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+}
 .discord-link img{ width:100%; height:100%; object-fit:cover; }
 
 .discord-bubble{
   position: absolute;
-  bottom: 72px;
-  right: 16px;
+  bottom: 0;
+  left: calc(100% + 12px);
   background: linear-gradient(135deg,#ff00ff,#00ffff);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
@@ -717,18 +725,19 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   transform: translateY(10px);
   transition: opacity .25s, transform .25s;
   z-index: 1000;
+  white-space: nowrap;
 }
 .discord-bubble::after{
   content: "";
   position: absolute;
-  top: 100%;
-  right: 24px;
+  top: 50%;
+  left: 0;
   width: 12px;
   height: 12px;
   background: inherit;
   -webkit-backdrop-filter: inherit;
   backdrop-filter: inherit;
-  transform: translateY(-50%) rotate(45deg);
+  transform: translate(-50%, -50%) rotate(45deg);
   border-radius: 2px;
 }
 .discord-bubble.show{
