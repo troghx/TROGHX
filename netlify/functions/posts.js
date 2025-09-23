@@ -35,6 +35,12 @@ function normCat(v) {
   return "game";
 }
 
+function normMode(v) {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  return s.toLowerCase();
+}
+
 const qs = (e) => e.queryStringParameters || {};
 
 function getId(event) {
@@ -94,6 +100,7 @@ async function ensureSchema() {
     image_thumb    TEXT,
     preview_video  TEXT,
     category       TEXT DEFAULT 'game',
+    player_mode    TEXT,
     first_link     TEXT,
     link_ok        BOOLEAN,
     gofile_id      TEXT,
@@ -106,6 +113,7 @@ async function ensureSchema() {
     ADD COLUMN IF NOT EXISTS first_link TEXT,
     ADD COLUMN IF NOT EXISTS link_ok BOOLEAN,
     ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'game',
+    ADD COLUMN IF NOT EXISTS player_mode TEXT,
     ADD COLUMN IF NOT EXISTS gofile_id TEXT,
     ADD COLUMN IF NOT EXISTS drive_id TEXT,
     ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`;
@@ -133,6 +141,7 @@ export async function handler(event) {
         if (lite) {
           const rows = await sql`
           SELECT id, title, category,
+                 player_mode AS "playerMode",
                  COALESCE(image_thumb, image) AS image_thumb,
                  created_at, link_ok, first_link, gofile_id, drive_id
           FROM posts
@@ -143,7 +152,9 @@ export async function handler(event) {
           return json(200, rows, cacheHdr(60));
         } else {
           const rows = await sql`
-          SELECT id, title, category, image, description, preview_video,
+          SELECT id, title, category,
+                 player_mode AS "playerMode",
+                 image, description, preview_video,
                  created_at, link_ok, first_link, gofile_id, drive_id
           FROM posts
           WHERE category = ${category}
@@ -171,7 +182,9 @@ export async function handler(event) {
           return json(200, { previewVideo: rows[0].preview_video || null }, cacheHdr(300));
         }
         const rows = await sql`
-          SELECT id, title, category, image, description, created_at, link_ok, first_link, gofile_id, drive_id
+          SELECT id, title, category,
+                 player_mode AS "playerMode",
+                 image, description, created_at, link_ok, first_link, gofile_id, drive_id
           FROM posts WHERE id=${id} LIMIT 1
         `;
         if (!rows.length) return json(404, { error: "not found" });
@@ -199,14 +212,15 @@ export async function handler(event) {
         const link_ok      = (typeof b.link_ok === "boolean") ? b.link_ok : null;
         const gofile_id    = b.gofile_id || gofileIdFrom(first_link);
         const drive_id     = b.drive_id || driveIdFrom(first_link);
+        const playerMode   = normMode(b.playerMode ?? b.player_mode);
 
         if (!title || !image || !image_thumb || !description) {
           return json(400, { error: "missing fields" });
         }
 
         const rows = await sql`
-          INSERT INTO posts (title, category, image, image_thumb, description, preview_video, link_ok, first_link, gofile_id, drive_id)
-          VALUES (${title}, ${category}, ${image}, ${image_thumb}, ${description}, ${previewVideo}, ${link_ok}, ${first_link}, ${gofile_id}, ${drive_id})
+          INSERT INTO posts (title, category, player_mode, image, image_thumb, description, preview_video, link_ok, first_link, gofile_id, drive_id)
+          VALUES (${title}, ${category}, ${playerMode}, ${image}, ${image_thumb}, ${description}, ${previewVideo}, ${link_ok}, ${first_link}, ${gofile_id}, ${drive_id})
           RETURNING id
         `;
         return json(200, { id: rows[0].id });
@@ -234,6 +248,8 @@ export async function handler(event) {
         const vThumb   = ("image_thumb"  in b || "imageThumb" in b) ? (b.image_thumb ?? b.imageThumb ?? null) : null;
         const vPrev    = ("previewVideo" in b || "preview_video" in b) ? (b.previewVideo ?? b.preview_video ?? null) : null;
         const vLinkOk  = ("link_ok"      in b) ? ((typeof b.link_ok === "boolean") ? b.link_ok : null) : null;
+        const hasMode  = ("playerMode" in b) || ("player_mode" in b);
+        const vMode    = hasMode ? normMode(b.playerMode ?? b.player_mode) : null;
         const vBump    = b.bump === true;
 
         let vFirst;
@@ -275,6 +291,7 @@ export async function handler(event) {
             image         = COALESCE(${vImage}, image),
             image_thumb   = COALESCE(${vThumb}, image_thumb),
             preview_video = COALESCE(${vPrev}, preview_video),
+            player_mode   = COALESCE(${vMode}, player_mode),
             link_ok       = COALESCE(${vLinkOk}, link_ok),
             first_link    = COALESCE(${vFirst}, first_link),
             gofile_id     = COALESCE(${vGofile}, gofile_id),
@@ -311,6 +328,7 @@ export async function handler(event) {
     return json(500, { error: "Internal Server Error", detail: String(err.message || err) });
   }
 }
+
 
 
 
