@@ -787,6 +787,9 @@ function openGame(initialGame, options = {}){
 
   const discord = socials.find(s => /discord/i.test(s.name || s.url));
   if(discord && modalContent){
+    const ctaWrap = document.createElement("div");
+    ctaWrap.className = "discord-cta";
+
     const link = document.createElement("a");
     link.className = "discord-link";
     link.href = discord.url;
@@ -796,12 +799,14 @@ function openGame(initialGame, options = {}){
     img.src = discord.image;
     img.alt = discord.name || "Discord";
     link.appendChild(img);
-    modalContent.appendChild(link);
+    ctaWrap.appendChild(link);
 
     const bubble = document.createElement("div");
     bubble.className = "discord-bubble";
     bubble.textContent = "Preguntas?🤨 pásate por el Discord";
-    modalContent.appendChild(bubble);
+    ctaWrap.appendChild(bubble);
+
+    modalContent.appendChild(ctaWrap);
 
     requestAnimationFrame(()=>{
       bubble.classList.add("show");
@@ -2217,6 +2222,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
