@@ -98,8 +98,8 @@ const TOPBAR_LOGOS = {
   movie: "assets/images/trogh-movies.png"
 };
 const PLAYER_MODE_ICONS = {
-  single: "assets/images/player-modes/single.svg",
-  multi: "assets/images/player-modes/multi.svg"
+  single: "assets/images/player-modes/single.png",
+  multi: "assets/images/player-modes/multi.png"
 };
 const PLAYER_MODE_LABELS = {
   single: "Un jugador",
@@ -2323,6 +2323,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
