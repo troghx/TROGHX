@@ -1111,29 +1111,16 @@ function openDmcaModal(){
 /* =========================
    FAQ Modal
    ========================= */
-async function openFaqModal(){
-  const modal = faqModalTemplate.content.cloneNode(true);
-  const node  = modal.querySelector('.tw-modal');
-  const content = modal.querySelector('.faq-content');
-  const modalClose = modal.querySelector('.tw-modal-close');
-
-  try{
-    const res = await fetch('/.netlify/functions/faq');
-    if(res.ok){
-      const data = await res.json();
-      if(content) content.innerHTML = data.content || '';
-    }else{
-      if(content) content.textContent = 'No se pudo cargar.';
-    }
-  }catch(err){
-    console.error(err);
-    if(content) content.textContent = 'No se pudo cargar.';
-  }
-
-  if(isAdmin){
-    const editBtn = document.createElement('button');
-    editBtn.className = 'dmca-btn';
-    editBtn.type = 'button';
+.tw-modal-description .modal-status{
+  margin: 12px 0;
+  padding: 12px 16px;
+  background: rgba(255,255,255,.05);
+  border-radius: 12px;
+  text-align: center;
+  font-weight: 500;
+}
+.tw-modal-description .modal-status--loading{ color: var(--ring); }
+.tw-modal-description .modal-status--error{ color: #ff7676; }
     editBtn.textContent = 'Editar';
     editBtn.addEventListener('click', openFaqEditor);
     modal.querySelector('.tw-modal-content')?.appendChild(editBtn);
@@ -1144,6 +1131,21 @@ async function openFaqModal(){
   modalClose?.addEventListener('click', ()=> closeModal(node, removeTrap, onEscape));
 
   openModalFragment(node);
+
+  (async ()=>{
+    try{
+      const res = await fetch('/.netlify/functions/faq');
+      if(res.ok){
+        const data = await res.json();
+        if(content) content.innerHTML = data.content || '';
+      }else{
+        if(content) content.textContent = 'No se pudo cargar.';
+      }
+    }catch(err){
+      console.error(err);
+      if(content) content.textContent = 'No se pudo cargar.';
+    }
+  })();
 }
 
 async function openFaqEditor(){
@@ -2213,6 +2215,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
