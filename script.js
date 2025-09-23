@@ -858,12 +858,55 @@ function initGameModal(initial = {}){
   const trailerFileInput = fragment.querySelector(".new-game-trailer-file");
   const trailerUrlInput  = fragment.querySelector(".new-game-trailer-url");
   const modalClose = fragment.querySelector(".tw-modal-close");
+  const playerModeField = fragment.querySelector(".player-mode-field");
+  const playerModeSelect = fragment.querySelector(".player-mode-select");
 
   const editorRoot = fragment.querySelector(".rich-editor");
   const editorAPI  = initRichEditor(editorRoot);
 
   const catSel = makeCategorySelect(initial.category || "game");
   form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
+
+  const catSelectEl = catSel.querySelector(".cat-select");
+
+  let lastPlayerModeValue = initial.playerMode || playerModeSelect?.value || "single";
+  if(playerModeSelect){
+    if(playerModeSelect.querySelector(`option[value="${lastPlayerModeValue}"]`)){
+      playerModeSelect.value = lastPlayerModeValue;
+    }else if(playerModeSelect.options.length){
+      playerModeSelect.value = playerModeSelect.options[0].value;
+      lastPlayerModeValue = playerModeSelect.value;
+    }
+    playerModeSelect.addEventListener("change", (e)=>{
+      lastPlayerModeValue = e.target.value;
+    });
+  }
+
+  const updatePlayerModeVisibility = (catValue)=>{
+    if(!playerModeField) return;
+    const isGame = catValue === "game";
+    if(isGame){
+      playerModeField.hidden = false;
+      if(playerModeSelect){
+        const option = playerModeSelect.querySelector(`option[value="${lastPlayerModeValue}"]`);
+        if(option){
+          playerModeSelect.value = lastPlayerModeValue;
+        }else if(playerModeSelect.options.length){
+          playerModeSelect.value = playerModeSelect.options[0].value;
+          lastPlayerModeValue = playerModeSelect.value;
+        }
+      }
+    }else{
+      if(playerModeSelect){
+        lastPlayerModeValue = playerModeSelect.value || lastPlayerModeValue;
+      }
+      playerModeField.hidden = true;
+    }
+  };
+
+  catSelectEl?.addEventListener("change", (e)=> updatePlayerModeVisibility(e.target.value));
+
+  updatePlayerModeVisibility(catSelectEl?.value || "game");
 
   if(trailerUrlInput){
     trailerUrlInput.value=""; trailerUrlInput.disabled=true;
@@ -874,7 +917,7 @@ function initGameModal(initial = {}){
   if(initial.description) editorAPI.setHTML(initial.description);
   if(imageInput && initial.image !== undefined) imageInput.required=false;
 
-  return { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel };
+  return { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, playerModeField, playerModeSelect };
 }
 
 async function compressCoverAndThumb(imageFile){
@@ -891,13 +934,15 @@ async function readTrailerFile(trailerFile){
 }
 
 async function gatherGameData(refs, { requireImage=true } = {}){
-  const { titleInput, imageInput, trailerFileInput, editorAPI, catSel } = refs;
+  const { titleInput, imageInput, trailerFileInput, editorAPI, catSel, playerModeSelect } = refs;
 
   const title=(titleInput?.value||"").trim();
   const descHTML=editorAPI.getHTML();
   const imageFile=imageInput?.files?.[0] || null;
   const trailerFile=trailerFileInput?.files?.[0] || null;
   const category = catSel.querySelector(".cat-select")?.value || "game";
+  const rawPlayerMode = playerModeSelect?.value || "";
+  const playerMode = category === "game" && rawPlayerMode ? rawPlayerMode : null;
 
   if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return null; }
   if(requireImage && !imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return null; }
@@ -922,12 +967,12 @@ async function gatherGameData(refs, { requireImage=true } = {}){
   const drive_id = plat === "drive" ? extractDriveId(first_link) : null;
   const link_ok = first_link ? await fetchLinkOk(first_link) : null;
 
-  return { title, descHTML, coverDataUrl, thumbDataUrl, previewSrc, category, first_link, link_ok, gofile_id, drive_id };
+  return { title, descHTML, coverDataUrl, thumbDataUrl, previewSrc, category, playerMode, first_link, link_ok, gofile_id, drive_id };
 }
 
 function openNewGameModal(){
   const refs = initGameModal();
-  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel } = refs;
+  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, playerModeSelect, playerModeField } = refs;
 
   const removeTrap=trapFocus(node);
   const onEscape=(e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
@@ -948,6 +993,7 @@ function openNewGameModal(){
       description: data.descHTML,
       previewVideo: data.previewSrc,
       category: data.category,
+      playerMode: data.playerMode,
       first_link: data.first_link,
       link_ok: data.link_ok,
       gofile_id: data.gofile_id,
@@ -966,7 +1012,7 @@ function openNewGameModal(){
 }
 function openEditGame(original){
   const refs = initGameModal(original);
-  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel  } = refs;
+  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, playerModeSelect, playerModeField  } = refs;
 
   let clearTrailerCb=null;
   {
@@ -986,7 +1032,7 @@ function openEditGame(original){
     const data = await gatherGameData(refs, { requireImage: false });
     if(!data) return;
 
-    const patch={ title: data.title, description: data.descHTML, category: data.category, first_link: data.first_link, link_ok: data.link_ok, gofile_id: data.gofile_id, drive_id: data.drive_id };
+    const patch={ title: data.title, description: data.descHTML, category: data.category, playerMode: data.playerMode, first_link: data.first_link, link_ok: data.link_ok, gofile_id: data.gofile_id, drive_id: data.drive_id };
 
     if(data.coverDataUrl){
       patch.image = data.coverDataUrl;
@@ -2222,6 +2268,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
