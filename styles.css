@@ -1255,13 +1255,11 @@ body.modal-open{ overflow:hidden; }
 .game-card a, .post-card a, .tile a { cursor:pointer; }
 
 .game-card, .post-card, .tile, .grid .card{
-  cursor: url("/assets/cursor/hand.cur") 10 2,
-          url("/assets/cursor/hand.png") 10 2,
+  cursor: url("/assets/cursor/hand.png") 10 2,
           pointer;
 }
 .tile-video{
-  cursor: url("/assets/cursor/hand.cur") 10 2,
-          url("/assets/cursor/hand.png") 10 2,
+  cursor: url("/assets/cursor/hand.png") 10 2,
           pointer;
 }
 
