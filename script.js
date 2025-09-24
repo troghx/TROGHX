@@ -70,18 +70,177 @@ const dmcaTexts = {
 };
 
 /* ------- LocalStorage keys ------- */
-const LS_RECENTES   = "tgx_recientes";
-const LS_ADMIN      = "tgx_is_admin";
-const LS_ADMIN_HASH = "tgx_admin_hash";
-const LS_ADMIN_SALT = "tgx_admin_salt";
-const LS_ADMIN_USER = "tgx_admin_user";
-const LS_SOCIALS    = "tgx_socials";
+const LS_RECENTES        = "tgx_recientes";
+const LS_SOCIALS         = "tgx_socials";
+const SS_ADMIN_FLAG      = "tgx_is_admin";
+const SS_ADMIN_HASH      = "tgx_admin_hash";
+const SS_ADMIN_SALT      = "tgx_admin_salt";
+const SS_ADMIN_USER      = "tgx_admin_user";
+const ADMIN_TOKEN_KEY    = "tgx_admin_token";
 
 /* ------- Endpoints ------- */
 const API_POSTS = "/.netlify/functions/posts";
 const API_SOC   = "/.netlify/functions/socials";
 const API_LINK  = "/.netlify/functions/linkcheck";
 const API_ADM   = "/.netlify/functions/admins";
+
+/* ------- Storage helpers ------- */
+function readSession(key){
+  try{ return sessionStorage.getItem(key); }
+  catch(err){ return null; }
+}
+function writeSession(key, value){
+  try{
+    if(value === undefined || value === null){ sessionStorage.removeItem(key); }
+    else { sessionStorage.setItem(key, value); }
+  }catch(err){ /* ignore */ }
+}
+let adminTokenMemory = null;
+function getAdminToken(){
+  if(adminTokenMemory) return adminTokenMemory;
+  const stored = readSession(ADMIN_TOKEN_KEY);
+  if(stored && stored.trim()){ adminTokenMemory = stored.trim(); return adminTokenMemory; }
+  return null;
+}
+function setAdminToken(token){
+  const value = token && token.trim() ? token.trim() : null;
+  adminTokenMemory = value;
+  if(value){ writeSession(ADMIN_TOKEN_KEY, value); }
+  else { writeSession(ADMIN_TOKEN_KEY, null); }
+}
+function purgeLegacyAdminStorage(){
+  try{
+    const keys = [SS_ADMIN_FLAG, SS_ADMIN_HASH, SS_ADMIN_SALT, SS_ADMIN_USER, ADMIN_TOKEN_KEY];
+    keys.forEach((key)=>{
+      const legacy = localStorage.getItem(key);
+      if(legacy !== null){
+        if(key === ADMIN_TOKEN_KEY) setAdminToken(legacy);
+        else writeSession(key, legacy);
+        localStorage.removeItem(key);
+      }
+    });
+  }catch(err){ /* ignore */ }
+}
+
+/* ------- Sanitizers ------- */
+const SAFE_PROTOCOLS = ["http:", "https:", "mailto:", "tel:", "magnet:", "data:"];
+const SAFE_STYLE_PROPS = new Set(["color", "background-color", "text-align", "font-weight", "font-style", "text-decoration", "font-family", "font-size"]);
+function sanitizeUrl(input){
+  if(!input && input !== 0) return "";
+  const raw = String(input).trim();
+  if(!raw) return "";
+  try{
+    const url = new URL(raw, window.location.origin);
+    if(!SAFE_PROTOCOLS.includes(url.protocol)) return "";
+    return url.href;
+  }catch(err){
+    const lower = raw.toLowerCase();
+    if(lower.startsWith("javascript:")) return "";
+    if(lower.startsWith("data:")) return raw;
+    return raw;
+  }
+}
+function sanitizeStyle(value){
+  if(!value) return "";
+  const safe = [];
+  value.split(";").forEach((decl)=>{
+    if(!decl) return;
+    const idx = decl.indexOf(":");
+    if(idx === -1) return;
+    const prop = decl.slice(0, idx).trim().toLowerCase();
+    const val = decl.slice(idx + 1).trim();
+    if(!SAFE_STYLE_PROPS.has(prop)) return;
+    if(/url\s*\(|expression\s*\(/i.test(val)) return;
+    safe.push(`${prop}: ${val}`);
+  });
+  return safe.join("; ");
+}
+function sanitizeHTML(html){
+  if(typeof html !== "string") return "";
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const allowedTags = new Set(["a","abbr","b","blockquote","br","code","div","em","font","h1","h2","h3","h4","h5","h6","hr","i","img","li","mark","ol","p","pre","s","small","span","strong","sub","sup","table","tbody","td","tfoot","th","thead","tr","u","ul"]);
+  const globalAttrs = new Set(["class","title","aria-label","aria-hidden","role","id","data-mode","data-label"]);
+  const urlAttrs = new Set(["href","src"]);
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
+  const toRemove = [];
+  while(walker.nextNode()){
+    const node = walker.currentNode;
+    const tag = node.tagName.toLowerCase();
+    if(!allowedTags.has(tag)){
+      toRemove.push(node);
+      continue;
+    }
+    Array.from(node.attributes).forEach(attr => {
+      const name = attr.name.toLowerCase();
+      const value = attr.value;
+      const isGlobal = globalAttrs.has(name) || name.startsWith("data-");
+      const isAllowedForTag =
+        (tag === "a" && ["href","rel","target","title"].includes(name)) ||
+        (tag === "img" && ["src","alt","title","loading","width","height"].includes(name)) ||
+        (tag === "font" && ["color","face","size"].includes(name)) ||
+        (tag === "table" && ["border","cellpadding","cellspacing"].includes(name)) ||
+        name === "style";
+      if(!(isGlobal || isAllowedForTag)){
+        node.removeAttribute(attr.name);
+        return;
+      }
+      if(name === "style"){
+        const safeStyle = sanitizeStyle(value);
+        if(safeStyle) node.setAttribute("style", safeStyle);
+        else node.removeAttribute("style");
+        return;
+      }
+      if(urlAttrs.has(name)){
+        const safeUrl = sanitizeUrl(value);
+        if(!safeUrl || (tag === "a" && safeUrl.startsWith("data:"))){ node.removeAttribute(attr.name); return; }
+        node.setAttribute(name, safeUrl);
+        if(tag === "a" && name === "href"){
+          const target = node.getAttribute("target");
+          if(target && target.toLowerCase() === "_blank"){
+            const rel = (node.getAttribute("rel") || "").split(/\s+/).filter(Boolean);
+            if(!rel.includes("noopener")) rel.push("noopener");
+            if(!rel.includes("noreferrer")) rel.push("noreferrer");
+            node.setAttribute("rel", rel.join(" ").trim());
+          }
+        }
+        return;
+      }
+      if(tag === "a" && name === "target"){
+        const safeTarget = value === "_blank" ? "_blank" : "_self";
+        node.setAttribute("target", safeTarget);
+        if(safeTarget === "_blank"){
+          const rel = (node.getAttribute("rel") || "").split(/\s+/).filter(Boolean);
+          if(!rel.includes("noopener")) rel.push("noopener");
+          if(!rel.includes("noreferrer")) rel.push("noreferrer");
+          node.setAttribute("rel", rel.join(" ").trim());
+        } else {
+          node.removeAttribute("rel");
+        }
+      }
+      if(tag === "a" && name === "rel"){
+        const tokens = value.split(/\s+/).filter(Boolean);
+        const safe = new Set(tokens);
+        safe.add("noopener");
+        safe.add("noreferrer");
+        node.setAttribute("rel", Array.from(safe).join(" "));
+      }
+    });
+  }
+  toRemove.forEach(node => {
+    const parent = node.parentNode;
+    if(!parent){ node.remove(); return; }
+    while(node.firstChild) parent.insertBefore(node.firstChild, node);
+    parent.removeChild(node);
+  });
+  return doc.body.innerHTML;
+}
+function setSafeHTML(el, html){
+  if(!el) return "";
+  const safe = sanitizeHTML(html || "");
+  el.innerHTML = safe;
+  return safe;
+}
 
 /* ------- Estado ------- */
 let isAdmin = false;
@@ -149,12 +308,14 @@ function recalcPageSize(){
 function rehydrate() {
   try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES)||"[]"); if(Array.isArray(saved)) recientes = saved; } catch (err) {}
   try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS)||"[]"); if(Array.isArray(savedS)) socials = savedS; } catch (err) {}
-  isAdmin = localStorage.getItem(LS_ADMIN) === "1";
-  try { const t=localStorage.getItem("tgx_admin_token"); if(!isAdmin && t && t.trim()) isAdmin=true; } catch (err) {}
+  purgeLegacyAdminStorage();
+  isAdmin = readSession(SS_ADMIN_FLAG) === "1";
+  const token = getAdminToken();
+  if(!isAdmin && token && token.trim()) isAdmin = true;
 }
 rehydrate();
 
-function persistAdmin(flag){ try{ localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); }catch (err) {} }
+function persistAdmin(flag){ writeSession(SS_ADMIN_FLAG, flag ? "1" : "0"); }
 function preload(src){ const img = new Image(); img.src = src; }
 
 function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
@@ -359,12 +520,12 @@ function insertLinkChip(editorArea){
   if(driveId) url=`https://drive.google.com/file/d/${driveId}`;
   if(!/^https?:\/\//i.test(url) && !url.startsWith("magnet:")) url="https://"+url;
   const plat=driveId ? "drive" : platformFromUrl(url);
-  const html=`<a href="${url.replace(/"/g,"&quot;")}" target="_blank" rel="noopener" class="link-chip chip-${plat}"><span class="chip-dot"></span>${text.replace(/[<>]/g,"")}</a>`;
+  const html=`<a href="${url.replace(/"/g,"&quot;")}" target="_blank" rel="noopener noreferrer" class="link-chip chip-${plat}"><span class="chip-dot"></span>${text.replace(/[<>]/g,"")}</a>`;
   document.execCommand("insertHTML", false, html);
 }
 function extractFirstLink(html){
   const tmp=document.createElement("div");
-  tmp.innerHTML=html||"";
+  tmp.innerHTML=sanitizeHTML(html||"");
   const a=tmp.querySelector("a[href]");
   return a ? a.getAttribute("href") : "";
 }
@@ -536,7 +697,10 @@ function initRichEditor(editorRoot){
     colorInput.addEventListener("input", ()=> exec("foreColor", colorInput.value));
   }
 
-  return { getHTML: ()=>editorArea.innerHTML.trim(), setHTML: (h)=>{ editorArea.innerHTML=h||""; } };
+  return {
+    getHTML: ()=> sanitizeHTML(editorArea.innerHTML.trim()),
+    setHTML: (h)=>{ editorArea.innerHTML = sanitizeHTML(h || ""); }
+  };
 }
 
 /* =========================
@@ -760,7 +924,7 @@ function setModalDescription(descEl, html, game){
   const finalHtml = (html === undefined || html === null || (typeof html === "string" && html.trim() === ""))
     ? "Sin descripción"
     : html;
-  descEl.innerHTML = finalHtml;
+  setSafeHTML(descEl, finalHtml);
   bindModalChipLinks(descEl, game);
 }
 async function openGameLazy(game){
@@ -847,7 +1011,9 @@ function openGame(initialGame, options = {}){
 
     const link = document.createElement("a");
     link.className = "discord-link";
-    link.href = discord.url;
+    const discordUrl = sanitizeUrl(discord.url);
+    if(!discordUrl) return;
+    link.href = discordUrl;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     const img = document.createElement("img");
@@ -874,7 +1040,7 @@ function openGame(initialGame, options = {}){
 }
 function deleteGame(game){
   if(!game.id){ alert("No se encontró ID."); return; }
-  const token = localStorage.getItem("tgx_admin_token") || "";
+  const token = getAdminToken() || "";
   if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
   apiDelete(game.id, token)
     .then(()=> reloadData())
@@ -1038,7 +1204,7 @@ function openNewGameModal(){
     const data = await gatherGameData(refs);
     if(!data) return;
 
-    const token=localStorage.getItem("tgx_admin_token")||"";
+    const token = getAdminToken() || "";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
     const newGame = {
@@ -1100,7 +1266,7 @@ function openEditGame(original){
     }
     patch.bump = true;
 
-    const token=localStorage.getItem("tgx_admin_token")||"";
+    const token = getAdminToken() || "";
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
     try{
@@ -1135,15 +1301,18 @@ function openNewSocialModal(){
     e.preventDefault();
     const file=imageInput?.files?.[0];
     const url=(urlInput.value||"").trim();
-    const name=(nameInput?.value||"").trim() || null;
+    const nameValue=(nameInput?.value||"").trim() || null;
+    const name = nameValue ? nameValue.replace(/[<>]/g, "") : null;
     if(!file){ alert("Selecciona una imagen."); return; }
     if(!url){ alert("Coloca el enlace de la red."); urlInput.focus(); return; }
+    const safeUrl = sanitizeUrl(url);
+    if(!safeUrl){ alert("URL inválida."); urlInput.focus(); return; }
 
     const reader=new FileReader();
     reader.onload = async ()=>{
       try{
-        const token=localStorage.getItem("tgx_admin_token")||"";
-        await socialsCreate({ name, image: reader.result, url }, token);
+        const token = getAdminToken() || "";
+        await socialsCreate({ name, image: reader.result, url: safeUrl }, token);
         socials = await socialsList();
         renderSocialBar();
       }catch(err){ console.error(err); alert("Error al guardar red social."); }
@@ -1162,9 +1331,14 @@ function renderSocialBar(){
   socials.forEach((s)=>{
     const wrap=document.createElement("div");
     wrap.className="social-tile-wrap"; wrap.style.position="relative"; wrap.style.display="inline-block";
-    const a=document.createElement("a"); a.href=s.url; a.target="_blank"; a.rel="noopener";
+    const safeUrl = sanitizeUrl(s.url);
+    if(!safeUrl) return;
+    const a=document.createElement("a"); a.href=safeUrl; a.target="_blank"; a.rel="noopener noreferrer";
     const tile=document.createElement("div"); tile.className="social-tile";
-    const img=document.createElement("img"); img.src=s.image; img.className="social-img";
+    const img=document.createElement("img");
+    const imgSrc = sanitizeUrl(s.image);
+    if(!imgSrc) return;
+    img.src=imgSrc; img.className="social-img";
     tile.appendChild(img); a.appendChild(tile); wrap.appendChild(a);
     if(isAdmin && s.id){
       const del=document.createElement("button");
@@ -1172,7 +1346,7 @@ function renderSocialBar(){
       del.addEventListener("click", async(e)=>{
         e.preventDefault(); e.stopPropagation();
         if(!confirm("¿Eliminar esta red social?")) return;
-        try{ const token=localStorage.getItem("tgx_admin_token")||""; await socialsDelete(s.id, token); socials=await socialsList(); renderSocialBar(); }
+        try{ const token = getAdminToken() || ""; await socialsDelete(s.id, token); socials=await socialsList(); renderSocialBar(); }
         catch(err){ console.error(err); alert("No se pudo eliminar."); }
       });
       wrap.appendChild(del);
@@ -1198,12 +1372,12 @@ function openDmcaModal(){
   const modalClose = modal.querySelector('.tw-modal-close');
 
   let current = 'es';
-  if(desc) desc.innerHTML = dmcaTexts[current];
+  if(desc) setSafeHTML(desc, dmcaTexts[current]);
   if(btnToggle) btnToggle.textContent = 'EN';
 
   btnToggle?.addEventListener('click', ()=>{
     current = current === 'es' ? 'en' : 'es';
-    if(desc) desc.innerHTML = dmcaTexts[current];
+    if(desc) setSafeHTML(desc, dmcaTexts[current]);
     if(btnToggle) btnToggle.textContent = current === 'es' ? 'EN' : 'ES';
   });
 
@@ -1245,7 +1419,7 @@ function openFaqModal(){
       const res = await fetch('/.netlify/functions/faq');
       if(res.ok){
         const data = await res.json();
-        if(content) content.innerHTML = data.content || '';
+        if(content) setSafeHTML(content, data.content || '');
       }else{
         if(content) content.textContent = 'No se pudo cargar.';
       }
@@ -1308,14 +1482,14 @@ async function openFaqEditor(){
   saveBtn?.addEventListener('click', async ()=>{
     const content = editorAPI.getHTML();
     try{
-      const token=localStorage.getItem('tgx_admin_token')||'';
+      const token = getAdminToken() || '';
       const res = await fetch('/.netlify/functions/faq', {
         method:'PUT',
         headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
         body:JSON.stringify({content})
       });
       if(res.ok){
-        if(contentEl) contentEl.innerHTML = content;
+        if(contentEl) setSafeHTML(contentEl, content);
         closeModal(node, removeTrap, onEscape);
       }else{
         alert('No se pudo guardar.');
@@ -1393,10 +1567,10 @@ function setupSideNav(){
    Admin: Token y Login / Crear Usuario
    ========================= */
 function ensureAuthTokenPrompt(){
-  try{
-    const k="tgx_admin_token"; let t=localStorage.getItem(k);
-    if(!t){ t = prompt("Pega tu AUTH_TOKEN de Netlify (requerido para publicar/editar/borrar):"); if(t) localStorage.setItem(k, t.trim()); }
-  }catch (err) {}
+  const token = getAdminToken();
+  if(token && token.trim()) return;
+  const input = prompt("Pega tu AUTH_TOKEN de Netlify (requerido para publicar/editar/borrar):");
+  if(input) setAdminToken(input);
 }
 
 function openAdminLoginModal(){
@@ -1429,9 +1603,9 @@ function openAdminLoginModal(){
     <span class="input-hint">4 a 6 dígitos</span>`;
   form.insertBefore(confirmWrap, actions);
 
-  const savedHash = localStorage.getItem(LS_ADMIN_HASH);
-  const savedSalt = localStorage.getItem(LS_ADMIN_SALT);
-  const savedUser = localStorage.getItem(LS_ADMIN_USER);
+  const savedHash = readSession(SS_ADMIN_HASH);
+  const savedSalt = readSession(SS_ADMIN_SALT);
+  const savedUser = readSession(SS_ADMIN_USER);
 
   const isCreateMode = { value: false };
   function setModeCreate(flag){
@@ -1465,9 +1639,9 @@ function openAdminLoginModal(){
       const salt=genSaltHex(16);
       const hash=await hashCreds(user,pin,salt);
       try{
-        localStorage.setItem(LS_ADMIN_HASH,hash);
-        localStorage.setItem(LS_ADMIN_SALT,salt);
-        localStorage.setItem(LS_ADMIN_USER,user);
+        writeSession(SS_ADMIN_HASH, hash);
+        writeSession(SS_ADMIN_SALT, salt);
+        writeSession(SS_ADMIN_USER, user);
       }catch (err) {}
     } else {
       if(user!==savedUser){ alert("Usuario o PIN incorrectos."); return; }
@@ -1499,10 +1673,10 @@ function openAdminMenuModal(){
   if(btnLogout) btnLogout.addEventListener("click", ()=>{
     isAdmin=false; persistAdmin(false);
     try {
-      localStorage.removeItem("tgx_admin_token");
-      localStorage.removeItem(LS_ADMIN_HASH);
-      localStorage.removeItem(LS_ADMIN_SALT);
-      localStorage.removeItem(LS_ADMIN_USER);
+      setAdminToken(null);
+      writeSession(SS_ADMIN_HASH, null);
+      writeSession(SS_ADMIN_SALT, null);
+      writeSession(SS_ADMIN_USER, null);
     } catch (err) {}
     renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
     alert("Sesión cerrada.");
@@ -1819,7 +1993,10 @@ async function downloadFromGofile(item){
       localStorage.setItem('tgx_downloads', JSON.stringify(hist));
     }catch(err){ /* ignore */ }
 
-    window.open(data.url, '_blank');
+    const safeUrl = sanitizeUrl(data.url);
+    if(!safeUrl){ throw new Error('invalid url'); }
+    const w = window.open(safeUrl, '_blank', 'noopener');
+    if(w) w.opener = null;
   } catch(err){
     console.error('[downloadFromGofile]', err);
     alert('No se pudo descargar');
@@ -2194,7 +2371,7 @@ function randomKey(len=28){
 
 async function openAdminCenter(){
   if(!isAdmin){ return; }
-  const token=localStorage.getItem("tgx_admin_token")||"";
+  const token = getAdminToken() || "";
   if(!token){ alert("Falta AUTH_TOKEN de Netlify para gestionar llaves."); return; }
 
   const frag = document.createDocumentFragment();
@@ -2323,7 +2500,6 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
-
 
 
 
