@@ -550,16 +550,20 @@ function getFilteredList(){
 function updatePager(totalPages){
   const pager  = document.getElementById("gridPager");
   if(!pager) return;
-  const status = pager.querySelector(".pg-status");
-  const prev   = pager.querySelector(".prev");
-  const next   = pager.querySelector(".next");
+  const dashes = pager.querySelectorAll(".pager-dash");
+  const liveStatus = pager.querySelector(".pager-live");
 
-  status.textContent = `Página ${page} / ${totalPages}`;
-  prev.disabled = page<=1;
-  next.disabled = page>=totalPages;
+  dashes.forEach(dash => dash.classList.remove("is-active"));
+  let activeIndex = 1;
+  if(page <= 1) activeIndex = 0;
+  else if(page >= totalPages) activeIndex = dashes.length - 1;
+  if(dashes[activeIndex]) {
+    dashes[activeIndex].classList.add("is-active");
+  }
 
-  prev.onclick = ()=>{ if(page>1){ page--; renderRow(true); } };
-  next.onclick = ()=>{ if(page<totalPages){ page++; renderRow(true); } };
+  if(liveStatus) {
+    liveStatus.textContent = `Página ${page} de ${totalPages}`;
+  }
 
   pager.style.display = (totalPages>1) ? "flex" : "none";
 }
@@ -2323,6 +2327,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
