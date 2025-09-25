@@ -554,12 +554,25 @@ function updatePager(totalPages){
   const dashes = pager.querySelectorAll(".pager-dash");
   const liveStatus = pager.querySelector(".pager-live");
 
-  dashes.forEach(dash => dash.classList.remove("is-active"));
-  let activeIndex = 1;
-  if(page <= 1) activeIndex = 0;
-  else if(page >= totalPages) activeIndex = dashes.length - 1;
-  if(dashes[activeIndex]) {
-    dashes[activeIndex].classList.add("is-active");
+  const prevAvailable = page > 1;
+  const nextAvailable = page < totalPages;
+
+  const middleIndex = Math.floor(dashes.length / 2);
+
+  dashes.forEach((dash, idx) => {
+    dash.classList.remove("is-active", "is-available", "is-disabled");
+    if(idx === 0){
+      dash.classList.toggle("is-available", prevAvailable);
+      dash.classList.toggle("is-disabled", !prevAvailable);
+    }
+    if(idx === dashes.length - 1){
+      dash.classList.toggle("is-available", nextAvailable);
+      dash.classList.toggle("is-disabled", !nextAvailable);
+    }
+  });
+
+  if(dashes[middleIndex]) {
+    dashes[middleIndex].classList.add("is-active");
   }
 
   if(liveStatus) {
@@ -2381,6 +2394,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
