@@ -120,6 +120,7 @@ function updateTopbarLogo(cat){
 let PAGE_SIZE = 12;
 let page = 1;
 let searchQuery = "";
+let recientesWheelCooldownTs = 0;
 const fullCache = new Map();
 const videoCache = new Map();
 
@@ -645,6 +646,58 @@ function attachHoverVideo(tile, g, vidEl){
   vidEl.__cancel = cancelDownload;
   window.__tgxVidIO.observe(vidEl);
 }
+function setupRecientesWheelPager(){
+  const grid = document.getElementById("gridRecientes");
+  if(!grid) return;
+
+  const list = getFilteredList();
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+
+  const removeHandler = () => {
+    if(!grid.__wheelPagerHandler) return;
+    grid.removeEventListener("wheel", grid.__wheelPagerHandler);
+    grid.__wheelPagerHandler = null;
+    grid.__wheelPagerBound = false;
+  };
+
+  if(totalPages <= 1){
+    removeHandler();
+    return;
+  }
+
+  if(grid.__wheelPagerBound) return;
+
+  const handler = (event) => {
+    const listInner = getFilteredList();
+    const totalPagesInner = Math.max(1, Math.ceil(listInner.length / PAGE_SIZE));
+    if(totalPagesInner <= 1){
+      removeHandler();
+      return;
+    }
+
+    event.preventDefault();
+
+    const now = Date.now();
+    if(now - recientesWheelCooldownTs < 200) return;
+
+    const direction = event.deltaY > 0 ? 1 : event.deltaY < 0 ? -1 : 0;
+    if(direction === 0) return;
+
+    if(direction > 0){
+      page = page === totalPagesInner ? 1 : page + 1;
+    }else{
+      page = page === 1 ? totalPagesInner : page - 1;
+    }
+
+    recientesWheelCooldownTs = now;
+    renderRow(true);
+  };
+
+  grid.__wheelPagerHandler = handler;
+  grid.__wheelPagerBound = true;
+  grid.addEventListener("wheel", handler, { passive: false });
+}
+
 function renderRow(keepScroll=false){
   const grid = document.getElementById("gridRecientes");
   if(!grid) return;
@@ -717,6 +770,7 @@ function renderRow(keepScroll=false){
   }
   updatePager(totalPages);
   if(!keepScroll) grid.scrollTo({ top: 0, behavior: "smooth" });
+  setupRecientesWheelPager();
 }
 
 /* =========================
@@ -2327,6 +2381,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
