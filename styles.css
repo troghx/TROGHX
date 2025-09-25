@@ -1060,13 +1060,35 @@ main, .main, .page, .app, .content {
   display: flex; align-items: center; justify-content: center;
   gap: 12px; padding: 8px 0 12px; border-top: 1px solid rgba(255,255,255,0.06);
 }
-.pg-btn {
-  background: linear-gradient(90deg,#a855f7,#06b6d4);
-  border: none; color: #0b1220; font-weight: 700;
-  padding: 8px 14px; border-radius: 10px; cursor: pointer;
+.pager-dashes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  font-size: 1.5rem;
+  letter-spacing: 0.5rem;
+  user-select: none;
 }
-.pg-btn[disabled] { opacity: .45; cursor: not-allowed; }
-.pg-status { opacity: .8; }
+
+.pager-dash {
+  color: rgba(230,235,240,.5);
+  opacity: .55;
+  padding: 0 2px;
+  transition: color .2s ease, opacity .2s ease;
+}
+
+.pager-dash.is-active {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.pager-dash.is-available {
+  opacity: .75;
+}
+
+.pager-dash.is-disabled {
+  opacity: .25;
+}
 
 /* Mantén tu "Añadir juego" pegado arriba a la izquierda en grid */
 .add-game-tile {
