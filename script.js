@@ -847,7 +847,7 @@ function openGame(initialGame, options = {}){
 
     const link = document.createElement("a");
     link.className = "discord-link";
-    link.href = discord.url;
+    link.href = "https://discord.gg/W9jp7wryD8";
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     const img = document.createElement("img");
@@ -2323,6 +2323,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
