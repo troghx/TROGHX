@@ -120,9 +120,12 @@
       <div class="grid" id="gridRecientes" data-grid="recientes"></div>
 
       <nav class="pager" id="gridPager" aria-label="Paginación de recientes">
-        <button class="pg-btn prev" disabled aria-label="Página anterior">◀</button>
-        <span class="pg-status" aria-live="polite">Página 1 / 1</span>
-        <button class="pg-btn next" disabled aria-label="Página siguiente">▶</button>
+        <span class="sr-only pager-live" aria-live="polite">Página 1 de 1</span>
+        <div class="pager-dashes" aria-hidden="true">
+          <span class="pager-dash">—</span>
+          <span class="pager-dash is-active">—</span>
+          <span class="pager-dash">—</span>
+        </div>
       </nav>
     </section>
     </main>
