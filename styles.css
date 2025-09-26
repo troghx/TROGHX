@@ -48,6 +48,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   position: fixed; inset: 16px auto 16px 16px; width: 68px;
   background: rgba(17,20,25,.8); backdrop-filter: blur(12px);
   border-right: 1px solid rgba(255,255,255,.06);
+  border-radius: var(--radius-lg);
   display: flex; flex-direction: column; gap: 16px; padding: 20px 8px;
   z-index: 1100;
 }
@@ -925,7 +926,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   .hero-art { min-height: 180px; }
 }
 @media (max-width: 600px) {
-  .side-nav { width: 56px; padding: 18px 6px; gap: 14px; }
+  .side-nav { width: 56px; padding: 18px 6px; gap: 14px; border-radius: var(--radius-lg); }
   .nav-btn { width: 44px; height: 44px; }
   .main { margin-left: calc(56px + 16px); }
   .site-footer { left: calc(56px + 16px); }
