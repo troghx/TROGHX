@@ -45,7 +45,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 /* ---------- Barra lateral ---------- */
 .side-nav {
-  position: fixed; inset: 0 auto 0 0; width: 68px;
+  position: fixed; inset: 16px auto 16px 16px; width: 68px;
   background: rgba(17,20,25,.8); backdrop-filter: blur(12px);
   border-right: 1px solid rgba(255,255,255,.06);
   display: flex; flex-direction: column; gap: 16px; padding: 20px 8px;
@@ -64,7 +64,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 /* ---------- Layout principal ---------- */
 .main {
-  margin-left: 68px;
+  margin-left: calc(68px + 16px);
   padding: 18px clamp(16px,4vw,28px);
   display: flex; flex-direction: column; gap: 24px; height: 100%;
 }
@@ -106,7 +106,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 .site-footer {
   position: fixed;
-  left: 68px;
+  left: calc(68px + 16px);
   right: 0;
   bottom: 0;
   text-align: center;
@@ -927,8 +927,8 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 @media (max-width: 600px) {
   .side-nav { width: 56px; padding: 18px 6px; gap: 14px; }
   .nav-btn { width: 44px; height: 44px; }
-  .main { margin-left: 56px; }
-  .site-footer { left: 56px; }
+  .main { margin-left: calc(56px + 16px); }
+  .site-footer { left: calc(56px + 16px); }
   .tile { flex-basis: clamp(180px, 52vw, 260px); }
   .tw-modal-content { max-width: 95%; padding: 16px; }
   .tw-modal-image { height: 180px; }
