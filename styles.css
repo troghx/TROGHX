@@ -107,7 +107,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 
 .site-footer {
   position: fixed;
-  left: calc(68px + 16px);
+  left: 0;
   right: 0;
   bottom: 0;
   text-align: center;
@@ -929,7 +929,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
   .side-nav { width: 56px; padding: 18px 6px; gap: 14px; border-radius: var(--radius-lg); }
   .nav-btn { width: 44px; height: 44px; }
   .main { margin-left: calc(56px + 16px); }
-  .site-footer { left: calc(56px + 16px); }
+  .site-footer { left: 0; }
   .tile { flex-basis: clamp(180px, 52vw, 260px); }
   .tw-modal-content { max-width: 95%; padding: 16px; }
   .tw-modal-image { height: 180px; }
