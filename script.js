@@ -1609,6 +1609,7 @@ function ensureDownloadsBadge(){
   if(!rail) return;
 
   let el = rail.querySelector(".yt-channel-badge");
+  const svgMarkup = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16.5a1 1 0 0 1-.7-.29l-5-5a1 1 0 0 1 1.4-1.42L12 14.09l4.3-4.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-.7.29Z"/></svg>';
 
   // Si fuera <a>, lo convierto a <button> para abrir Descargas (sin romper estilos)
   if (el && el.tagName === "A") {
@@ -1624,12 +1625,10 @@ function ensureDownloadsBadge(){
     el = document.createElement("button");
     el.type = "button";
     el.className = "yt-channel-badge";
-    const img = document.createElement("img");
-    img.src = "assets/images/youtube-channel.png";
-    img.alt = "Descargas";
-    el.appendChild(img);
     rail.appendChild(el);
   }
+  el.innerHTML = svgMarkup;
+  el.setAttribute("aria-label", "Descargas");
   el.onclick = toggleDownloadsPanel;
   return el;
 }
@@ -2394,6 +2393,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
