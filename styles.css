@@ -47,8 +47,7 @@ body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
 .side-nav {
   position: fixed; inset: 16px auto 16px 16px; width: 68px;
   background: rgba(17,20,25,.8); backdrop-filter: blur(12px);
-  border-right: 3px solid transparent;
-  border-image: linear-gradient(180deg, #ff00ff, #38bdf8) 1;
+  border-right: 1px solid rgba(255,255,255,.06);
   border-radius: var(--radius-lg);
   display: flex; flex-direction: column; gap: 16px; padding: 20px 8px;
   z-index: 1100;
