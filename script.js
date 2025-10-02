@@ -342,6 +342,16 @@ function platformFromUrl(u){
   if (s.includes("pixeldrain.com")) return "pixeldrain";
   return "generic";
 }
+function escapeHtml(str){
+  return String(str ?? "").replace(/[&<>'"]/g, (ch)=>({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    "'":"&#39;",
+    '"':"&quot;"
+  })[ch] || ch);
+}
+
 function insertLinkChip(editorArea){
   editorArea.focus();
   const text=(prompt("Nombre a mostrar del enlace:")||"").trim();
@@ -361,6 +371,80 @@ function insertLinkChip(editorArea){
   if(!/^https?:\/\//i.test(url) && !url.startsWith("magnet:")) url="https://"+url;
   const plat=driveId ? "drive" : platformFromUrl(url);
   const html=`<a href="${url.replace(/"/g,"&quot;")}" target="_blank" rel="noopener" class="link-chip chip-${plat}"><span class="chip-dot"></span>${text.replace(/[<>]/g,"")}</a>`;
+  document.execCommand("insertHTML", false, html);
+}
+
+async function insertVideoPreview(editorArea){
+  editorArea.focus();
+  const raw = (prompt("Pega la URL del video:") || "").trim();
+  if(!raw) return;
+
+  let url = raw.replace(/^\s+|\s+$/g, "");
+  if(!url) return;
+  if(/^\/\//.test(url)) url = "https:" + url;
+  if(!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  url = url.replace(/^http:\/\//i, "https://");
+
+  let normalizedUrl = url;
+  try {
+    const parsed = new URL(url);
+    if(parsed.protocol !== "https:") parsed.protocol = "https:";
+    normalizedUrl = parsed.toString();
+  } catch {
+    return;
+  }
+
+  let title = "";
+  let thumbnail = "";
+  let provider = "";
+
+  const ytMatch = normalizedUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i);
+  if(ytMatch){
+    provider = "YouTube";
+    thumbnail = `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+  }
+
+  if(!thumbnail){
+    const odyMatch = normalizedUrl.match(/odysee\.com\/(?:[^:]+:[^/]+\/)?[^:]+:([A-Za-z0-9]+)/i);
+    if(odyMatch){
+      provider = "Odysee";
+      thumbnail = `https://thumbnails.lbry.com/${odyMatch[1]}`;
+    }
+  }
+
+  try {
+    const resp = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(normalizedUrl)}`, { mode: "cors" });
+    if(resp.ok){
+      const data = await resp.json();
+      if(!title && data?.title) title = data.title;
+      if(!thumbnail && data?.thumbnail_url) thumbnail = data.thumbnail_url;
+      if(!provider && data?.provider_name) provider = data.provider_name;
+    }
+  } catch (err) {
+    // Ignorar errores de red o CORS
+  }
+
+  if(!thumbnail){
+    const safeHost = (()=>{ try{ return new URL(normalizedUrl).hostname; } catch{ return "video"; } })();
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 90'>`+
+      `<rect width='160' height='90' rx='12' ry='12' fill='rgba(0,0,0,0.7)'/>`+
+      `<text x='80' y='50' fill='white' font-family='sans-serif' font-size='16' text-anchor='middle'>${escapeHtml(safeHost)}</text>`+
+      `</svg>`;
+    thumbnail = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+  }
+
+  const captionText = title || provider || (()=>{ try{ return new URL(normalizedUrl).hostname; } catch { return ""; } })();
+  const altText = title || provider || "Previsualización de video";
+  const figcaption = captionText ? `<figcaption>${escapeHtml(captionText)}</figcaption>` : "";
+  const html = `<figure class="video-card">`+
+    `<a href="${escapeHtml(normalizedUrl)}" target="_blank" rel="noopener" class="video-card-link">`+
+    `<span class="video-card-play" aria-hidden="true">▶</span>`+
+    `<img src="${escapeHtml(thumbnail)}" alt="${escapeHtml(altText)}" loading="lazy" />`+
+    `</a>`+
+    `${figcaption}`+
+    `</figure>`;
+
+  editorArea.focus();
   document.execCommand("insertHTML", false, html);
 }
 function extractFirstLink(html){
@@ -516,6 +600,7 @@ function initRichEditor(editorRoot){
   toolbar.addEventListener("click",(e)=>{
     const btn=e.target.closest(".rtb-btn"); if(!btn) return;
     if (btn.classList.contains("rtb-link")) { insertLinkChip(editorArea); return; }
+    if (btn.classList.contains("rtb-video")) { void insertVideoPreview(editorArea); return; }
     if (btn.classList.contains("rtb-align")) {
       const a = btn.dataset.align;
       if(a==="left")   exec("justifyLeft");
@@ -2393,6 +2478,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
