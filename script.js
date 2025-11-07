@@ -12,6 +12,182 @@ const newSocialModalTemplate = document.getElementById("new-social-modal-templat
 const dmcaModalTemplate = document.getElementById("dmca-modal-template");
 const faqModalTemplate = document.getElementById("faq-modal-template");
 
+initStarfield();
+
+function initStarfield() {
+  const canvas = document.getElementById("star-canvas");
+  if (!canvas) return;
+
+  const prefersReducedMotion =
+    typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const state = {
+    stars: [],
+    width: 0,
+    height: 0,
+    pixelRatio: 1,
+    centerX: 0,
+    centerY: 0,
+    maxOrbit: 0,
+    lastTime: 0,
+    animationId: 0
+  };
+
+  const ROTATION_BASE = 0.03;
+  const ROTATION_VARIANCE = 0.045;
+
+  function createStar() {
+    const distanceRatio = Math.pow(Math.random(), 0.45);
+    const depth = 0.35 + Math.random() * 0.65;
+    return {
+      angle: Math.random() * Math.PI * 2,
+      distanceRatio,
+      depth,
+      baseSize: 0.6 + Math.random() * 1.4,
+      baseAlpha: 0.45 + Math.random() * 0.4,
+      pulseAmplitude: 0.15 + Math.random() * 0.25,
+      pulseSpeed: 0.8 + Math.random() * 1.4,
+      pulsePhase: Math.random() * Math.PI * 2,
+      rotationFactor: 0.5 + Math.random() * 1.1
+    };
+  }
+
+  function updateStarMetrics(star) {
+    star.distance = star.distanceRatio * state.maxOrbit;
+    star.radius = Math.max(0.35, star.baseSize * star.depth) * state.pixelRatio;
+    const depthSpeed = 0.6 + star.depth * 0.4;
+    star.angularVelocity = (ROTATION_BASE + ROTATION_VARIANCE * star.rotationFactor) * depthSpeed;
+  }
+
+  function adjustStarCount(target) {
+    if (target > state.stars.length) {
+      for (let i = state.stars.length; i < target; i += 1) {
+        state.stars.push(createStar());
+      }
+    } else if (target < state.stars.length) {
+      state.stars.length = target;
+    }
+  }
+
+  function resize() {
+    state.pixelRatio = Math.min(window.devicePixelRatio || 1, 2.2);
+    state.width = window.innerWidth;
+    state.height = window.innerHeight;
+    const displayWidth = Math.max(1, Math.floor(state.width * state.pixelRatio));
+    const displayHeight = Math.max(1, Math.floor(state.height * state.pixelRatio));
+
+    canvas.width = displayWidth;
+    canvas.height = displayHeight;
+    canvas.style.width = `${state.width}px`;
+    canvas.style.height = `${state.height}px`;
+
+    state.centerX = displayWidth / 2;
+    state.centerY = displayHeight / 2;
+    state.maxOrbit = Math.hypot(displayWidth, displayHeight) / 2;
+
+    const density = 0.000085;
+    const target = Math.round(Math.min(360, Math.max(140, state.width * state.height * density)));
+    adjustStarCount(target);
+    state.stars.forEach(updateStarMetrics);
+  }
+
+  function paintStars(delta, advance = true) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    for (const star of state.stars) {
+      if (advance) {
+        star.angle += star.angularVelocity * delta;
+        star.pulsePhase += star.pulseSpeed * delta;
+      }
+
+      const brightness = Math.min(
+        1,
+        Math.max(0, star.baseAlpha + Math.sin(star.pulsePhase) * star.pulseAmplitude)
+      );
+      const flicker = 1 + Math.sin(star.pulsePhase * 1.2) * 0.15;
+      const radius = star.radius * flicker;
+      const glowRadius = radius * (2.6 + star.depth * 0.7);
+
+      const x = state.centerX + Math.cos(star.angle) * star.distance;
+      const y = state.centerY + Math.sin(star.angle) * star.distance;
+
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
+      gradient.addColorStop(0, `rgba(255, 255, 255, ${0.85 * brightness})`);
+      gradient.addColorStop(0.45, `rgba(136, 196, 255, ${0.4 * brightness})`);
+      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  function renderFrame(now) {
+    if (!state.lastTime) {
+      state.lastTime = now;
+    }
+    const delta = Math.min(0.05, (now - state.lastTime) / 1000);
+    state.lastTime = now;
+    paintStars(delta, true);
+    state.animationId = requestAnimationFrame(renderFrame);
+  }
+
+  function startAnimation() {
+    if (state.animationId) return;
+    state.lastTime = 0;
+    state.animationId = requestAnimationFrame(renderFrame);
+  }
+
+  function stopAnimation() {
+    if (state.animationId) {
+      cancelAnimationFrame(state.animationId);
+      state.animationId = 0;
+    }
+  }
+
+  resize();
+  paintStars(0, false);
+  canvas.style.opacity = "1";
+
+  const shouldReduceMotion = prefersReducedMotion && prefersReducedMotion.matches;
+  if (!shouldReduceMotion) {
+    startAnimation();
+  }
+
+  window.addEventListener("resize", () => {
+    resize();
+    paintStars(0, false);
+  });
+
+  if (prefersReducedMotion) {
+    const handler = (event) => {
+      if (event.matches) {
+        stopAnimation();
+        paintStars(0, false);
+        canvas.style.opacity = "1";
+      } else {
+        canvas.style.opacity = "1";
+        resize();
+        startAnimation();
+      }
+    };
+
+    if (typeof prefersReducedMotion.addEventListener === "function") {
+      prefersReducedMotion.addEventListener("change", handler);
+    } else if (typeof prefersReducedMotion.addListener === "function") {
+      prefersReducedMotion.addListener(handler);
+    }
+  }
+}
+
 const dmcaTexts = {
   es: `
     <p><strong>TROGH</strong> no aloja archivos ni juegos con derechos de autor. Este sitio solo muestra metadatos y <em>enlaces</em> hacia servicios de terceros que alojan los contenidos bajo sus propios términos.</p>
@@ -2478,6 +2654,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
