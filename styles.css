@@ -32,10 +32,33 @@ body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   color: var(--text);
-  background: var(--accent-gradient-135);
+  background:
+    radial-gradient(circle at 20% 25%, rgba(31, 200, 107, 0.12), transparent 60%),
+    radial-gradient(circle at 80% 15%, rgba(15, 102, 255, 0.15), transparent 65%),
+    #05070f;
   position: relative;
 }
 body.modal-open > *:not(.tw-modal) { filter: blur(4px); }
+
+#star-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: -2;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 120%, rgba(5, 8, 15, 0.85), transparent 65%),
+    radial-gradient(circle at 50% -10%, rgba(9, 16, 25, 0.6), transparent 55%);
+  pointer-events: none;
+  z-index: -1;
+}
 
 .sr-only {
   position: absolute;
