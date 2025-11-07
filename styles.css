@@ -6,7 +6,7 @@
   --text: #e6ebf0;
   --accent: #1fc86b;
   --accent-blue: #001735;
-  --accent-green: #239c54;
+  --accent-green: #949c23;
   --accent-gradient: linear-gradient(45deg, var(--accent-blue), var(--accent-green));
   --accent-gradient-135: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
   --accent-glow-blue: rgba(15, 102, 255, .28);
