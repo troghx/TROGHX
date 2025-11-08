@@ -1443,6 +1443,7 @@ body.modal-open { overflow: hidden; }
 
   .comment-tab{
     --comment-tab-width: 64px;
+    
     position: relative;
     display: flex;
     align-items: stretch;
@@ -1456,6 +1457,7 @@ body.modal-open { overflow: hidden; }
     transition: transform .3s ease, box-shadow .3s ease;
     box-shadow: 0 14px 28px rgba(0,0,0,.38);
     z-index: 1;
+    overflow: visible;
   }
   
 .comment-tab-toggle{
@@ -1480,6 +1482,7 @@ body.modal-open { overflow: hidden; }
   box-shadow: 0 12px 20px rgba(229,57,53,.45);
   transition: transform .2s ease, box-shadow .2s ease;
   gap: 12px;
+  transform-origin: center bottom;
 }
 
 .comment-tab-toggle span{ pointer-events:none; }
@@ -1531,9 +1534,22 @@ body.modal-open { overflow: hidden; }
 }
 
 
-  .comment-tab.is-open{
+.comment-tab.is-open{
   transform: translateX(0);
   box-shadow: 0 16px 30px rgba(0,0,0,.42);
+}
+
+.comment-tab.is-animating-open .comment-tab-toggle,
+.comment-tab.is-animating-close .comment-tab-toggle{
+  will-change: transform;
+}
+
+.comment-tab.is-animating-open .comment-tab-toggle{
+  animation: commentToggleOpen .7s ease;
+}
+
+.comment-tab.is-animating-close .comment-tab-toggle{
+  animation: commentToggleClose .55s ease;
 }
 
 .comment-tab.is-open .comment-tab-body{
@@ -1572,6 +1588,48 @@ body.modal-open { overflow: hidden; }
   margin: 0;
 }
 
+@keyframes commentToggleOpen{
+  0%{
+    transform-origin: center bottom;
+    transform: scaleY(1) scaleX(1);
+  }
+  45%{
+    transform-origin: center bottom;
+    transform: scaleY(.25) scaleX(1);
+  }
+  55%{
+    transform-origin: left center;
+    transform: scaleY(.25) scaleX(1);
+  }
+  80%{
+    transform-origin: left center;
+    transform: scaleY(1) scaleX(1.08);
+  }
+  100%{
+    transform-origin: left center;
+    transform: scaleY(1) scaleX(1);
+  }
+}
+
+@keyframes commentToggleClose{
+  0%{
+    transform-origin: left center;
+    transform: scaleY(1) scaleX(1);
+  }
+  30%{
+    transform-origin: left center;
+    transform: scaleY(1) scaleX(1.06);
+  }
+  55%{
+    transform-origin: center bottom;
+    transform: scaleY(.25) scaleX(1);
+  }
+  100%{
+    transform-origin: center bottom;
+    transform: scaleY(1) scaleX(1);
+  }
+}
+
 @media (max-width: 640px){
   .game-modal .game-modal-shell{
     flex-direction: column;
@@ -1599,6 +1657,7 @@ body.modal-open { overflow: hidden; }
   }
 
   .comment-tab{
+    --comment-panel-width: 100%;
     position: relative;
     top: 0;
     right: 0;
@@ -1616,6 +1675,11 @@ body.modal-open { overflow: hidden; }
   .comment-tab.is-open{
     transform: none;
     box-shadow: 0 12px 24px rgba(0,0,0,.38);
+  }
+
+  .comment-tab.is-animating-open .comment-tab-toggle,
+  .comment-tab.is-animating-close .comment-tab-toggle{
+    animation: none;
   }
 
   .comment-tab-toggle{
