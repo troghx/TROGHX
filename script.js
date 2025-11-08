@@ -1236,6 +1236,33 @@ function appendComment(key, comment){
   return list;
 }
 
+function deleteComment(key, commentId){
+  if(!key) return [];
+  const store = readCommentStore();
+  const list = Array.isArray(store[key]) ? store[key] : [];
+  const idToRemove = commentId ?? null;
+  if(idToRemove === null){
+    return list;
+  }
+  const filtered = list.filter(entry => {
+    if(!entry) return false;
+    if(entry.id !== undefined && entry.id !== null){
+      return entry.id !== idToRemove;
+    }
+    if(entry.createdAt !== undefined && entry.createdAt !== null){
+      return entry.createdAt !== idToRemove;
+    }
+    return true;
+  });
+  if(filtered.length === 0){
+    delete store[key];
+  }else{
+    store[key] = filtered;
+  }
+  writeCommentStore(store);
+  return filtered;
+}
+
 function formatCommentDate(timestamp){
   try{
     const date = new Date(timestamp);
@@ -1330,19 +1357,63 @@ function openGame(initialGame, options = {}){
     comments.slice().reverse().forEach(entry => {
       const item = document.createElement("li");
       item.className = "comment-item";
+      const role = entry?.role === "admin" || entry?.admin === true ? "admin" : "user";
+      item.dataset.role = role;
+      if(role === "admin"){
+        item.classList.add("is-admin");
+      }
+
       const meta = document.createElement("div");
       meta.className = "comment-meta";
+
+      const author = document.createElement("div");
+      author.className = "comment-author";
+
       const alias = document.createElement("span");
       alias.className = "comment-alias";
+      if(role === "admin") alias.classList.add("is-admin");
       alias.textContent = entry?.alias || "Anónimo";
+      author.appendChild(alias);
+
+      if(role === "admin"){
+        const badge = document.createElement("span");
+        badge.className = "comment-role-badge";
+        badge.textContent = "Admin";
+        author.appendChild(badge);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "comment-meta-actions";
+
       const time = document.createElement("time");
       time.className = "comment-date";
       if(entry?.createdAt) time.dateTime = entry.createdAt;
       time.textContent = formatCommentDate(entry?.createdAt || Date.now());
-      meta.append(alias, time);
+      actions.appendChild(time);
+
+      if(isAdmin){
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "comment-delete";
+        removeBtn.textContent = "Eliminar";
+        removeBtn.setAttribute("aria-label", "Eliminar comentario");
+        removeBtn.addEventListener("click", ()=>{
+          const commentId = entry?.id ?? entry?.createdAt ?? null;
+          if(commentId === null) return;
+          const confirmMessage = "¿Eliminar este comentario?";
+          if(typeof window !== "undefined" && !window.confirm(confirmMessage)) return;
+          deleteComment(key, commentId);
+          renderComments();
+        });
+        actions.appendChild(removeBtn);
+      }
+
+      meta.append(author, actions);
+
       const body = document.createElement("p");
       body.className = "comment-message";
       body.textContent = entry?.message || "";
+
       item.append(meta, body);
       commentList.appendChild(item);
     });
@@ -1399,7 +1470,8 @@ function openGame(initialGame, options = {}){
       alias: aliasValue,
       message,
       email: emailValue,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      role: isAdmin ? "admin" : "user"
     };
     appendComment(key, entry);
     commentForm.reset();
@@ -2943,6 +3015,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
