@@ -1282,18 +1282,32 @@ function openGame(initialGame, options = {}){
   let currentGame = { ...initialGame };
   let commentTabOpenState = false;
   let commentTabAnimationTimer = null;
+  let commentTabHeadingTimer = null;
   const timerHost = typeof window !== "undefined" ? window : globalThis;
 
   const triggerCommentTabAnimation = (isOpen)=>{
     if(!commentTab) return;
     commentTab.classList.remove("is-animating-open", "is-animating-close");
-    void commentTab.offsetWidth;
     const className = isOpen ? "is-animating-open" : "is-animating-close";
     commentTab.classList.add(className);
     if(commentTabAnimationTimer) timerHost.clearTimeout(commentTabAnimationTimer);
     commentTabAnimationTimer = timerHost.setTimeout(()=>{
       commentTab.classList.remove(className);
     }, isOpen ? 720 : 560);
+  };
+
+  const setCommentTabHeaderState = (enabled, delay = 0)=>{
+    if(!commentTab) return;
+    if(commentTabHeadingTimer) timerHost.clearTimeout(commentTabHeadingTimer);
+    const apply = ()=>{
+      commentTab.classList.toggle("is-header-open", Boolean(enabled));
+      commentTabHeadingTimer = null;
+    };
+    if(delay > 0){
+      commentTabHeadingTimer = timerHost.setTimeout(apply, delay);
+    }else{
+      apply();
+    }
   };
 
   const applyTitle = ()=>{ if(modalTitle) modalTitle.textContent = currentGame?.title || "Sin título"; };
@@ -1342,6 +1356,16 @@ function openGame(initialGame, options = {}){
     commentTab.classList.toggle("is-open", isOpen);
     commentTabBody?.setAttribute("aria-hidden", String(!isOpen));
     commentFormWrap.setAttribute("aria-hidden", String(!isOpen));
+    if(isOpen){
+      if(shouldAnimate){
+        setCommentTabHeaderState(false);
+        setCommentTabHeaderState(true, 320);
+      }else{
+        setCommentTabHeaderState(true);
+      }
+    }else{
+      setCommentTabHeaderState(false);
+    }
     if(shouldAnimate) triggerCommentTabAnimation(isOpen);
     commentTabOpenState = isOpen;
   };
@@ -2919,6 +2943,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
