@@ -1442,7 +1442,6 @@ body.modal-open { overflow: hidden; }
 }
 
   .comment-tab{
-    --comment-panel-width: clamp(280px, 30vw, 360px);
     --comment-tab-width: 64px;
     position: relative;
     display: flex;
@@ -1477,7 +1476,7 @@ body.modal-open { overflow: hidden; }
   letter-spacing: .18em;
   font-weight: 700;
   padding: 24px 12px;
-  border-radius: 18px 0 0 18px;
+  border-radius: 0px 18px 18px 0px;
   box-shadow: 0 12px 20px rgba(229,57,53,.45);
   transition: transform .2s ease, box-shadow .2s ease;
   gap: 12px;
