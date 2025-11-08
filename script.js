@@ -1276,15 +1276,20 @@ function openGame(initialGame, options = {}){
   const commentTabBody = commentSection?.querySelector(".comment-tab-body") || null;
   const commentFormWrap = commentSection?.querySelector(".comment-form-wrap") || null;
   const commentForm = commentSection?.querySelector(".comment-form") || null;
+  const commentCountBadge = commentSection?.querySelector(".comment-count") || null;
+  const commentCountLabel = commentSection?.querySelector(".comment-count-label") || null;
   const { initialState = null, initialMessage = null } = options || {};
   let currentGame = { ...initialGame };
 
   const applyTitle = ()=>{ if(modalTitle) modalTitle.textContent = currentGame?.title || "Sin título"; };
   const renderDescription = ()=> setModalDescription(modalDesc, currentGame?.description, currentGame);
   const renderComments = ()=>{
-    if(!commentList || !commentEmpty) return;
     const key = getCommentKey(currentGame);
     const comments = key ? getCommentsByKey(key) : [];
+    const total = comments.length;
+    if(commentCountBadge) commentCountBadge.textContent = String(total);
+    if(commentCountLabel) commentCountLabel.textContent = total === 1 ? "(1 comentario)" : `(${total} comentarios)`;
+    if(!commentList || !commentEmpty) return;
     commentList.innerHTML = "";
     if(!comments.length){
       commentEmpty.hidden = false;
@@ -2896,6 +2901,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
