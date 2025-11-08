@@ -191,16 +191,15 @@
         </div>
         <aside class="game-modal-comments" aria-label="Comentarios del juego">
           <div class="comment-tab" data-open="false">
-            <button class="comment-tab-toggle" type="button" aria-expanded="false">
+            <button class="comment-tab-toggle" type="button" aria-expanded="false" aria-describedby="commentIntro">
               <span>Comentarios</span>
             </button>
             <div class="comment-tab-body" aria-hidden="true">
-              <header class="comment-header">
-                <h3>Comentarios</h3>
-                <p class="comment-help">Comparte tu experiencia con otros jugadores.</p>
-              </header>
-              <ul class="comment-list" aria-live="polite"></ul>
-              <p class="comment-empty">Sé el primero en dejar un comentario.</p>
+              <div class="comment-panel">
+                <p class="comment-help" id="commentIntro">Comparte tu experiencia con otros jugadores.</p>
+                <ul class="comment-list" aria-live="polite"></ul>
+                <p class="comment-empty">Sé el primero en dejar un comentario.</p>
+              </div>
               <div class="comment-form-wrap" aria-hidden="true">
                 <form class="comment-form">
                   <label class="comment-field">
