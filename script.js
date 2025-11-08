@@ -1280,6 +1280,21 @@ function openGame(initialGame, options = {}){
   const commentCountLabel = commentSection?.querySelector(".comment-count-label") || null;
   const { initialState = null, initialMessage = null } = options || {};
   let currentGame = { ...initialGame };
+  let commentTabOpenState = false;
+  let commentTabAnimationTimer = null;
+  const timerHost = typeof window !== "undefined" ? window : globalThis;
+
+  const triggerCommentTabAnimation = (isOpen)=>{
+    if(!commentTab) return;
+    commentTab.classList.remove("is-animating-open", "is-animating-close");
+    void commentTab.offsetWidth;
+    const className = isOpen ? "is-animating-open" : "is-animating-close";
+    commentTab.classList.add(className);
+    if(commentTabAnimationTimer) timerHost.clearTimeout(commentTabAnimationTimer);
+    commentTabAnimationTimer = timerHost.setTimeout(()=>{
+      commentTab.classList.remove(className);
+    }, isOpen ? 720 : 560);
+  };
 
   const applyTitle = ()=>{ if(modalTitle) modalTitle.textContent = currentGame?.title || "Sin título"; };
   const renderDescription = ()=> setModalDescription(modalDesc, currentGame?.description, currentGame);
@@ -1318,16 +1333,19 @@ function openGame(initialGame, options = {}){
       commentList.appendChild(item);
     });
   };
-  const setCommentTabState = (open)=>{
+  const setCommentTabState = (open, { animate = true } = {})=>{
     if(!commentTab || !commentToggle || !commentFormWrap) return;
     const isOpen = Boolean(open);
+    const shouldAnimate = animate && commentTabOpenState !== isOpen;
     commentTab.dataset.open = String(isOpen);
     commentToggle.setAttribute("aria-expanded", String(isOpen));
     commentTab.classList.toggle("is-open", isOpen);
     commentTabBody?.setAttribute("aria-hidden", String(!isOpen));
     commentFormWrap.setAttribute("aria-hidden", String(!isOpen));
+    if(shouldAnimate) triggerCommentTabAnimation(isOpen);
+    commentTabOpenState = isOpen;
   };
-  setCommentTabState(false);
+  setCommentTabState(false, { animate: false });
   commentToggle?.addEventListener("click", ()=>{
     const isOpen = commentTab?.classList.contains("is-open");
     setCommentTabState(!isOpen);
@@ -2901,6 +2919,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
