@@ -1089,11 +1089,80 @@ function bindModalChipLinks(container, game){
 }
 function setModalDescription(descEl, html, game){
   if(!descEl) return;
+  const target = descEl.querySelector(".game-modal-body") || descEl;
   const finalHtml = (html === undefined || html === null || (typeof html === "string" && html.trim() === ""))
     ? "Sin descripción"
     : html;
-  descEl.innerHTML = finalHtml;
-  bindModalChipLinks(descEl, game);
+  target.innerHTML = finalHtml;
+  bindModalChipLinks(target, game);
+}
+
+const COMMENT_STORAGE_KEY = "tgx_modal_comments_v1";
+
+function readCommentStore(){
+  try{
+    const raw = localStorage.getItem(COMMENT_STORAGE_KEY);
+    if(!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed ? parsed : {};
+  }catch(err){
+    console.warn("[comments] No se pudo leer el almacenamiento", err);
+    return {};
+  }
+}
+
+function writeCommentStore(store){
+  try{
+    localStorage.setItem(COMMENT_STORAGE_KEY, JSON.stringify(store));
+  }catch(err){
+    console.warn("[comments] No se pudo guardar", err);
+  }
+}
+
+function getCommentKey(game){
+  if(game?.id !== undefined && game.id !== null){
+    return `id:${game.id}`;
+  }
+  if(game?.slug){
+    return `slug:${game.slug}`;
+  }
+  const title = typeof game?.title === "string" ? game.title.trim() : "";
+  if(title){
+    return `title:${title.toLowerCase()}`;
+  }
+  return null;
+}
+
+function getCommentsByKey(key){
+  if(!key) return [];
+  const store = readCommentStore();
+  const comments = store[key];
+  return Array.isArray(comments) ? comments : [];
+}
+
+function appendComment(key, comment){
+  if(!key) return [];
+  const store = readCommentStore();
+  const list = Array.isArray(store[key]) ? store[key] : [];
+  list.push(comment);
+  store[key] = list;
+  writeCommentStore(store);
+  return list;
+}
+
+function formatCommentDate(timestamp){
+  try{
+    const date = new Date(timestamp);
+    return date.toLocaleDateString("es-ES", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }catch(err){
+    return "";
+  }
 }
 async function openGameLazy(game){
   const modal = openGame(game, { initialState: "loading" });
@@ -1113,17 +1182,101 @@ function openGame(initialGame, options = {}){
   const modalTitle   = modal.querySelector(".tw-modal-title");
   const modalDesc    = modal.querySelector(".tw-modal-description");
   const modalClose   = modal.querySelector(".tw-modal-close");
+  const commentSection = modal.querySelector(".game-modal-comments");
+  const commentList = commentSection?.querySelector(".comment-list") || null;
+  const commentEmpty = commentSection?.querySelector(".comment-empty") || null;
+  const commentTab = commentSection?.querySelector(".comment-tab") || null;
+  const commentToggle = commentSection?.querySelector(".comment-tab-toggle") || null;
+  const commentFormWrap = commentSection?.querySelector(".comment-form-wrap") || null;
+  const commentForm = commentSection?.querySelector(".comment-form") || null;
   const { initialState = null, initialMessage = null } = options || {};
   let currentGame = { ...initialGame };
 
   const applyTitle = ()=>{ if(modalTitle) modalTitle.textContent = currentGame?.title || "Sin título"; };
   const renderDescription = ()=> setModalDescription(modalDesc, currentGame?.description, currentGame);
+  const renderComments = ()=>{
+    if(!commentList || !commentEmpty) return;
+    const key = getCommentKey(currentGame);
+    const comments = key ? getCommentsByKey(key) : [];
+    commentList.innerHTML = "";
+    if(!comments.length){
+      commentEmpty.hidden = false;
+      commentList.hidden = true;
+      return;
+    }
+    commentEmpty.hidden = true;
+    commentList.hidden = false;
+    comments.slice().reverse().forEach(entry => {
+      const item = document.createElement("li");
+      item.className = "comment-item";
+      const meta = document.createElement("div");
+      meta.className = "comment-meta";
+      const alias = document.createElement("span");
+      alias.className = "comment-alias";
+      alias.textContent = entry?.alias || "Anónimo";
+      const time = document.createElement("time");
+      time.className = "comment-date";
+      if(entry?.createdAt) time.dateTime = entry.createdAt;
+      time.textContent = formatCommentDate(entry?.createdAt || Date.now());
+      meta.append(alias, time);
+      const body = document.createElement("p");
+      body.className = "comment-message";
+      body.textContent = entry?.message || "";
+      item.append(meta, body);
+      commentList.appendChild(item);
+    });
+  };
+  const setCommentTabState = (open)=>{
+    if(!commentTab || !commentToggle || !commentFormWrap) return;
+    const isOpen = Boolean(open);
+    commentTab.dataset.open = String(isOpen);
+    commentToggle.setAttribute("aria-expanded", String(isOpen));
+    commentTab.classList.toggle("is-open", isOpen);
+    commentFormWrap.setAttribute("aria-hidden", String(!isOpen));
+  };
+  setCommentTabState(false);
+  commentToggle?.addEventListener("click", ()=>{
+    const isOpen = commentTab?.classList.contains("is-open");
+    setCommentTabState(!isOpen);
+    if(!isOpen){
+      const textarea = commentForm?.querySelector("textarea[name='comment']");
+      textarea?.focus({ preventScroll: false });
+    }
+  });
+  commentForm?.addEventListener("submit", (ev)=>{
+    ev.preventDefault();
+    const key = getCommentKey(currentGame);
+    if(!key){
+      alert("No se pudo asociar el comentario a la publicación.");
+      return;
+    }
+    const formData = new FormData(commentForm);
+    const message = String(formData.get("comment") || "").trim();
+    if(message.length === 0){
+      const textarea = commentForm.querySelector("textarea[name='comment']");
+      textarea?.focus();
+      return;
+    }
+    const aliasValue = String(formData.get("alias") || "").trim() || "Anónimo";
+    const emailValue = String(formData.get("email") || "").trim();
+    const entry = {
+      id: Date.now(),
+      alias: aliasValue,
+      message,
+      email: emailValue,
+      createdAt: new Date().toISOString()
+    };
+    appendComment(key, entry);
+    commentForm.reset();
+    renderComments();
+  });
   const showLoading = (message = "Cargando…")=> setModalDescription(modalDesc, `<p class="modal-status modal-status--loading">${message}</p>`, currentGame);
   const showError = (message = "No se pudo cargar la información adicional. Intenta nuevamente.")=> setModalDescription(modalDesc, `<p class="modal-status modal-status--error">${message}</p>`, currentGame);
   const update = (data = {})=>{
     currentGame = { ...currentGame, ...data };
     applyTitle();
     renderDescription();
+    renderComments();
     return currentGame;
   };
 
@@ -1135,6 +1288,7 @@ function openGame(initialGame, options = {}){
   }else{
     renderDescription();
   }
+  renderComments();
 
   if(isAdmin){
     const kebabBtn=document.createElement("button");
@@ -2654,6 +2808,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
