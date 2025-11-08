@@ -1443,7 +1443,8 @@ body.modal-open { overflow: hidden; }
 
   .comment-tab{
     --comment-tab-width: 64px;
-    
+    --comment-toggle-height: 68px;
+
     position: relative;
     display: flex;
     align-items: stretch;
@@ -1454,12 +1455,18 @@ body.modal-open { overflow: hidden; }
     pointer-events: auto;
     gap: 0;
     transform: translateX(calc(var(--comment-panel-width) - var(--comment-tab-width)));
-    transition: transform .3s ease, box-shadow .3s ease;
+    transition: transform .3s ease, box-shadow .3s ease, width .38s ease, padding .38s ease;
     box-shadow: 0 14px 28px rgba(0,0,0,.38);
     z-index: 1;
     overflow: visible;
   }
   
+.comment-tab.is-header-open{
+    width: var(--comment-panel-width);
+    flex-direction: column;
+    align-items: stretch;
+  }
+
 .comment-tab-toggle{
   position: relative;
   display: inline-flex;
@@ -1480,10 +1487,26 @@ body.modal-open { overflow: hidden; }
   padding: 24px 12px;
   border-radius: 0px 18px 18px 0px;
   box-shadow: 0 12px 20px rgba(229,57,53,.45);
-  transition: transform .2s ease, box-shadow .2s ease;
+  transition: transform .2s ease, box-shadow .2s ease, border-radius .32s ease, width .38s ease,
+    min-width .38s ease, padding .38s ease, letter-spacing .38s ease;
   gap: 12px;
   transform-origin: center bottom;
 }
+
+  .comment-tab.is-header-open .comment-tab-toggle{
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    padding: 16px 22px;
+    border-radius: 18px 18px 0 0;
+    letter-spacing: .14em;
+    transform-origin: center center;
+    min-height: var(--comment-toggle-height);
+  }
 
 .comment-tab-toggle span{ pointer-events:none; }
 
@@ -1533,6 +1556,12 @@ body.modal-open { overflow: hidden; }
   box-shadow: 0 14px 28px rgba(0,0,0,.38);
 }
 
+  .comment-tab.is-header-open .comment-tab-body{
+    margin-left: 0;
+    border-radius: 0 0 18px 18px;
+    width: 100%;
+    flex: 1 1 auto;
+  }
 
 .comment-tab.is-open{
   transform: translateX(0);
@@ -1595,15 +1624,15 @@ body.modal-open { overflow: hidden; }
   }
   45%{
     transform-origin: center bottom;
-    transform: scaleY(.25) scaleX(1);
+    transform: scaleY(.12) scaleX(1);
   }
   55%{
     transform-origin: left center;
-    transform: scaleY(.25) scaleX(1);
+    transform: scaleY(.12) scaleX(1.12);
   }
   80%{
     transform-origin: left center;
-    transform: scaleY(1) scaleX(1.08);
+    transform: scaleY(.18) scaleX(1.18);
   }
   100%{
     transform-origin: left center;
@@ -1614,15 +1643,15 @@ body.modal-open { overflow: hidden; }
 @keyframes commentToggleClose{
   0%{
     transform-origin: left center;
-    transform: scaleY(1) scaleX(1);
+    transform: scaleY(.18) scaleX(1.08);
   }
   30%{
     transform-origin: left center;
-    transform: scaleY(1) scaleX(1.06);
+    transform: scaleY(.2) scaleX(1.16);
   }
   55%{
     transform-origin: center bottom;
-    transform: scaleY(.25) scaleX(1);
+    transform: scaleY(.12) scaleX(1.05);
   }
   100%{
     transform-origin: center bottom;
@@ -1698,6 +1727,13 @@ body.modal-open { overflow: hidden; }
     gap: 10px;
   }
 
+  .comment-tab.is-header-open .comment-tab-toggle{
+    border-radius: 999px;
+    width: auto;
+    min-width: auto;
+    padding: 10px 18px;
+  }
+
   .comment-tab-toggle:hover,
   .comment-tab-toggle:focus-visible{
     transform: translateY(-1px);
@@ -1720,6 +1756,10 @@ body.modal-open { overflow: hidden; }
     border-radius: 18px;
     box-shadow: 0 12px 24px rgba(0,0,0,.38);
     padding: 18px;
+  }
+
+  .comment-tab.is-header-open .comment-tab-body{
+    border-radius: 18px;
   }
 
   .comment-tab-body .comment-list{
