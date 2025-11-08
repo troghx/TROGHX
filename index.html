@@ -181,46 +181,46 @@
 
   <template id="game-modal-template">
     <div class="tw-modal game-modal" role="dialog" aria-label="Detalles del juego">
-      <div class="tw-modal-content">
-        <button class="tw-modal-close" aria-label="Cerrar">×</button>
-        <h2 class="tw-modal-title"></h2>
-        <div class="tw-modal-description" id="gameModalContent">
-          <div class="game-modal-layout">
+      <div class="game-modal-shell">
+        <div class="tw-modal-content">
+          <button class="tw-modal-close" aria-label="Cerrar">×</button>
+          <h2 class="tw-modal-title"></h2>
+          <div class="tw-modal-description" id="gameModalContent">
             <div class="game-modal-body" aria-live="polite"></div>
-            <section class="game-modal-comments" aria-label="Comentarios del juego">
-              <div class="comment-tab" data-open="false">
-                <div class="comment-tab-body">
-                  <header class="comment-header">
-                    <h3>Comentarios</h3>
-                    <p class="comment-help">Comparte tu experiencia con otros jugadores.</p>
-                  </header>
-                  <ul class="comment-list" aria-live="polite"></ul>
-                  <p class="comment-empty">Sé el primero en dejar un comentario.</p>
-                  <div class="comment-form-wrap" aria-hidden="true">
-                    <form class="comment-form">
-                      <label class="comment-field">
-                        Comentario
-                        <textarea name="comment" rows="4" required placeholder="Escribe tu comentario…"></textarea>
-                      </label>
-                      <label class="comment-field">
-                        Alias
-                        <input type="text" name="alias" maxlength="32" placeholder="Tu nickname" />
-                      </label>
-                      <label class="comment-field">
-                        Correo
-                        <input type="email" name="email" inputmode="email" placeholder="tucorreo@example.com" />
-                      </label>
-                      <button type="submit" class="comment-submit">Publicar</button>
-                    </form>
-                  </div>
-                </div>
-                <button class="comment-tab-toggle" type="button" aria-expanded="false">
-                  <span>Comentario</span>
-                </button>
-              </div>
-            </section>
           </div>
         </div>
+        <aside class="game-modal-comments" aria-label="Comentarios del juego">
+          <div class="comment-tab" data-open="false">
+            <button class="comment-tab-toggle" type="button" aria-expanded="false">
+              <span>Comentarios</span>
+            </button>
+            <div class="comment-tab-body" aria-hidden="true">
+              <header class="comment-header">
+                <h3>Comentarios</h3>
+                <p class="comment-help">Comparte tu experiencia con otros jugadores.</p>
+              </header>
+              <ul class="comment-list" aria-live="polite"></ul>
+              <p class="comment-empty">Sé el primero en dejar un comentario.</p>
+              <div class="comment-form-wrap" aria-hidden="true">
+                <form class="comment-form">
+                  <label class="comment-field">
+                    Comentario
+                    <textarea name="comment" rows="4" required placeholder="Escribe tu comentario…"></textarea>
+                  </label>
+                  <label class="comment-field">
+                    Alias
+                    <input type="text" name="alias" maxlength="32" placeholder="Tu nickname" />
+                  </label>
+                  <label class="comment-field">
+                    Correo
+                    <input type="email" name="email" inputmode="email" placeholder="tucorreo@example.com" />
+                  </label>
+                  <button type="submit" class="comment-submit">Publicar</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   </template>
