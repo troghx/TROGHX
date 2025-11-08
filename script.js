@@ -254,10 +254,11 @@ const LS_ADMIN_USER = "tgx_admin_user";
 const LS_SOCIALS    = "tgx_socials";
 
 /* ------- Endpoints ------- */
-const API_POSTS = "/.netlify/functions/posts";
-const API_SOC   = "/.netlify/functions/socials";
-const API_LINK  = "/.netlify/functions/linkcheck";
-const API_ADM   = "/.netlify/functions/admins";
+const API_POSTS    = "/.netlify/functions/posts";
+const API_SOC      = "/.netlify/functions/socials";
+const API_LINK     = "/.netlify/functions/linkcheck";
+const API_ADM      = "/.netlify/functions/admins";
+const API_COMMENTS = "/.netlify/functions/comments";
 
 /* ------- Estado ------- */
 let isAdmin = false;
@@ -1183,84 +1184,93 @@ function setModalDescription(descEl, html, game){
   bindModalChipLinks(target, game);
 }
 
-const COMMENT_STORAGE_KEY = "tgx_modal_comments_v1";
+const commentCache = new Map();
 
-function readCommentStore(){
-  try{
-    const raw = localStorage.getItem(COMMENT_STORAGE_KEY);
-    if(!raw) return {};
-    const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed ? parsed : {};
-  }catch(err){
-    console.warn("[comments] No se pudo leer el almacenamiento", err);
-    return {};
-  }
+function normalizeComment(entry = {}){
+  if(!entry || typeof entry !== "object") return null;
+  const aliasRaw = typeof entry.alias === "string" ? entry.alias.trim() : "";
+  const messageRaw = typeof entry.message === "string" ? entry.message : "";
+  const roleRaw = typeof entry.role === "string" ? entry.role.toLowerCase() : "user";
+  const created = entry.createdAt || entry.created_at || null;
+  return {
+    id: entry.id || entry.commentId || entry.comment_id || null,
+    postId: entry.postId || entry.post_id || null,
+    alias: aliasRaw || "Anónimo",
+    message: messageRaw,
+    role: roleRaw === "admin" ? "admin" : "user",
+    createdAt: created,
+  };
 }
 
-function writeCommentStore(store){
-  try{
-    localStorage.setItem(COMMENT_STORAGE_KEY, JSON.stringify(store));
-  }catch(err){
-    console.warn("[comments] No se pudo guardar", err);
-  }
+function cloneComments(list){
+  return Array.isArray(list) ? list.map(item => ({ ...item })) : [];
 }
 
-function getCommentKey(game){
-  if(game?.id !== undefined && game.id !== null){
-    return `id:${game.id}`;
+async function commentsList(postId, { force = false } = {}){
+  if(!postId) return [];
+  const cacheKey = String(postId);
+  if(!force && commentCache.has(cacheKey)){
+    return cloneComments(commentCache.get(cacheKey));
   }
-  if(game?.slug){
-    return `slug:${game.slug}`;
+  const qs = new URLSearchParams({ postId: cacheKey });
+  const res = await fetch(`${API_COMMENTS}?${qs.toString()}`, { cache: "no-store" });
+  if(!res.ok){
+    const text = await res.text().catch(()=> "");
+    throw new Error(`No se pudieron obtener los comentarios: ${text || res.status}`);
   }
-  const title = typeof game?.title === "string" ? game.title.trim() : "";
-  if(title){
-    return `title:${title.toLowerCase()}`;
-  }
-  return null;
+  const data = await res.json().catch(()=> []);
+  const list = Array.isArray(data) ? data.map(normalizeComment).filter(Boolean) : [];
+  commentCache.set(cacheKey, list);
+  return cloneComments(list);
 }
 
-function getCommentsByKey(key){
-  if(!key) return [];
-  const store = readCommentStore();
-  const comments = store[key];
-  return Array.isArray(comments) ? comments : [];
-}
-
-function appendComment(key, comment){
-  if(!key) return [];
-  const store = readCommentStore();
-  const list = Array.isArray(store[key]) ? store[key] : [];
-  list.push(comment);
-  store[key] = list;
-  writeCommentStore(store);
-  return list;
-}
-
-function deleteComment(key, commentId){
-  if(!key) return [];
-  const store = readCommentStore();
-  const list = Array.isArray(store[key]) ? store[key] : [];
-  const idToRemove = commentId ?? null;
-  if(idToRemove === null){
-    return list;
-  }
-  const filtered = list.filter(entry => {
-    if(!entry) return false;
-    if(entry.id !== undefined && entry.id !== null){
-      return entry.id !== idToRemove;
-    }
-    if(entry.createdAt !== undefined && entry.createdAt !== null){
-      return entry.createdAt !== idToRemove;
-    }
-    return true;
+async function commentsCreate(postId, payload = {}){
+  if(!postId) throw new Error("Falta el ID de la publicación");
+  const cacheKey = String(postId);
+  const headers = { "Content-Type": "application/json" };
+  const token = typeof payload.token === "string" ? payload.token.trim() : "";
+  if(token) headers.Authorization = `Bearer ${token}`;
+  const body = {
+    postId: cacheKey,
+    alias: payload.alias,
+    email: payload.email,
+    message: payload.message,
+  };
+  const res = await fetch(API_COMMENTS, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body)
   });
-  if(filtered.length === 0){
-    delete store[key];
-  }else{
-    store[key] = filtered;
+  if(!res.ok){
+    const text = await res.text().catch(()=> "");
+    throw new Error(`No se pudo publicar el comentario: ${text || res.status}`);
   }
-  writeCommentStore(store);
-  return filtered;
+  const data = await res.json().catch(()=> null);
+  const normalized = normalizeComment(data);
+  if(!normalized) return null;
+  const existing = commentCache.get(cacheKey) || [];
+  commentCache.set(cacheKey, [...existing, normalized]);
+  return { ...normalized };
+}
+
+async function commentsDelete(commentId, postId, token){
+  if(!commentId) throw new Error("Falta el ID del comentario");
+  if(!token) throw new Error("Falta AUTH_TOKEN");
+  const cacheKey = postId ? String(postId) : null;
+  const qs = cacheKey ? `?postId=${encodeURIComponent(cacheKey)}` : "";
+  const res = await fetch(`${API_COMMENTS}/${commentId}${qs}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if(!res.ok){
+    const text = await res.text().catch(()=> "");
+    throw new Error(`No se pudo eliminar el comentario: ${text || res.status}`);
+  }
+  if(cacheKey && commentCache.has(cacheKey)){
+    const next = commentCache.get(cacheKey).filter(entry => entry?.id !== commentId);
+    commentCache.set(cacheKey, next);
+  }
+  return true;
 }
 
 function formatCommentDate(timestamp){
@@ -1305,11 +1315,17 @@ function openGame(initialGame, options = {}){
   const commentForm = commentSection?.querySelector(".comment-form") || null;
   const commentCountBadge = commentSection?.querySelector(".comment-count") || null;
   const commentCountLabel = commentSection?.querySelector(".comment-count-label") || null;
+  const commentStatus = commentSection?.querySelector(".comment-status") || null;
+  const commentStatusText = commentStatus?.querySelector?.(".comment-status-text") || null;
+  const commentRetry = commentStatus?.querySelector?.(".comment-retry") || null;
+  const commentSubmitButton = commentForm?.querySelector?.(".comment-submit") || null;
   const { initialState = null, initialMessage = null } = options || {};
   let currentGame = { ...initialGame };
   let commentTabOpenState = false;
   let commentTabAnimationTimer = null;
   let commentTabHeadingTimer = null;
+  let commentsState = { items: [], loading: false, error: null };
+  let lastLoadedPostId = null;
   const timerHost = typeof window !== "undefined" ? window : globalThis;
 
   const triggerCommentTabAnimation = (isOpen)=>{
@@ -1337,24 +1353,77 @@ function openGame(initialGame, options = {}){
     }
   };
 
+  const setCommentStatus = (message, { kind = "info", showRetry = false } = {})=>{
+    if(!commentStatus) return;
+    if(!message){
+      commentStatus.hidden = true;
+      commentStatus.dataset.kind = "";
+      commentStatus.dataset.showRetry = "false";
+      if(commentStatusText) commentStatusText.textContent = "";
+      if(commentRetry) commentRetry.disabled = false;
+      return;
+    }
+    commentStatus.hidden = false;
+    commentStatus.dataset.kind = kind;
+    commentStatus.dataset.showRetry = showRetry ? "true" : "false";
+    if(commentStatusText){
+      commentStatusText.textContent = message;
+    }else{
+      commentStatus.textContent = message;
+    }
+    if(commentRetry) commentRetry.disabled = kind === "loading";
+  };
+
   const applyTitle = ()=>{ if(modalTitle) modalTitle.textContent = currentGame?.title || "Sin título"; };
   const renderDescription = ()=> setModalDescription(modalDesc, currentGame?.description, currentGame);
-  const renderComments = ()=>{
-    const key = getCommentKey(currentGame);
-    const comments = key ? getCommentsByKey(key) : [];
-    const total = comments.length;
+  const updateCommentCounters = (total)=>{
     if(commentCountBadge) commentCountBadge.textContent = String(total);
     if(commentCountLabel) commentCountLabel.textContent = total === 1 ? "(1 comentario)" : `(${total} comentarios)`;
-    if(!commentList || !commentEmpty) return;
+  };
+  const renderComments = ()=>{
+    const items = Array.isArray(commentsState.items) ? commentsState.items : [];
+    const total = items.length;
+    updateCommentCounters(total);
+
+    if(!commentList || !commentEmpty){
+      if(commentsState.loading){
+        setCommentStatus("Cargando comentarios…", { kind: "loading" });
+      }else if(commentsState.error){
+        setCommentStatus("No se pudieron cargar los comentarios.", { kind: "error", showRetry: true });
+      }else{
+        setCommentStatus(null);
+      }
+      return;
+    }
+
     commentList.innerHTML = "";
-    if(!comments.length){
+
+    if(commentsState.loading){
+      setCommentStatus("Cargando comentarios…", { kind: "loading" });
+      commentEmpty.hidden = true;
+      commentList.hidden = true;
+      return;
+    }
+
+    if(commentsState.error){
+      setCommentStatus("No se pudieron cargar los comentarios.", { kind: "error", showRetry: true });
+      commentEmpty.hidden = true;
+      commentList.hidden = true;
+      return;
+    }
+
+    setCommentStatus(null);
+
+    if(!items.length){
       commentEmpty.hidden = false;
       commentList.hidden = true;
       return;
     }
+
     commentEmpty.hidden = true;
     commentList.hidden = false;
-    comments.slice().reverse().forEach(entry => {
+
+    items.slice().reverse().forEach(entry => {
       const item = document.createElement("li");
       item.className = "comment-item";
       const role = entry?.role === "admin" || entry?.admin === true ? "admin" : "user";
@@ -1397,13 +1466,25 @@ function openGame(initialGame, options = {}){
         removeBtn.className = "comment-delete";
         removeBtn.textContent = "Eliminar";
         removeBtn.setAttribute("aria-label", "Eliminar comentario");
-        removeBtn.addEventListener("click", ()=>{
-          const commentId = entry?.id ?? entry?.createdAt ?? null;
-          if(commentId === null) return;
+        removeBtn.addEventListener("click", async ()=>{
+          const commentId = entry?.id ? String(entry.id) : null;
+          const postId = currentGame?.id ?? null;
+          if(!commentId || !postId) return;
           const confirmMessage = "¿Eliminar este comentario?";
           if(typeof window !== "undefined" && !window.confirm(confirmMessage)) return;
-          deleteComment(key, commentId);
-          renderComments();
+          const token = localStorage.getItem("tgx_admin_token") || "";
+          if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
+          removeBtn.disabled = true;
+          try{
+            await commentsDelete(commentId, postId, token);
+            commentsState.items = commentsState.items.filter(item => item?.id !== commentId);
+            renderComments();
+          }catch(err){
+            console.error("[comments] eliminar falló", err);
+            setCommentStatus("No se pudo eliminar el comentario.", { kind: "error" });
+            alert("No se pudo eliminar el comentario.");
+            removeBtn.disabled = false;
+          }
         });
         actions.appendChild(removeBtn);
       }
@@ -1417,6 +1498,35 @@ function openGame(initialGame, options = {}){
       item.append(meta, body);
       commentList.appendChild(item);
     });
+  };
+
+  const loadComments = async ({ force = false } = {})=>{
+    const postId = currentGame?.id ?? null;
+    if(!postId){
+      commentsState = { items: [], loading: false, error: null };
+      lastLoadedPostId = null;
+      renderComments();
+      return;
+    }
+    if(commentsState.loading) return;
+    if(!force && lastLoadedPostId === postId && commentsState.items.length){
+      return;
+    }
+    commentsState.loading = true;
+    commentsState.error = null;
+    renderComments();
+    try{
+      const list = await commentsList(postId, { force });
+      commentsState.items = Array.isArray(list) ? list : [];
+      commentsState.error = null;
+      lastLoadedPostId = postId;
+    }catch(err){
+      console.error("[comments] carga falló", err);
+      commentsState.error = err;
+    }finally{
+      commentsState.loading = false;
+      renderComments();
+    }
   };
   const setCommentTabState = (open, { animate = true } = {})=>{
     if(!commentTab || !commentToggle || !commentFormWrap) return;
@@ -1443,16 +1553,26 @@ function openGame(initialGame, options = {}){
   setCommentTabState(false, { animate: false });
   commentToggle?.addEventListener("click", ()=>{
     const isOpen = commentTab?.classList.contains("is-open");
-    setCommentTabState(!isOpen);
-    if(!isOpen){
+    const nextOpenState = !isOpen;
+    setCommentTabState(nextOpenState);
+    if(nextOpenState){
+      if(commentsState.error){
+        loadComments({ force: true });
+      }else if(!commentsState.items.length && !commentsState.loading){
+        loadComments();
+      }
       const textarea = commentForm?.querySelector("textarea[name='comment']");
       textarea?.focus({ preventScroll: false });
     }
   });
-  commentForm?.addEventListener("submit", (ev)=>{
+  commentRetry?.addEventListener("click", ()=>{
+    if(commentsState.loading) return;
+    loadComments({ force: true });
+  });
+  commentForm?.addEventListener("submit", async (ev)=>{
     ev.preventDefault();
-    const key = getCommentKey(currentGame);
-    if(!key){
+    const postId = currentGame?.id ?? null;
+    if(!postId){
       alert("No se pudo asociar el comentario a la publicación.");
       return;
     }
@@ -1465,25 +1585,45 @@ function openGame(initialGame, options = {}){
     }
     const aliasValue = String(formData.get("alias") || "").trim() || "Anónimo";
     const emailValue = String(formData.get("email") || "").trim();
-    const entry = {
-      id: Date.now(),
-      alias: aliasValue,
-      message,
-      email: emailValue,
-      createdAt: new Date().toISOString(),
-      role: isAdmin ? "admin" : "user"
-    };
-    appendComment(key, entry);
-    commentForm.reset();
-    renderComments();
+    if(commentSubmitButton) commentSubmitButton.disabled = true;
+    try{
+      const token = isAdmin ? (localStorage.getItem("tgx_admin_token") || "") : "";
+      const created = await commentsCreate(postId, { alias: aliasValue, email: emailValue, message, token });
+      if(created){
+        commentsState.items = [...commentsState.items, created];
+        commentsState.error = null;
+        lastLoadedPostId = postId;
+        renderComments();
+        commentForm.reset();
+      }
+    }catch(err){
+      console.error("[comments] crear falló", err);
+      setCommentStatus("No se pudo publicar el comentario. Inténtalo nuevamente.", { kind: "error" });
+      alert("No se pudo publicar el comentario. Inténtalo nuevamente.");
+    }finally{
+      if(commentSubmitButton) commentSubmitButton.disabled = false;
+    }
   });
   const showLoading = (message = "Cargando…")=> setModalDescription(modalDesc, `<p class="modal-status modal-status--loading">${message}</p>`, currentGame);
   const showError = (message = "No se pudo cargar la información adicional. Intenta nuevamente.")=> setModalDescription(modalDesc, `<p class="modal-status modal-status--error">${message}</p>`, currentGame);
   const update = (data = {})=>{
+    const previousId = currentGame?.id ?? null;
     currentGame = { ...currentGame, ...data };
+    const nextId = currentGame?.id ?? null;
     applyTitle();
     renderDescription();
-    renderComments();
+    if(nextId !== previousId){
+      commentsState = { items: [], loading: false, error: null };
+      lastLoadedPostId = null;
+      renderComments();
+      if(nextId){
+        loadComments({ force: true });
+      }else{
+        setCommentStatus(null);
+      }
+    }else{
+      renderComments();
+    }
     return currentGame;
   };
 
@@ -1496,6 +1636,7 @@ function openGame(initialGame, options = {}){
     renderDescription();
   }
   renderComments();
+  loadComments({ force: true });
 
   if(isAdmin){
     const kebabBtn=document.createElement("button");
@@ -3015,6 +3156,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
