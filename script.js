@@ -1187,6 +1187,7 @@ function openGame(initialGame, options = {}){
   const commentEmpty = commentSection?.querySelector(".comment-empty") || null;
   const commentTab = commentSection?.querySelector(".comment-tab") || null;
   const commentToggle = commentSection?.querySelector(".comment-tab-toggle") || null;
+  const commentTabBody = commentSection?.querySelector(".comment-tab-body") || null;
   const commentFormWrap = commentSection?.querySelector(".comment-form-wrap") || null;
   const commentForm = commentSection?.querySelector(".comment-form") || null;
   const { initialState = null, initialMessage = null } = options || {};
@@ -1232,6 +1233,7 @@ function openGame(initialGame, options = {}){
     commentTab.dataset.open = String(isOpen);
     commentToggle.setAttribute("aria-expanded", String(isOpen));
     commentTab.classList.toggle("is-open", isOpen);
+    commentTabBody?.setAttribute("aria-hidden", String(!isOpen));
     commentFormWrap.setAttribute("aria-hidden", String(!isOpen));
   };
   setCommentTabState(false);
@@ -2808,6 +2810,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
