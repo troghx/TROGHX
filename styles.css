@@ -1439,22 +1439,23 @@ body.modal-open { overflow: hidden; }
   z-index: 20;
 }
 
-.comment-tab{
-  --comment-panel-width: clamp(280px, 30vw, 360px);
-  --comment-tab-width: 64px;
-  position: relative;
-  display: flex;
-  align-items: stretch;
-  width: calc(var(--comment-tab-width) + var(--comment-panel-width));
-  flex: 0 0 auto;
-  height: 100%;
-  min-height: 280px;
-  pointer-events: auto;
-  gap: 0;
-  transform: translateX(calc(var(--comment-panel-width) - var(--comment-tab-width)));
-  transition: transform .3s ease, box-shadow .3s ease;
-  box-shadow: 0 14px 28px rgba(0,0,0,.38);
-  z-index: 1;
+  .comment-tab{
+    --comment-panel-width: clamp(280px, 30vw, 360px);
+    --comment-tab-width: 64px;
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    width: calc(var(--comment-tab-width) + var(--comment-panel-width));
+    flex: 0 0 auto;
+    height: 100%;
+    min-height: 280px;
+    pointer-events: auto;
+    gap: 0;
+    transform: translateX(calc(var(--comment-panel-width) - var(--comment-tab-width)));
+    transition: transform .3s ease, box-shadow .3s ease;
+    box-shadow: 0 14px 28px rgba(0,0,0,.38);
+    z-index: 1;
+  }
   
 .comment-tab-toggle{
   position: relative;
@@ -1843,6 +1844,24 @@ body.modal-open{ overflow:hidden; }
           pointer;
 }
 .tile-video{
+  cursor: url("/assets/cursor/hand.png") 10 2,
+          pointer;
+}
+
+button,
+[role="button"],
+a[href],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.comment-tab-toggle,
+.comment-submit,
+.tw-modal-close,
+.nav-btn,
+.yt-channel-badge,
+.dmca-btn,
+.faq-btn,
+.user-pill{
   cursor: url("/assets/cursor/hand.png") 10 2,
           pointer;
 }
