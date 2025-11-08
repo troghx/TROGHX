@@ -1380,6 +1380,8 @@ body.modal-open { overflow: hidden; }
 .game-modal-body::-webkit-scrollbar-thumb{
   background: rgba(255,255,255,.18);
   border-radius: 8px;
+  }
+
 .game-modal .tw-modal-content{
   overflow: visible;
 }
