@@ -1762,7 +1762,7 @@ body.modal-open { overflow: hidden; }
 
   .comment-tab{
     --comment-tab-width: 64px;
-    --comment-toggle-height: 68px;
+    --comment-toggle-height: 1px;
 
     position: relative;
     display: flex;
