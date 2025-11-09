@@ -1192,6 +1192,8 @@ function normalizeComment(entry = {}){
   const messageRaw = typeof entry.message === "string" ? entry.message : "";
   const roleRaw = typeof entry.role === "string" ? entry.role.toLowerCase() : "user";
   const created = entry.createdAt || entry.created_at || null;
+  const parentId = entry.parentId || entry.parent_id || null;
+  const pinnedAt = entry.pinnedAt || entry.pinned_at || null;
   return {
     id: entry.id || entry.commentId || entry.comment_id || null,
     postId: entry.postId || entry.post_id || null,
@@ -1199,6 +1201,8 @@ function normalizeComment(entry = {}){
     message: messageRaw,
     role: roleRaw === "admin" ? "admin" : "user",
     createdAt: created,
+    parentId: parentId,
+    pinnedAt: pinnedAt,
   };
 }
 
@@ -1235,6 +1239,7 @@ async function commentsCreate(postId, payload = {}){
     alias: payload.alias,
     email: payload.email,
     message: payload.message,
+    parentId: payload.parentId,
   };
   const res = await fetch(API_COMMENTS, {
     method: "POST",
@@ -1267,10 +1272,40 @@ async function commentsDelete(commentId, postId, token){
     throw new Error(`No se pudo eliminar el comentario: ${text || res.status}`);
   }
   if(cacheKey && commentCache.has(cacheKey)){
-    const next = commentCache.get(cacheKey).filter(entry => entry?.id !== commentId);
+    const next = commentCache
+      .get(cacheKey)
+      .filter(entry => entry?.id !== commentId && entry?.parentId !== commentId);
     commentCache.set(cacheKey, next);
   }
   return true;
+}
+
+async function commentsPin(commentId, postId, pinned, token){
+  if(!commentId) throw new Error("Falta el ID del comentario");
+  if(!token) throw new Error("Falta AUTH_TOKEN");
+  const cacheKey = postId ? String(postId) : null;
+  const qs = cacheKey ? `?postId=${encodeURIComponent(cacheKey)}` : "";
+  const res = await fetch(`${API_COMMENTS}/${commentId}${qs}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ pinned: Boolean(pinned) })
+  });
+  if(!res.ok){
+    const text = await res.text().catch(()=> "");
+    throw new Error(`No se pudo actualizar el comentario: ${text || res.status}`);
+  }
+  const data = await res.json().catch(()=> null);
+  const normalized = normalizeComment(data);
+  if(cacheKey && commentCache.has(cacheKey) && normalized){
+    const next = commentCache
+      .get(cacheKey)
+      .map(entry => entry?.id === normalized.id ? normalized : entry);
+    commentCache.set(cacheKey, next);
+  }
+  return normalized;
 }
 
 function formatCommentDate(timestamp){
@@ -1319,6 +1354,9 @@ function openGame(initialGame, options = {}){
   const commentStatusText = commentStatus?.querySelector?.(".comment-status-text") || null;
   const commentRetry = commentStatus?.querySelector?.(".comment-retry") || null;
   const commentSubmitButton = commentForm?.querySelector?.(".comment-submit") || null;
+  const commentFormReplying = commentForm?.querySelector?.(".comment-form-replying") || null;
+  const commentFormReplyTarget = commentFormReplying?.querySelector?.(".comment-form-reply-target") || null;
+  const commentFormCancelReply = commentFormReplying?.querySelector?.(".comment-form-cancel-reply") || null;
   const { initialState = null, initialMessage = null } = options || {};
   let currentGame = { ...initialGame };
   let commentTabOpenState = false;
@@ -1326,6 +1364,10 @@ function openGame(initialGame, options = {}){
   let commentTabHeadingTimer = null;
   let commentsState = { items: [], loading: false, error: null };
   let lastLoadedPostId = null;
+  const expandedReplies = new Set();
+  let replyTargetId = null;
+  let replyTargetAlias = "";
+  let openActionsMenu = null;
   const timerHost = typeof window !== "undefined" ? window : globalThis;
 
   const triggerCommentTabAnimation = (isOpen)=>{
@@ -1380,7 +1422,337 @@ function openGame(initialGame, options = {}){
     if(commentCountBadge) commentCountBadge.textContent = String(total);
     if(commentCountLabel) commentCountLabel.textContent = total === 1 ? "(1 comentario)" : `(${total} comentarios)`;
   };
-  const renderComments = ()=>{
+  const closeOpenActionsMenu = ()=>{
+    if(!openActionsMenu) return;
+    const toggle = openActionsMenu.closest(".comment-actions")?.querySelector?.(".comment-actions-toggle");
+    if(toggle) toggle.setAttribute("aria-expanded", "false");
+    openActionsMenu.hidden = true;
+    openActionsMenu = null;
+  };
+
+  const updateReplyIndicator = ()=>{
+    if(!commentForm) return;
+    if(commentFormReplying){
+      if(replyTargetId){
+        commentFormReplying.hidden = false;
+        if(commentFormReplyTarget) commentFormReplyTarget.textContent = replyTargetAlias || "Anónimo";
+      }else{
+        commentFormReplying.hidden = true;
+      }
+    }
+    if(replyTargetId){
+      commentForm.dataset.replyId = replyTargetId;
+    }else{
+      delete commentForm.dataset.replyId;
+    }
+  };
+
+  const setReplyTarget = (comment)=>{
+    if(comment && comment.id){
+      replyTargetId = String(comment.id);
+      replyTargetAlias = comment.alias || "Anónimo";
+    }else{
+      replyTargetId = null;
+      replyTargetAlias = "";
+    }
+    updateReplyIndicator();
+  };
+
+  updateReplyIndicator();
+
+  commentFormCancelReply?.addEventListener("click", (ev)=>{
+    ev.preventDefault();
+    setReplyTarget(null);
+    closeOpenActionsMenu();
+  });
+
+  modalNode?.addEventListener("click", (ev)=>{
+    if(!ev.target.closest(".comment-actions")){
+      closeOpenActionsMenu();
+    }
+  });
+
+  const parseTimestamp = (value)=>{
+    const time = value ? Date.parse(value) : NaN;
+    return Number.isNaN(time) ? 0 : time;
+  };
+
+  const buildCommentTree = (items)=>{
+    const map = new Map();
+    const roots = [];
+    (items || []).forEach(entry => {
+      if(!entry || !entry.id) return;
+      map.set(entry.id, { ...entry, replies: [] });
+    });
+    map.forEach(node => {
+      if(node.parentId && map.has(node.parentId)){
+        map.get(node.parentId).replies.push(node);
+      }else{
+        roots.push(node);
+      }
+    });
+    map.forEach(node => {
+      node.replies.sort((a, b)=> parseTimestamp(a.createdAt) - parseTimestamp(b.createdAt));
+    });
+    roots.sort((a, b)=>{
+      const aPinned = parseTimestamp(a.pinnedAt);
+      const bPinned = parseTimestamp(b.pinnedAt);
+      if(aPinned !== bPinned) return bPinned - aPinned;
+      return parseTimestamp(b.createdAt) - parseTimestamp(a.createdAt);
+    });
+    return roots;
+  };
+
+  const handleReply = (comment)=>{
+    closeOpenActionsMenu();
+    if(!comment) return;
+    const key = comment?.id ? String(comment.id) : null;
+    if(key) expandedReplies.add(key);
+    setReplyTarget(comment);
+    renderComments();
+    const textarea = commentForm?.querySelector("textarea[name='comment']");
+    if(textarea){ textarea.focus({ preventScroll: false }); }
+    commentForm?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  const handlePin = async (comment, shouldPin)=>{
+    if(!comment?.id) return;
+    const postId = currentGame?.id ?? null;
+    if(!postId) return;
+    const token = localStorage.getItem("tgx_admin_token") || "";
+    if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
+    try{
+      const updated = await commentsPin(comment.id, postId, shouldPin, token);
+      if(updated){
+        commentsState.items = commentsState.items.map(item => item?.id === updated.id ? { ...updated } : item);
+        renderComments();
+      }
+    }catch(err){
+      console.error("[comments] pin falló", err);
+      setCommentStatus("No se pudo actualizar el comentario.", { kind: "error" });
+      alert("No se pudo actualizar el comentario.");
+    }
+  };
+
+  const handleDelete = async (comment)=>{
+    closeOpenActionsMenu();
+    const commentId = comment?.id ? String(comment.id) : null;
+    const postId = currentGame?.id ?? null;
+    if(!commentId || !postId) return;
+    const confirmMessage = "¿Eliminar este comentario?";
+    if(typeof window !== "undefined" && !window.confirm(confirmMessage)) return;
+    const token = localStorage.getItem("tgx_admin_token") || "";
+    if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
+    try{
+      await commentsDelete(commentId, postId, token);
+      commentsState.items = commentsState.items.filter(item => item?.id !== commentId && item?.parentId !== commentId);
+      expandedReplies.delete(commentId);
+      if(comment?.parentId) expandedReplies.delete(String(comment.parentId));
+      if(replyTargetId && (replyTargetId === commentId || replyTargetId === String(comment?.parentId))){
+        setReplyTarget(null);
+      }
+      renderComments();
+    }catch(err){
+      console.error("[comments] eliminar falló", err);
+      setCommentStatus("No se pudo eliminar el comentario.", { kind: "error" });
+      alert("No se pudo eliminar el comentario.");
+    }
+  };
+
+  const createActionsMenu = (comment, { isReply = false } = {})=>{
+    const actions = [];
+    if(!isReply){
+      actions.push({ type: "reply", label: "Responder" });
+    }
+    if(isAdmin){
+      if(!isReply){
+        const isPinned = Boolean(comment?.pinnedAt);
+        actions.push({ type: isPinned ? "unpin" : "pin", label: isPinned ? "Desfijar" : "Fijar arriba" });
+      }
+      actions.push({ type: "delete", label: "Eliminar" });
+    }else if(isReply){
+      return null;
+    }
+    if(!actions.length) return null;
+
+    const wrap = document.createElement("div");
+    wrap.className = "comment-actions";
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "comment-actions-toggle";
+    toggle.setAttribute("aria-haspopup", "menu");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.innerHTML = "<span aria-hidden=\"true\">⋮</span>";
+    toggle.title = "Más opciones";
+
+    const menu = document.createElement("div");
+    menu.className = "comment-actions-menu";
+    menu.setAttribute("role", "menu");
+    menu.hidden = true;
+
+    actions.forEach(action => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "comment-actions-item";
+      btn.textContent = action.label;
+      btn.dataset.action = action.type;
+      btn.addEventListener("click", ()=>{
+        closeOpenActionsMenu();
+        switch(action.type){
+          case "reply":
+            handleReply(comment);
+            break;
+          case "pin":
+            handlePin(comment, true);
+            break;
+          case "unpin":
+            handlePin(comment, false);
+            break;
+          case "delete":
+            handleDelete(comment);
+            break;
+          default:
+            break;
+        }
+      });
+      menu.appendChild(btn);
+    });
+
+    toggle.addEventListener("click", (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      if(openActionsMenu === menu){
+        closeOpenActionsMenu();
+      }else{
+        closeOpenActionsMenu();
+        menu.hidden = false;
+        toggle.setAttribute("aria-expanded", "true");
+        openActionsMenu = menu;
+      }
+    });
+
+    wrap.append(toggle, menu);
+    return wrap;
+  };
+
+  const createCommentElement = (comment, { isReply = false } = {})=>{
+    const item = document.createElement("li");
+    item.className = isReply ? "comment-reply" : "comment-item";
+    if(comment?.id) item.dataset.commentId = String(comment.id);
+    const role = comment?.role === "admin" ? "admin" : "user";
+    item.dataset.role = role;
+    if(role === "admin") item.classList.add("is-admin");
+    if(!isReply && comment?.pinnedAt) item.classList.add("is-pinned");
+    if(!isReply && replyTargetId && comment?.id === replyTargetId) item.classList.add("is-reply-target");
+
+    const meta = document.createElement("div");
+    meta.className = "comment-meta";
+    if(isReply) meta.classList.add("comment-meta--compact");
+
+    const author = document.createElement("div");
+    author.className = "comment-author";
+    if(isReply) author.classList.add("comment-author--compact");
+
+    const alias = document.createElement("span");
+    alias.className = "comment-alias";
+    if(role === "admin") alias.classList.add("is-admin");
+    alias.textContent = comment?.alias || "Anónimo";
+    author.appendChild(alias);
+
+    if(role === "admin"){
+      const badge = document.createElement("span");
+      badge.className = "comment-role-badge";
+      badge.textContent = "Admin";
+      author.appendChild(badge);
+    }
+
+    if(!isReply && comment?.pinnedAt){
+      const pinnedBadge = document.createElement("span");
+      pinnedBadge.className = "comment-pinned-badge";
+      pinnedBadge.textContent = "Fijado";
+      author.appendChild(pinnedBadge);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "comment-meta-actions";
+
+    const time = document.createElement("time");
+    time.className = "comment-date";
+    if(comment?.createdAt) time.dateTime = comment.createdAt;
+    time.textContent = formatCommentDate(comment?.createdAt || Date.now());
+    actions.appendChild(time);
+
+    const actionsMenu = createActionsMenu(comment, { isReply });
+    if(actionsMenu) actions.appendChild(actionsMenu);
+
+    meta.append(author, actions);
+
+    const body = document.createElement("p");
+    body.className = "comment-message";
+    if(isReply) body.classList.add("comment-message--reply");
+    body.textContent = comment?.message || "";
+
+    item.append(meta, body);
+
+    if(!isReply){
+      const thread = createRepliesThread(comment);
+      if(thread) item.appendChild(thread);
+    }
+
+    return item;
+  };
+
+  const createRepliesThread = (comment)=>{
+    const replies = Array.isArray(comment?.replies) ? comment.replies : [];
+    if(!replies.length) return null;
+    const thread = document.createElement("div");
+    thread.className = "comment-thread";
+
+    const line = document.createElement("div");
+    line.className = "comment-thread-line";
+    line.setAttribute("aria-hidden", "true");
+    thread.appendChild(line);
+
+    const body = document.createElement("div");
+    body.className = "comment-thread-body";
+
+    const list = document.createElement("ul");
+    list.className = "comment-replies";
+
+    const commentKey = comment?.id ? String(comment.id) : null;
+    const isExpanded = commentKey ? expandedReplies.has(commentKey) : false;
+    const visibleCount = isExpanded ? replies.length : Math.min(1, replies.length);
+
+    replies.forEach((reply, index)=>{
+      const replyEl = createCommentElement(reply, { isReply: true });
+      if(!isExpanded && index >= visibleCount){
+        replyEl.classList.add("is-collapsed");
+        replyEl.hidden = true;
+      }
+      list.appendChild(replyEl);
+    });
+
+    body.appendChild(list);
+
+    if(!isExpanded && replies.length > visibleCount){
+      const remaining = replies.length - visibleCount;
+      const moreBtn = document.createElement("button");
+      moreBtn.type = "button";
+      moreBtn.className = "comment-more-replies";
+      moreBtn.textContent = remaining === 1 ? "Ver 1 respuesta más" : `Ver ${remaining} respuestas más`;
+      moreBtn.addEventListener("click", ()=>{
+        if(commentKey) expandedReplies.add(commentKey);
+        renderComments();
+      });
+      body.appendChild(moreBtn);
+    }
+
+    thread.appendChild(body);
+    return thread;
+  };
+
+  function renderComments(){
     const items = Array.isArray(commentsState.items) ? commentsState.items : [];
     const total = items.length;
     updateCommentCounters(total);
@@ -1396,6 +1768,7 @@ function openGame(initialGame, options = {}){
       return;
     }
 
+    closeOpenActionsMenu();
     commentList.innerHTML = "";
 
     if(commentsState.loading){
@@ -1423,94 +1796,30 @@ function openGame(initialGame, options = {}){
     commentEmpty.hidden = true;
     commentList.hidden = false;
 
-    items.slice().reverse().forEach(entry => {
-      const item = document.createElement("li");
-      item.className = "comment-item";
-      const role = entry?.role === "admin" || entry?.admin === true ? "admin" : "user";
-      item.dataset.role = role;
-      if(role === "admin"){
-        item.classList.add("is-admin");
-      }
-
-      const meta = document.createElement("div");
-      meta.className = "comment-meta";
-
-      const author = document.createElement("div");
-      author.className = "comment-author";
-
-      const alias = document.createElement("span");
-      alias.className = "comment-alias";
-      if(role === "admin") alias.classList.add("is-admin");
-      alias.textContent = entry?.alias || "Anónimo";
-      author.appendChild(alias);
-
-      if(role === "admin"){
-        const badge = document.createElement("span");
-        badge.className = "comment-role-badge";
-        badge.textContent = "Admin";
-        author.appendChild(badge);
-      }
-
-      const actions = document.createElement("div");
-      actions.className = "comment-meta-actions";
-
-      const time = document.createElement("time");
-      time.className = "comment-date";
-      if(entry?.createdAt) time.dateTime = entry.createdAt;
-      time.textContent = formatCommentDate(entry?.createdAt || Date.now());
-      actions.appendChild(time);
-
-      if(isAdmin){
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.className = "comment-delete";
-        removeBtn.textContent = "Eliminar";
-        removeBtn.setAttribute("aria-label", "Eliminar comentario");
-        removeBtn.addEventListener("click", async ()=>{
-          const commentId = entry?.id ? String(entry.id) : null;
-          const postId = currentGame?.id ?? null;
-          if(!commentId || !postId) return;
-          const confirmMessage = "¿Eliminar este comentario?";
-          if(typeof window !== "undefined" && !window.confirm(confirmMessage)) return;
-          const token = localStorage.getItem("tgx_admin_token") || "";
-          if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
-          removeBtn.disabled = true;
-          try{
-            await commentsDelete(commentId, postId, token);
-            commentsState.items = commentsState.items.filter(item => item?.id !== commentId);
-            renderComments();
-          }catch(err){
-            console.error("[comments] eliminar falló", err);
-            setCommentStatus("No se pudo eliminar el comentario.", { kind: "error" });
-            alert("No se pudo eliminar el comentario.");
-            removeBtn.disabled = false;
-          }
-        });
-        actions.appendChild(removeBtn);
-      }
-
-      meta.append(author, actions);
-
-      const body = document.createElement("p");
-      body.className = "comment-message";
-      body.textContent = entry?.message || "";
-
-      item.append(meta, body);
-      commentList.appendChild(item);
+    const threads = buildCommentTree(items);
+    threads.forEach(comment => {
+      const node = createCommentElement(comment);
+      commentList.appendChild(node);
     });
-  };
+  }
 
   const loadComments = async ({ force = false } = {})=>{
     const postId = currentGame?.id ?? null;
     if(!postId){
       commentsState = { items: [], loading: false, error: null };
       lastLoadedPostId = null;
+      expandedReplies.clear();
+      setReplyTarget(null);
       renderComments();
       return;
     }
     if(commentsState.loading) return;
     if(!force && lastLoadedPostId === postId && commentsState.items.length){
       return;
+    }
+    if(lastLoadedPostId !== postId){
+      expandedReplies.clear();
+      setReplyTarget(null);
     }
     commentsState.loading = true;
     commentsState.error = null;
@@ -1588,13 +1897,18 @@ function openGame(initialGame, options = {}){
     if(commentSubmitButton) commentSubmitButton.disabled = true;
     try{
       const token = isAdmin ? (localStorage.getItem("tgx_admin_token") || "") : "";
-      const created = await commentsCreate(postId, { alias: aliasValue, email: emailValue, message, token });
+      const parentId = replyTargetId ? String(replyTargetId) : undefined;
+      const created = await commentsCreate(postId, { alias: aliasValue, email: emailValue, message, token, parentId });
       if(created){
         commentsState.items = [...commentsState.items, created];
         commentsState.error = null;
         lastLoadedPostId = postId;
+        if(created.parentId){
+          expandedReplies.add(String(created.parentId));
+        }
         renderComments();
         commentForm.reset();
+        setReplyTarget(null);
       }
     }catch(err){
       console.error("[comments] crear falló", err);
@@ -3156,6 +3470,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
