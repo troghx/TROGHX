@@ -1821,10 +1821,10 @@ body.modal-open { overflow: hidden; }
     width: 100%;
     min-width: 0;
     padding: 16px 22px;
-    border-radius: 18px 18px 0 0;
+    /* border-radius: 18px 18px 0 0; */
     letter-spacing: .14em;
     transform-origin: center center;
-    min-height: var(--comment-toggle-height);
+    /* min-height: var(--comment-toggle-height); */
   }
 
 .comment-tab-toggle span{ pointer-events:none; }
