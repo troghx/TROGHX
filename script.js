@@ -1348,6 +1348,7 @@ function openGame(initialGame, options = {}){
   const commentTabBody = commentSection?.querySelector(".comment-tab-body") || null;
   const commentFormWrap = commentSection?.querySelector(".comment-form-wrap") || null;
   const commentForm = commentSection?.querySelector(".comment-form") || null;
+  const commentFormToggle = commentSection?.querySelector(".comment-form-toggle") || null;
   const commentCountBadge = commentSection?.querySelector(".comment-count") || null;
   const commentCountLabel = commentSection?.querySelector(".comment-count-label") || null;
   const commentStatus = commentSection?.querySelector(".comment-status") || null;
@@ -1360,6 +1361,7 @@ function openGame(initialGame, options = {}){
   const { initialState = null, initialMessage = null } = options || {};
   let currentGame = { ...initialGame };
   let commentTabOpenState = false;
+  let commentFormExpanded = false;
   let commentTabAnimationTimer = null;
   let commentTabHeadingTimer = null;
   let commentsState = { items: [], loading: false, error: null };
@@ -1369,6 +1371,49 @@ function openGame(initialGame, options = {}){
   let replyTargetAlias = "";
   let openActionsMenu = null;
   const timerHost = typeof window !== "undefined" ? window : globalThis;
+
+  const focusCommentTextarea = ()=>{
+    if(!commentForm) return;
+    const textarea = commentForm.querySelector("textarea[name='comment']");
+    if(!textarea) return;
+    const focusTask = ()=> textarea.focus({ preventScroll: false });
+    if(typeof timerHost?.requestAnimationFrame === "function"){
+      timerHost.requestAnimationFrame(focusTask);
+    }else{
+      focusTask();
+    }
+  };
+
+  const focusCommentToggle = ()=>{
+    if(!commentFormToggle) return;
+    const focusTask = ()=> commentFormToggle.focus({ preventScroll: false });
+    if(typeof timerHost?.requestAnimationFrame === "function"){
+      timerHost.requestAnimationFrame(focusTask);
+    }else{
+      focusTask();
+    }
+  };
+
+  const setCommentFormExpanded = (expanded, { focus = false } = {})=>{
+    const isExpanded = Boolean(expanded);
+    commentFormExpanded = isExpanded;
+    if(commentFormWrap){
+      commentFormWrap.dataset.formOpen = isExpanded ? "true" : "false";
+      commentFormWrap.classList.toggle("is-form-open", isExpanded);
+    }
+    if(commentForm){
+      commentForm.hidden = !isExpanded;
+    }
+    if(commentFormToggle){
+      commentFormToggle.hidden = isExpanded;
+      commentFormToggle.setAttribute("aria-expanded", String(isExpanded));
+    }
+    if(isExpanded){
+      if(focus) focusCommentTextarea();
+    }else if(focus){
+      focusCommentToggle();
+    }
+  };
 
   const triggerCommentTabAnimation = (isOpen)=>{
     if(!commentTab) return;
@@ -1459,11 +1504,19 @@ function openGame(initialGame, options = {}){
   };
 
   updateReplyIndicator();
+  setCommentFormExpanded(false);
 
   commentFormCancelReply?.addEventListener("click", (ev)=>{
     ev.preventDefault();
     setReplyTarget(null);
     closeOpenActionsMenu();
+  });
+
+  commentFormToggle?.addEventListener("click", ()=>{
+    if(!commentTab?.classList.contains("is-open")){
+      setCommentTabState(true);
+    }
+    setCommentFormExpanded(true, { focus: true });
   });
 
   modalNode?.addEventListener("click", (ev)=>{
@@ -1509,9 +1562,11 @@ function openGame(initialGame, options = {}){
     const key = comment?.id ? String(comment.id) : null;
     if(key) expandedReplies.add(key);
     setReplyTarget(comment);
+    if(!commentTab?.classList.contains("is-open")){
+      setCommentTabState(true, { animate: false });
+    }
+    setCommentFormExpanded(true, { focus: true });
     renderComments();
-    const textarea = commentForm?.querySelector("textarea[name='comment']");
-    if(textarea){ textarea.focus({ preventScroll: false }); }
     commentForm?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
@@ -1853,8 +1908,10 @@ function openGame(initialGame, options = {}){
       }else{
         setCommentTabHeaderState(true);
       }
+      setCommentFormExpanded(commentFormExpanded);
     }else{
       setCommentTabHeaderState(false);
+      setCommentFormExpanded(false);
     }
     if(shouldAnimate) triggerCommentTabAnimation(isOpen);
     commentTabOpenState = isOpen;
@@ -1870,8 +1927,11 @@ function openGame(initialGame, options = {}){
       }else if(!commentsState.items.length && !commentsState.loading){
         loadComments();
       }
-      const textarea = commentForm?.querySelector("textarea[name='comment']");
-      textarea?.focus({ preventScroll: false });
+      if(commentFormExpanded){
+        focusCommentTextarea();
+      }else{
+        focusCommentToggle();
+      }
     }
   });
   commentRetry?.addEventListener("click", ()=>{
@@ -3470,6 +3530,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
