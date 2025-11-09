@@ -16,7 +16,7 @@ let schemaReady = false;
 const json = (status, data, extra = {}) =>
   baseJson(status, data, {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,DELETE,PATCH,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     ...extra,
   });
@@ -92,6 +92,22 @@ async function ensureSchema() {
     created_at TIMESTAMPTZ DEFAULT now()
   )`;
   await sql`CREATE INDEX IF NOT EXISTS idx_comments_post_created ON comments (post_id, created_at)`;
+  await sql`ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id uuid`;
+  await sql`ALTER TABLE comments ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMPTZ`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments (parent_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_comments_pinned ON comments (pinned_at DESC NULLS LAST)`;
+  await sql`
+    DO $$
+    BEGIN
+      ALTER TABLE comments
+        ADD CONSTRAINT comments_parent_fk
+        FOREIGN KEY (parent_id)
+        REFERENCES comments(id)
+        ON DELETE CASCADE;
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+    END $$;
+  `;
 }
 
 function mapRow(row = {}) {
@@ -102,6 +118,8 @@ function mapRow(row = {}) {
     message: row.message || "",
     role: row.role === "admin" ? "admin" : "user",
     createdAt: row.createdAt || row.created_at || null,
+    parentId: row.parentId || row.parent_id || null,
+    pinnedAt: row.pinnedAt || row.pinned_at || null,
   };
 }
 
@@ -130,10 +148,12 @@ export async function handler(event) {
                  alias,
                  message,
                  role,
-                 created_at AS "createdAt"
+                 created_at AS "createdAt",
+                 parent_id AS "parentId",
+                 pinned_at AS "pinnedAt"
           FROM comments
           WHERE post_id = ${postId}
-          ORDER BY created_at ASC
+          ORDER BY pinned_at DESC NULLS LAST, created_at ASC
         `;
         return json(200, rows.map(mapRow), cacheHdr(15));
       } catch (err) {
@@ -157,21 +177,140 @@ export async function handler(event) {
       const isAdminComment = auth(event).ok;
       const role = isAdminComment ? "admin" : "user";
 
+      const parentId =
+        normPostId(body.parentId) ||
+        normPostId(body.parent_id) ||
+        normPostId(body.replyTo) ||
+        null;
+
+      if (parentId) {
+        try {
+          const parentRows = await sql`
+            SELECT id, post_id AS "postId", parent_id AS "parentId"
+            FROM comments
+            WHERE id = ${parentId}
+            LIMIT 1
+          `;
+          const parent = parentRows[0];
+          if (!parent || parent.postId !== postId) {
+            return json(400, { error: "invalid parent" });
+          }
+        } catch (err) {
+          console.error("[POST /comments] parent lookup", err);
+          return json(500, { error: "Parent lookup failed", detail: String(err.message || err) });
+        }
+      }
+
       try {
         const rows = await sql`
-          INSERT INTO comments (post_id, alias, email, message, role)
-          VALUES (${postId}, ${alias}, ${email}, ${message}, ${role})
+          INSERT INTO comments (post_id, alias, email, message, role, parent_id)
+          VALUES (${postId}, ${alias}, ${email}, ${message}, ${role}, ${parentId})
           RETURNING id,
                     post_id AS "postId",
                     alias,
                     message,
                     role,
-                    created_at AS "createdAt"
+                    created_at AS "createdAt",
+                    parent_id AS "parentId",
+                    pinned_at AS "pinnedAt"
         `;
         return json(201, mapRow(rows[0] || {}));
       } catch (err) {
         console.error("[POST /comments]", err);
         return json(500, { error: "Create failed", detail: String(err.message || err) });
+      }
+    }
+
+    // ---------- PIN / UPDATE ----------
+    if (event.httpMethod === "PATCH" && event.path.includes("/comments/")) {
+      const authResult = auth(event);
+      if (!authResult.ok) return authResult.res;
+
+      const id = getCommentId(event);
+      if (!id) return json(400, { error: "invalid id" });
+
+      const params = qs(event);
+      const postId =
+        normPostId(params.postId) || normPostId(params.post_id) || normPostId(params.id);
+
+      const body = parseBody(event);
+      const pinnedValue = Boolean(body?.pinned);
+
+      try {
+        let rows;
+        if (pinnedValue) {
+          if (postId) {
+            rows = await sql`
+              UPDATE comments
+              SET pinned_at = now()
+              WHERE id = ${id}
+                AND parent_id IS NULL
+                AND post_id = ${postId}
+              RETURNING id,
+                        post_id AS "postId",
+                        alias,
+                        message,
+                        role,
+                        created_at AS "createdAt",
+                        parent_id AS "parentId",
+                        pinned_at AS "pinnedAt"
+            `;
+          } else {
+            rows = await sql`
+              UPDATE comments
+              SET pinned_at = now()
+              WHERE id = ${id}
+                AND parent_id IS NULL
+              RETURNING id,
+                        post_id AS "postId",
+                        alias,
+                        message,
+                        role,
+                        created_at AS "createdAt",
+                        parent_id AS "parentId",
+                        pinned_at AS "pinnedAt"
+            `;
+          }
+        } else {
+          if (postId) {
+            rows = await sql`
+              UPDATE comments
+              SET pinned_at = NULL
+              WHERE id = ${id}
+                AND parent_id IS NULL
+                AND post_id = ${postId}
+              RETURNING id,
+                        post_id AS "postId",
+                        alias,
+                        message,
+                        role,
+                        created_at AS "createdAt",
+                        parent_id AS "parentId",
+                        pinned_at AS "pinnedAt"
+            `;
+          } else {
+            rows = await sql`
+              UPDATE comments
+              SET pinned_at = NULL
+              WHERE id = ${id}
+                AND parent_id IS NULL
+              RETURNING id,
+                        post_id AS "postId",
+                        alias,
+                        message,
+                        role,
+                        created_at AS "createdAt",
+                        parent_id AS "parentId",
+                        pinned_at AS "pinnedAt"
+            `;
+          }
+        }
+        if (!rows.length)
+          return json(404, { error: "not found" });
+        return json(200, mapRow(rows[0] || {}));
+      } catch (err) {
+        console.error("[PATCH /comments/:id]", err);
+        return json(500, { error: "Update failed", detail: String(err.message || err) });
       }
     }
 
