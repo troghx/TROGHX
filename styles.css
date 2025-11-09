@@ -1774,7 +1774,7 @@ body.modal-open { overflow: hidden; }
     min-height: 280px;
     pointer-events: auto;
     gap: 0;
-    transform: translateX(calc(var(--comment-panel-width) - var(--comment-tab-width)));
+    transform: translateX(0);
     transition: transform .3s ease, box-shadow .3s ease, width .38s ease, padding .38s ease;
     box-shadow: 0 14px 28px rgba(0,0,0,.38);
     z-index: 1;
