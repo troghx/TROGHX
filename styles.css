@@ -271,6 +271,8 @@ body::before {
 
 .hero-message p {
   margin: 0;
+}
+
 .business-slot-right {
   display:flex;
   align-items:center;
