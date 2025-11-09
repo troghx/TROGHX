@@ -1371,6 +1371,32 @@ function openGame(initialGame, options = {}){
   let replyTargetAlias = "";
   let openActionsMenu = null;
   const timerHost = typeof window !== "undefined" ? window : globalThis;
+  const commentPanelMinWidth = 280;
+  const commentPanelMaxWidth = 420;
+  const commentPanelGutter = 32;
+
+  const getViewportWidth = ()=>{
+    if(typeof window !== "undefined" && Number.isFinite(window.innerWidth)){
+      return window.innerWidth;
+    }
+    return modalContent?.ownerDocument?.documentElement?.clientWidth || 0;
+  };
+
+  const updateCommentLayout = ()=>{
+    if(!commentSection || !commentTab || !modalContent) return;
+    const viewportWidth = getViewportWidth();
+    if(!viewportWidth) return;
+    const rect = modalContent.getBoundingClientRect();
+    const available = viewportWidth - rect.right - commentPanelGutter;
+    const shouldStack = available < commentPanelMinWidth;
+    commentSection.classList.toggle("is-stacked", shouldStack);
+    if(shouldStack){
+      commentTab.style.removeProperty("--comment-panel-width");
+    }else{
+      const width = Math.max(commentPanelMinWidth, Math.min(commentPanelMaxWidth, available));
+      commentTab.style.setProperty("--comment-panel-width", `${Math.round(width)}px`);
+    }
+  };
 
   const focusCommentTextarea = ()=>{
     if(!commentForm) return;
@@ -1915,6 +1941,7 @@ function openGame(initialGame, options = {}){
     }
     if(shouldAnimate) triggerCommentTabAnimation(isOpen);
     commentTabOpenState = isOpen;
+    updateCommentLayout();
   };
   setCommentTabState(false, { animate: false });
   commentToggle?.addEventListener("click", ()=>{
@@ -2044,8 +2071,36 @@ function openGame(initialGame, options = {}){
   }
 
   const removeTrap = trapFocus(modalNode);
-  const onEscape   = (e)=>{ if(e.key==="Escape") closeModal(modalNode, removeTrap, onEscape); };
-  if(modalClose) modalClose.addEventListener("click", ()=> closeModal(modalNode, removeTrap, onEscape));
+  const handleResize = ()=> updateCommentLayout();
+  const cleanupModal = ()=>{
+    if(typeof window !== "undefined"){
+      window.removeEventListener("resize", handleResize);
+    }
+  };
+  const performClose = ()=>{
+    cleanupModal();
+    closeModal(modalNode, removeTrap, onEscape);
+  };
+  const onEscape   = (e)=>{
+    if(e.key!=="Escape") return;
+    performClose();
+  };
+  if(typeof window !== "undefined"){
+    window.addEventListener("resize", handleResize);
+    const scheduleLayout = ()=>{
+      const run = ()=> updateCommentLayout();
+      if(typeof window.requestAnimationFrame === "function"){
+        window.requestAnimationFrame(()=>{
+          run();
+          window.requestAnimationFrame(run);
+        });
+      }else{
+        setTimeout(()=>{ run(); setTimeout(run, 50); }, 0);
+      }
+    };
+    scheduleLayout();
+  }
+  if(modalClose) modalClose.addEventListener("click", ()=> performClose());
   openModalFragment(modalNode);
 
   const discord = socials.find(s => /discord/i.test(s.name || s.url));
@@ -3530,6 +3585,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
