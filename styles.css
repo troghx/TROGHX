@@ -1760,9 +1760,10 @@ body.modal-open { overflow: hidden; }
   z-index: 20;
 }
 
-  .comment-tab{
+.comment-tab{
     --comment-tab-width: 64px;
     --comment-toggle-height: 1px;
+    --comment-panel-width: clamp(320px, 32vw, 420px);
 
     position: relative;
     display: flex;
@@ -1810,6 +1811,94 @@ body.modal-open { overflow: hidden; }
     min-width .38s ease, padding .38s ease, letter-spacing .38s ease;
   gap: 12px;
   transform-origin: center bottom;
+}
+
+.game-modal-comments.is-stacked{
+  position: static;
+  margin-top: 16px;
+  pointer-events: auto;
+  width: auto;
+}
+
+.game-modal-comments.is-stacked .comment-tab{
+  --comment-panel-width: 100%;
+  position: relative;
+  top: 0;
+  right: 0;
+  bottom: auto;
+  width: 100%;
+  margin-top: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  height: auto;
+  flex: 1 1 auto;
+  transform: none;
+  box-shadow: 0 12px 24px rgba(0,0,0,.38);
+}
+
+.game-modal-comments.is-stacked .comment-tab.is-open{
+  transform: none;
+  box-shadow: 0 12px 24px rgba(0,0,0,.38);
+}
+
+.game-modal-comments.is-stacked .comment-tab.is-animating-open .comment-tab-toggle,
+.game-modal-comments.is-stacked .comment-tab.is-animating-close .comment-tab-toggle{
+  animation: none;
+}
+
+.game-modal-comments.is-stacked .comment-tab-toggle{
+  order: -1;
+  width: auto;
+  min-width: auto;
+  align-self: flex-end;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  letter-spacing: .14em;
+  padding: 10px 18px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+  box-shadow: 0 12px 24px rgba(229,57,53,.45);
+  flex-direction: row;
+  gap: 10px;
+}
+
+.game-modal-comments.is-stacked .comment-tab.is-header-open .comment-tab-toggle{
+  border-radius: 999px;
+  width: auto;
+  min-width: auto;
+  padding: 10px 18px;
+}
+
+.game-modal-comments.is-stacked .comment-tab-toggle:hover,
+.game-modal-comments.is-stacked .comment-tab-toggle:focus-visible{
+  transform: translateY(-1px);
+}
+
+.game-modal-comments.is-stacked .comment-count{
+  min-width: 36px;
+  min-height: 28px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  letter-spacing: .08em;
+}
+
+.game-modal-comments.is-stacked .comment-tab-body{
+  margin-left: 0;
+  margin-top: 12px;
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  border-radius: 18px;
+  box-shadow: 0 12px 24px rgba(0,0,0,.38);
+  padding: 18px;
+}
+
+.game-modal-comments.is-stacked .comment-tab.is-header-open .comment-tab-body{
+  border-radius: 18px;
+}
+
+.game-modal-comments.is-stacked .comment-panel{
+  padding-right: 0;
 }
 
   .comment-tab.is-header-open .comment-tab-toggle{
