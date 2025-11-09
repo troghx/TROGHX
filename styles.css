@@ -1863,10 +1863,10 @@ body.modal-open { overflow: hidden; }
   height: 100%;
   padding: 20px 22px 22px 22px;
   margin-left: -1px;
-  border-radius: 0 18px 18px 0;
+  /* border-radius: 0 18px 18px 0;
   border: 1px solid rgba(255,255,255,.08);
   background: linear-gradient(135deg, rgba(20,28,38,.92) 0%, rgba(11,15,23,.86) 100%);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px); */
   overflow: hidden;
   transform: translateX(calc(100% + 18px));
   opacity: 0;
