@@ -251,29 +251,26 @@ body::before {
 .hero .actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
 .hero-banner {
-  display:flex;
-  align-items:center;
-  justify-content: space-between;
-  gap:20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
 }
 
 .hero-message {
-  flex:1;
-  text-align:center;
+  max-width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+  margin: 0 auto;
 }
 
-.business-slot-left {
-  display:flex;
-  align-items: center; /* Align content to the bottom */
-  justify-content: center;
-  padding: 10px;
-  border: 1px dashed rgba(255,255,255,.15);
-  background: rgba(255,255,255,.03);
-  border-radius: 14px;
-  font-weight: 700;
-  text-align: left;
-  flex-direction: column; /* Stack h2 and p vertically */
-}
+.hero-message p {
+  margin: 0;
 .business-slot-right {
   display:flex;
   align-items:center;
