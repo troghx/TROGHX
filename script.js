@@ -252,6 +252,7 @@ const LS_ADMIN_HASH = "tgx_admin_hash";
 const LS_ADMIN_SALT = "tgx_admin_salt";
 const LS_ADMIN_USER = "tgx_admin_user";
 const LS_SOCIALS    = "tgx_socials";
+const LS_ADMIN_NOTIF = "tgx_admin_notifications_seen";
 
 /* ------- Endpoints ------- */
 const API_POSTS    = "/.netlify/functions/posts";
@@ -275,6 +276,11 @@ const TOPBAR_LOGOS = {
   app: "assets/images/trogh-app.png",
   movie: "assets/images/trogh-movies.png"
 };
+const CATEGORY_LABELS = {
+  game: "Juego",
+  app: "Aplicación",
+  movie: "Película"
+};
 const PLAYER_MODE_ICONS = {
   single: "assets/images/player-modes/single.png",
   multi: "assets/images/player-modes/multi.png"
@@ -283,6 +289,8 @@ const PLAYER_MODE_LABELS = {
   single: "Un jugador",
   multi: "Multijugador"
 };
+const ADMIN_NOTIF_LIMIT = 40;
+const ADMIN_NOTIF_POLL_INTERVAL = 45000;
 function updateTopbarLogo(cat){
   const logoEl = document.querySelector('.topbar .logo');
   if(!logoEl) return;
@@ -301,6 +309,26 @@ let searchQuery = "";
 let recientesWheelCooldownTs = 0;
 const fullCache = new Map();
 const videoCache = new Map();
+
+const adminNotifications = {
+  wrap: null,
+  button: null,
+  count: null,
+  panel: null,
+  list: null,
+  empty: null,
+  refreshBtn: null,
+  initialized: false,
+  panelOpen: false,
+  loading: false,
+  error: null,
+  items: [],
+  timer: null,
+  lastSeenAt: loadAdminNotificationsSeen(),
+  lastFetchedAt: null,
+  docClickHandler: null,
+  docKeyHandler: null,
+};
 
 // Recalcula el tamaño de página en función del espacio disponible en la cuadrícula
 function recalcPageSize(){
@@ -335,6 +363,40 @@ rehydrate();
 
 function persistAdmin(flag){ try{ localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); }catch (err) {} }
 function preload(src){ const img = new Image(); img.src = src; }
+
+function loadAdminNotificationsSeen(){
+  if(typeof localStorage === "undefined") return null;
+  try{
+    const raw = localStorage.getItem(LS_ADMIN_NOTIF);
+    if(!raw) return null;
+    const ts = Date.parse(raw);
+    if(Number.isNaN(ts)) return null;
+    return new Date(ts).toISOString();
+  }catch(err){
+    return null;
+  }
+}
+
+function saveAdminNotificationsSeen(value){
+  if(typeof localStorage === "undefined") return;
+  try{
+    if(value){
+      localStorage.setItem(LS_ADMIN_NOTIF, value);
+    }else{
+      localStorage.removeItem(LS_ADMIN_NOTIF);
+    }
+  }catch(err){}
+}
+
+function parseTime(value){
+  const time = value ? Date.parse(value) : NaN;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function formatCategoryLabel(cat){
+  const key = typeof cat === "string" ? cat.toLowerCase() : "";
+  return CATEGORY_LABELS[key] || CATEGORY_LABELS.game;
+}
 
 function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
 async function sha256(str){ const enc=new TextEncoder().encode(str); const digest=await crypto.subtle.digest("SHA-256",enc); return toHex(digest); }
@@ -1194,6 +1256,8 @@ function normalizeComment(entry = {}){
   const created = entry.createdAt || entry.created_at || null;
   const parentId = entry.parentId || entry.parent_id || null;
   const pinnedAt = entry.pinnedAt || entry.pinned_at || null;
+  const postTitleRaw = typeof entry.postTitle === "string" ? entry.postTitle : (typeof entry.post_title === "string" ? entry.post_title : "");
+  const postCategoryRaw = typeof entry.postCategory === "string" ? entry.postCategory : (typeof entry.post_category === "string" ? entry.post_category : "");
   return {
     id: entry.id || entry.commentId || entry.comment_id || null,
     postId: entry.postId || entry.post_id || null,
@@ -1203,6 +1267,8 @@ function normalizeComment(entry = {}){
     createdAt: created,
     parentId: parentId,
     pinnedAt: pinnedAt,
+    postTitle: postTitleRaw || "",
+    postCategory: postCategoryRaw ? postCategoryRaw.toLowerCase() : "",
   };
 }
 
@@ -1322,16 +1388,23 @@ function formatCommentDate(timestamp){
     return "";
   }
 }
-async function openGameLazy(game){
-  const modal = openGame(game, { initialState: "loading" });
-  try{
-    const full = await apiGet(game.id);
-    const data = { ...game, ...full };
-    modal?.update?.(data);
-  }catch(err){
-    console.error("[openGameLazy] detalle falló", err);
-    modal?.showError?.("No se pudo cargar la información adicional. Revisa tu conexión.");
-  }
+function openGameLazy(game){
+  const hasFullData = game && typeof game.description === "string" && game.description.trim() !== "";
+  const modal = openGame(game, { initialState: hasFullData ? null : "loading" });
+  const postId = game?.id;
+  if(!postId) return modal;
+  if(hasFullData) return modal;
+  apiGet(postId)
+    .then(full => {
+      if(!full) return;
+      const data = { ...game, ...full };
+      modal?.update?.(data);
+    })
+    .catch(err => {
+      console.error("[openGameLazy] detalle falló", err);
+      modal?.showError?.("No se pudo cargar la información adicional. Revisa tu conexión.");
+    });
+  return modal;
 }
 function openGame(initialGame, options = {}){
   const modal = modalTemplate.content.cloneNode(true);
@@ -1370,6 +1443,8 @@ function openGame(initialGame, options = {}){
   let replyTargetId = null;
   let replyTargetAlias = "";
   let openActionsMenu = null;
+  let highlightCommentId = null;
+  let highlightPendingScroll = false;
   const timerHost = typeof window !== "undefined" ? window : globalThis;
   const commentPanelMinWidth = 280;
   const commentPanelMaxWidth = 420;
@@ -1527,6 +1602,14 @@ function openGame(initialGame, options = {}){
       replyTargetAlias = "";
     }
     updateReplyIndicator();
+  };
+
+  const setHighlightTarget = (commentId, parentId)=>{
+    highlightCommentId = commentId ? String(commentId) : null;
+    highlightPendingScroll = Boolean(highlightCommentId);
+    if(parentId){
+      expandedReplies.add(String(parentId));
+    }
   };
 
   updateReplyIndicator();
@@ -1882,6 +1965,20 @@ function openGame(initialGame, options = {}){
       const node = createCommentElement(comment);
       commentList.appendChild(node);
     });
+
+    requestAnimationFrame(()=>{
+      if(!commentList) return;
+      commentList.querySelectorAll(".is-highlighted").forEach(el => el.classList.remove("is-highlighted"));
+      if(!highlightCommentId) return;
+      const target = commentList.querySelector(`[data-comment-id="${highlightCommentId}"]`);
+      if(target){
+        target.classList.add("is-highlighted");
+        if(highlightPendingScroll){
+          highlightPendingScroll = false;
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    });
   }
 
   const loadComments = async ({ force = false } = {})=>{
@@ -2039,6 +2136,22 @@ function openGame(initialGame, options = {}){
   renderComments();
   loadComments({ force: true });
 
+  const openComments = ({ focus = false, highlightId = null, highlightParentId = null } = {})=>{
+    setCommentTabState(true, { animate: false });
+    if(highlightId){
+      setHighlightTarget(highlightId, highlightParentId);
+      renderComments();
+    }
+    loadComments({ force: true });
+    if(focus){
+      if(commentFormExpanded){
+        focusCommentTextarea();
+      }else{
+        focusCommentToggle();
+      }
+    }
+  };
+
   if(isAdmin){
     const kebabBtn=document.createElement("button");
     kebabBtn.className="tw-modal-menu";
@@ -2133,7 +2246,7 @@ function openGame(initialGame, options = {}){
       link.addEventListener("mouseenter", ()=>{ hide(); clearTimeout(t); });
     });
   }
-  return { update, showLoading, showError, get data(){ return currentGame; } };
+  return { update, showLoading, showError, openComments, get data(){ return currentGame; } };
 }
 function deleteGame(game){
   if(!game.id){ alert("No se encontró ID."); return; }
@@ -2780,17 +2893,388 @@ function openAdminMenuModal(){
   openModalFragment(node);
 }
 
+function stopAdminNotificationPolling(){
+  if(adminNotifications.timer){
+    try{ clearInterval(adminNotifications.timer); }catch(err){}
+    adminNotifications.timer = null;
+  }
+}
+
+function startAdminNotificationPolling(force = false){
+  if(!isAdmin) return;
+  stopAdminNotificationPolling();
+  if(force){
+    fetchAdminNotifications({ force: true }).catch(()=>{});
+  }else{
+    fetchAdminNotifications().catch(()=>{});
+  }
+  if(typeof window !== "undefined" && Number.isFinite(ADMIN_NOTIF_POLL_INTERVAL) && ADMIN_NOTIF_POLL_INTERVAL > 0){
+    adminNotifications.timer = window.setInterval(()=>{
+      fetchAdminNotifications().catch(err => console.error("[admin notifications] poll", err));
+    }, ADMIN_NOTIF_POLL_INTERVAL);
+  }
+}
+
+async function fetchAdminNotifications({ force = false } = {}){
+  if(!isAdmin || !adminNotifications.wrap) return;
+  if(adminNotifications.loading) return;
+  adminNotifications.loading = true;
+  adminNotifications.error = null;
+  renderAdminNotifications();
+
+  const params = new URLSearchParams({ latest: "1", limit: String(ADMIN_NOTIF_LIMIT) });
+  if(!force){
+    const sinceSource = adminNotifications.lastFetchedAt || adminNotifications.lastSeenAt;
+    const sinceTime = parseTime(sinceSource);
+    if(sinceTime){
+      params.set("since", new Date(sinceTime).toISOString());
+    }
+  }
+
+  try{
+    const res = await fetch(`${API_COMMENTS}?${params.toString()}`, { cache: "no-store" });
+    if(!res.ok){
+      const text = await res.text().catch(()=> "");
+      throw new Error(text || res.statusText || String(res.status));
+    }
+    const data = await res.json().catch(()=> []);
+    const normalized = Array.isArray(data) ? data.map(normalizeComment).filter(item => item && item.id && item.postId) : [];
+    if(force){
+      adminNotifications.items = normalized
+        .sort((a,b)=> parseTime(b.createdAt) - parseTime(a.createdAt))
+        .slice(0, ADMIN_NOTIF_LIMIT);
+    }else if(normalized.length){
+      const map = new Map(adminNotifications.items.map(item => [String(item.id), item]));
+      normalized.forEach(item => {
+        const key = String(item.id);
+        const prev = map.get(key) || {};
+        map.set(key, { ...prev, ...item });
+      });
+      adminNotifications.items = Array.from(map.values())
+        .sort((a,b)=> parseTime(b.createdAt) - parseTime(a.createdAt))
+        .slice(0, ADMIN_NOTIF_LIMIT);
+    }
+    if(adminNotifications.items.length){
+      const latest = parseTime(adminNotifications.items[0]?.createdAt);
+      if(latest){
+        adminNotifications.lastFetchedAt = new Date(latest).toISOString();
+      }
+    }else if(force && !adminNotifications.lastFetchedAt){
+      adminNotifications.lastFetchedAt = new Date().toISOString();
+    }
+  }catch(err){
+    adminNotifications.error = err;
+    console.error("[admin notifications] fetch", err);
+  }finally{
+    adminNotifications.loading = false;
+    renderAdminNotifications();
+    if(adminNotifications.panelOpen){
+      markAdminNotificationsAsSeen();
+    }else{
+      updateAdminNotificationBadge();
+    }
+  }
+}
+
+function updateAdminNotificationBadge(){
+  const { count, button, items, lastSeenAt } = adminNotifications;
+  if(button){
+    const lastSeenTime = parseTime(lastSeenAt);
+    let unseen = 0;
+    for(const item of items){
+      const created = parseTime(item?.createdAt);
+      if(!created) continue;
+      if(!lastSeenTime || created > lastSeenTime) unseen += 1;
+    }
+    button.classList.toggle("has-unseen", unseen > 0);
+    if(count){
+      if(unseen > 0){
+        count.textContent = unseen > 99 ? "99+" : String(unseen);
+        count.hidden = false;
+      }else{
+        count.hidden = true;
+      }
+    }
+  }
+}
+
+function renderAdminNotifications(){
+  const { wrap, list, empty, items, loading, error } = adminNotifications;
+  if(!wrap || !list || !empty) return;
+  list.innerHTML = "";
+  list.hidden = true;
+
+  if(!items.length){
+    if(loading){
+      empty.textContent = "Cargando notificaciones…";
+    }else if(error){
+      empty.textContent = "No se pudieron cargar las notificaciones.";
+    }else{
+      empty.textContent = "Sin comentarios nuevos.";
+    }
+    empty.hidden = false;
+    updateAdminNotificationBadge();
+    return;
+  }
+
+  empty.hidden = true;
+  list.hidden = false;
+  const lastSeenTime = parseTime(adminNotifications.lastSeenAt);
+
+  items.forEach(item => {
+    const li = document.createElement("li");
+    li.className = "admin-notify-item";
+
+    const entry = document.createElement("button");
+    entry.type = "button";
+    entry.className = "admin-notify-entry";
+    entry.dataset.commentId = item.id ? String(item.id) : "";
+    entry.dataset.postId = item.postId ? String(item.postId) : "";
+    if(item.parentId) entry.dataset.parentId = String(item.parentId);
+    if(item.postTitle) entry.dataset.postTitle = item.postTitle;
+    if(item.postCategory) entry.dataset.postCategory = item.postCategory;
+    if(item.parentId) entry.classList.add("is-reply");
+
+    const created = parseTime(item.createdAt);
+    if(!lastSeenTime || (created && created > lastSeenTime)){
+      entry.classList.add("is-unseen");
+    }
+
+    const head = document.createElement("div");
+    head.className = "admin-notify-entry-head";
+
+    const postTitle = document.createElement("span");
+    postTitle.className = "admin-notify-post";
+    postTitle.textContent = item.postTitle || "Publicación";
+
+    const meta = document.createElement("div");
+    meta.className = "admin-notify-meta";
+    if(item.parentId){
+      const replyBadge = document.createElement("span");
+      replyBadge.className = "admin-notify-reply";
+      replyBadge.textContent = "Respuesta";
+      meta.appendChild(replyBadge);
+    }
+    if(item.postCategory){
+      const cat = document.createElement("span");
+      cat.className = "admin-notify-category";
+      cat.textContent = formatCategoryLabel(item.postCategory);
+      meta.appendChild(cat);
+    }
+    const timeEl = document.createElement("time");
+    timeEl.className = "admin-notify-date";
+    if(item.createdAt) timeEl.dateTime = item.createdAt;
+    timeEl.textContent = formatCommentDate(item.createdAt || Date.now());
+    meta.appendChild(timeEl);
+
+    head.append(postTitle, meta);
+
+    const body = document.createElement("div");
+    body.className = "admin-notify-body";
+    const alias = document.createElement("span");
+    alias.className = "admin-notify-alias";
+    alias.textContent = item.alias || "Anónimo";
+    const msg = document.createElement("p");
+    msg.className = "admin-notify-message";
+    const cleanMessage = String(item.message || "").replace(/\s+/g, " ").trim();
+    msg.textContent = cleanMessage.length > 160 ? `${cleanMessage.slice(0,157)}…` : cleanMessage;
+    body.append(alias, msg);
+
+    entry.append(head, body);
+    li.appendChild(entry);
+    list.appendChild(li);
+  });
+
+  updateAdminNotificationBadge();
+}
+
+function markAdminNotificationsAsSeen(){
+  if(!adminNotifications.items.length) return;
+  const latest = parseTime(adminNotifications.items[0]?.createdAt);
+  if(!latest) return;
+  const iso = new Date(latest).toISOString();
+  adminNotifications.lastSeenAt = iso;
+  saveAdminNotificationsSeen(iso);
+  updateAdminNotificationBadge();
+  if(adminNotifications.list){
+    adminNotifications.list.querySelectorAll(".admin-notify-entry.is-unseen").forEach(el => el.classList.remove("is-unseen"));
+  }
+}
+
+function closeAdminNotificationsPanel(silent = false){
+  const { panel, button, wrap } = adminNotifications;
+  if(panel) panel.hidden = true;
+  if(button) button.setAttribute("aria-expanded", "false");
+  wrap?.classList.remove("is-open");
+  adminNotifications.panelOpen = false;
+  if(!silent) updateAdminNotificationBadge();
+}
+
+function openAdminNotificationsPanel(){
+  if(!isAdmin || !adminNotifications.panel) return;
+  if(adminNotifications.panelOpen) return;
+  adminNotifications.panel.hidden = false;
+  adminNotifications.button?.setAttribute("aria-expanded", "true");
+  adminNotifications.wrap?.classList.add("is-open");
+  adminNotifications.panelOpen = true;
+  adminNotifications.panel?.focus?.();
+  renderAdminNotifications();
+  markAdminNotificationsAsSeen();
+  fetchAdminNotifications({ force: true }).catch(()=>{});
+}
+
+function handleAdminNotificationToggle(){
+  if(adminNotifications.panelOpen){
+    closeAdminNotificationsPanel();
+  }else{
+    openAdminNotificationsPanel();
+  }
+}
+
+async function openNotificationItem(notification){
+  if(!notification || !notification.postId) return;
+  closeAdminNotificationsPanel();
+
+  const postId = String(notification.postId);
+  let base = (Array.isArray(recientes) ? recientes : []).find(item => item?.id === postId);
+  let modal = null;
+
+  try{
+    if(base){
+      const merged = { ...base };
+      if(notification.postTitle && !merged.title) merged.title = notification.postTitle;
+      if(notification.postCategory && !merged.category) merged.category = notification.postCategory;
+      modal = openGameLazy(merged);
+    }else{
+      let detail = null;
+      try{
+        detail = await apiGet(postId);
+      }catch(err){
+        console.error("[admin notifications] detalle", err);
+      }
+      if(detail){
+        if(notification.postTitle && !detail.title) detail.title = notification.postTitle;
+        if(notification.postCategory && !detail.category) detail.category = notification.postCategory;
+        modal = openGame(detail);
+      }else{
+        modal = openGameLazy({ id: postId, title: notification.postTitle || "Publicación" });
+      }
+    }
+
+    modal?.openComments?.({
+      focus: true,
+      highlightId: notification.id || null,
+      highlightParentId: notification.parentId || null,
+    });
+  }catch(err){
+    console.error("[admin notifications] open", err);
+    alert("No se pudo abrir la publicación asociada al comentario.");
+  }
+}
+
+async function handleAdminNotificationListClick(ev){
+  const entry = ev.target.closest?.(".admin-notify-entry");
+  if(!entry) return;
+  ev.preventDefault();
+  const commentId = entry.dataset.commentId || "";
+  const target = adminNotifications.items.find(item => String(item.id) === commentId);
+  await openNotificationItem(target);
+}
+
+function updateAdminNotificationsState(){
+  const { wrap, button, panel } = adminNotifications;
+  if(!wrap || !button || !panel){
+    stopAdminNotificationPolling();
+    return;
+  }
+  const visible = Boolean(isAdmin);
+  wrap.hidden = !visible;
+  wrap.setAttribute("aria-hidden", String(!visible));
+  if(!visible){
+    closeAdminNotificationsPanel(true);
+    stopAdminNotificationPolling();
+    adminNotifications.button?.classList.remove("has-unseen");
+    if(adminNotifications.count) adminNotifications.count.hidden = true;
+    adminNotifications.items = [];
+    adminNotifications.error = null;
+    adminNotifications.lastFetchedAt = null;
+    renderAdminNotifications();
+    return;
+  }
+  if(!adminNotifications.timer){
+    startAdminNotificationPolling(true);
+  }else{
+    updateAdminNotificationBadge();
+  }
+}
+
+function setupAdminNotifications(){
+  const wrap = document.querySelector(".admin-notify");
+  const button = wrap?.querySelector?.(".admin-notify-btn");
+  const count = wrap?.querySelector?.(".admin-notify-count");
+  const panel = wrap?.querySelector?.(".admin-notify-panel");
+  const list = wrap?.querySelector?.(".admin-notify-list");
+  const empty = wrap?.querySelector?.(".admin-notify-empty");
+  const refreshBtn = wrap?.querySelector?.(".admin-notify-refresh");
+
+  if(!wrap || !button || !panel || !list || !empty){
+    stopAdminNotificationPolling();
+    adminNotifications.wrap = null;
+    adminNotifications.button = null;
+    adminNotifications.count = null;
+    adminNotifications.panel = null;
+    adminNotifications.list = null;
+    adminNotifications.empty = null;
+    adminNotifications.refreshBtn = null;
+    return;
+  }
+
+  adminNotifications.wrap = wrap;
+  adminNotifications.button = button;
+  adminNotifications.count = count;
+  adminNotifications.panel = panel;
+  adminNotifications.list = list;
+  adminNotifications.empty = empty;
+  adminNotifications.refreshBtn = refreshBtn;
+
+  if(!adminNotifications.initialized){
+    button.addEventListener("click", handleAdminNotificationToggle);
+    list.addEventListener("click", handleAdminNotificationListClick);
+    refreshBtn?.addEventListener("click", ()=> fetchAdminNotifications({ force: true }));
+    adminNotifications.docClickHandler = (ev)=>{
+      if(!adminNotifications.panelOpen) return;
+      if(adminNotifications.wrap?.contains(ev.target)) return;
+      closeAdminNotificationsPanel();
+    };
+    adminNotifications.docKeyHandler = (ev)=>{
+      if(ev.key === "Escape" && adminNotifications.panelOpen){
+        closeAdminNotificationsPanel();
+      }
+    };
+    document.addEventListener("click", adminNotifications.docClickHandler);
+    document.addEventListener("keydown", adminNotifications.docKeyHandler);
+    adminNotifications.initialized = true;
+  }
+
+  panel.hidden = true;
+  button.setAttribute("aria-expanded", "false");
+  updateAdminNotificationsState();
+  renderAdminNotifications();
+}
+
 function setupAdminButton(){
   const btn=document.querySelector(".user-pill");
-  if(!btn) return;
-  btn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
-  btn.onclick = ()=>{
-    if(isAdmin){
-      openAdminMenuModal();
-    } else {
-      openAdminLoginModal();
-    }
-  };
+  if(btn){
+    btn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
+    btn.onclick = ()=>{
+      if(isAdmin){
+        openAdminMenuModal();
+      } else {
+        openAdminLoginModal();
+      }
+    };
+  }
+  setupAdminNotifications();
 }
 
 /* =========================
@@ -3585,6 +4069,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
