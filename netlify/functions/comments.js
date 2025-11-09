@@ -120,6 +120,8 @@ function mapRow(row = {}) {
     createdAt: row.createdAt || row.created_at || null,
     parentId: row.parentId || row.parent_id || null,
     pinnedAt: row.pinnedAt || row.pinned_at || null,
+    postTitle: row.postTitle || row.post_title || null,
+    postCategory: row.postCategory || row.post_category || null,
   };
 }
 
@@ -137,6 +139,60 @@ export async function handler(event) {
 
     // ---------- LIST ----------
     if (event.httpMethod === "GET" && event.path.endsWith("/comments")) {
+      const latestFlag =
+        params.latest === "1" ||
+        params.latest === "true" ||
+        params.feed === "1" ||
+        params.feed === "true";
+
+      if (latestFlag) {
+        const limit = Math.min(Math.max(parseInt(params.limit || "20", 10) || 20, 1), 100);
+        const sinceRaw = params.since || params.after || null;
+        const sinceTime = sinceRaw ? Date.parse(sinceRaw) : NaN;
+        const sinceIso = Number.isNaN(sinceTime) ? null : new Date(sinceTime).toISOString();
+
+        try {
+          const rows = sinceIso
+            ? await sql`
+              SELECT c.id,
+                     c.post_id AS "postId",
+                     c.alias,
+                     c.message,
+                     c.role,
+                     c.created_at AS "createdAt",
+                     c.parent_id AS "parentId",
+                     c.pinned_at AS "pinnedAt",
+                     p.title AS "postTitle",
+                     p.category AS "postCategory"
+              FROM comments c
+              JOIN posts p ON p.id = c.post_id
+              WHERE c.created_at > ${sinceIso}
+              ORDER BY c.created_at DESC
+              LIMIT ${limit}
+            `
+            : await sql`
+              SELECT c.id,
+                     c.post_id AS "postId",
+                     c.alias,
+                     c.message,
+                     c.role,
+                     c.created_at AS "createdAt",
+                     c.parent_id AS "parentId",
+                     c.pinned_at AS "pinnedAt",
+                     p.title AS "postTitle",
+                     p.category AS "postCategory"
+              FROM comments c
+              JOIN posts p ON p.id = c.post_id
+              ORDER BY c.created_at DESC
+              LIMIT ${limit}
+            `;
+          return json(200, rows.map(mapRow), cacheHdr(5));
+        } catch (err) {
+          console.error("[GET /comments feed]", err);
+          return json(500, { error: "Feed failed", detail: String(err.message || err) });
+        }
+      }
+
       const postId =
         normPostId(params.postId) || normPostId(params.post_id) || normPostId(params.id);
       if (!postId) return json(400, { error: "missing postId" });
