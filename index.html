@@ -204,8 +204,9 @@
                 <ul class="comment-list" aria-live="polite"></ul>
                 <p class="comment-empty">Sé el primero en dejar un comentario.</p>
               </div>
-              <div class="comment-form-wrap" aria-hidden="true">
-                <form class="comment-form">
+              <div class="comment-form-wrap" aria-hidden="true" data-form-open="false">
+                <button type="button" class="comment-form-toggle" aria-expanded="false">Comentar</button>
+                <form class="comment-form" hidden>
                   <div class="comment-form-replying" hidden>
                     <span>Respondiendo a <strong class="comment-form-reply-target"></strong></span>
                     <button type="button" class="comment-form-cancel-reply">Cancelar</button>
