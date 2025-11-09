@@ -86,9 +86,27 @@
           <button class="dmca-btn faq-btn" type="button">FAQ</button>
         </div>
       </div>
-      <button class="user-pill" aria-label="Iniciar sesión como administrador">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-      </button>
+      <div class="admin-controls">
+        <button class="user-pill" aria-label="Iniciar sesión como administrador">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        </button>
+        <div class="admin-notify" hidden>
+          <button class="admin-notify-btn" type="button" aria-label="Notificaciones de comentarios" aria-haspopup="true" aria-expanded="false" aria-controls="adminNotifyPanel">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2a5 5 0 0 0-5 5v2.26c0 .52-.19 1.03-.53 1.42L5 12.63a1 1 0 0 0 .77 1.64H18.23a1 1 0 0 0 .77-1.64l-1.47-1.95a2 2 0 0 1-.53-1.42V7a5 5 0 0 0-5-5Zm0 20a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Z"/>
+            </svg>
+            <span class="admin-notify-count" hidden aria-live="polite">0</span>
+          </button>
+          <div class="admin-notify-panel" id="adminNotifyPanel" role="dialog" aria-modal="false" aria-label="Notificaciones de comentarios" hidden tabindex="-1">
+            <div class="admin-notify-header">
+              <h3>Notificaciones</h3>
+              <button type="button" class="admin-notify-refresh">Actualizar</button>
+            </div>
+            <p class="admin-notify-empty">Sin comentarios nuevos.</p>
+            <ul class="admin-notify-list" role="list"></ul>
+          </div>
+        </div>
+      </div>
     </header>
 
     <section id="hero" class="hero card no-art" aria-label="Destacado">
