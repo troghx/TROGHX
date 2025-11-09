@@ -1341,7 +1341,7 @@ body.modal-open { overflow: hidden; }
   flex-direction:column;
   gap:16px;
   overflow-y:auto;
-  padding-right:6px;
+  padding-right:30px;
   scrollbar-width:thin;
   scrollbar-color:rgba(255,255,255,.15) transparent;
 }
@@ -1366,7 +1366,7 @@ body.modal-open { overflow: hidden; }
 .comment-list{
   list-style:none;
   margin:0;
-  padding:0;
+  padding:30px;
   display:flex;
   flex-direction:column;
   gap:12px;
