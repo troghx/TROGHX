@@ -270,7 +270,6 @@ window.currentCategory = "game";
 const activeDownloads = window.activeDownloads || [];
 window.activeDownloads = activeDownloads;
 let downloadsExpanded = false;
-let heroCarouselTimer = null;
 const TOPBAR_LOGOS = {
   game: "assets/images/logotopbar.png",
   app: "assets/images/trogh-app.png",
@@ -1119,95 +1118,6 @@ function renderHeroCarousel(){
   if(!hero) return;
   const sideAds = hero.querySelectorAll(".business-slot-left, .business-slot-right");
   hero.classList.toggle("hero--simple", sideAds.length === 0);
-
-  const heroArt = hero.querySelector(".hero-art");
-  const heroCarousel = heroArt?.querySelector(".hero-carousel");
-
-  if(heroCarouselTimer){
-    clearInterval(heroCarouselTimer);
-    heroCarouselTimer = null;
-  }
-
-  if(!heroArt || !heroCarousel){
-    hero.classList.add("no-art");
-    return;
-  }
-
-  if(typeof heroArt.__heroCleanup === "function"){
-    heroArt.__heroCleanup();
-    heroArt.__heroCleanup = null;
-  }
-
-  heroCarousel.innerHTML = "";
-  heroCarousel.hidden = true;
-  heroArt.hidden = true;
-  heroArt.style.backgroundImage = "";
-  heroArt.setAttribute("aria-label", "Juego destacado no disponible");
-  hero.classList.add("no-art");
-
-  const slides = (Array.isArray(recientes) ? recientes : [])
-    .filter(game => {
-      const cover = game?.image || game?.image_thumb;
-      return typeof cover === "string" && cover.trim() !== "";
-    })
-    .slice(0, 5);
-
-  if(!slides.length) return;
-
-  hero.classList.remove("no-art");
-  heroArt.hidden = false;
-  heroCarousel.hidden = false;
-
-  const images = slides.map((game, index) => {
-    const img = document.createElement("img");
-    const cover = game.image || game.image_thumb;
-    img.src = cover;
-    img.loading = index === 0 ? "eager" : "lazy";
-    img.alt = game.title ? `Portada de ${game.title}` : "Juego destacado";
-    if(index === 0) img.classList.add("active");
-    heroCarousel.appendChild(img);
-    if(index > 0) preload(cover);
-    return img;
-  });
-
-  let activeIndex = 0;
-
-  const setActive = (idx)=>{
-    const safeIdx = ((idx % images.length) + images.length) % images.length;
-    images.forEach((img, i)=> img.classList.toggle("active", i === safeIdx));
-    activeIndex = safeIdx;
-    const game = slides[activeIndex];
-    const cover = game?.image || game?.image_thumb || "";
-    if(cover) heroArt.style.backgroundImage = `url(${cover})`;
-    heroArt.dataset.activeIndex = String(activeIndex);
-    heroArt.setAttribute("aria-label", game?.title ? `Abrir ${game.title}` : "Abrir juego destacado");
-  };
-
-  setActive(0);
-
-  if(images.length > 1){
-    heroCarouselTimer = window.setInterval(()=>{
-      setActive(activeIndex + 1);
-    }, 6000);
-  }
-
-  const openActive = ()=>{
-    const game = slides[activeIndex];
-    if(game) openGameLazy(game);
-  };
-  const handleKey = (ev)=>{
-    if(ev.key === "Enter" || ev.key === " "){
-      ev.preventDefault();
-      openActive();
-    }
-  };
-
-  heroArt.addEventListener("click", openActive);
-  heroArt.addEventListener("keydown", handleKey);
-  heroArt.__heroCleanup = ()=>{
-    heroArt.removeEventListener("click", openActive);
-    heroArt.removeEventListener("keydown", handleKey);
-  };
 }
 
 /* =========================
@@ -4069,6 +3979,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
