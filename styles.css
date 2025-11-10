@@ -519,11 +519,17 @@ body::before {
   box-shadow: var(--shadow);
 }
 .hero {
-  position: relative; overflow: hidden; display: grid;
-  grid-template-columns: 1.1fr .9fr; gap: 10px; min-height: 240px; flex: 0 0 auto;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 240px;
+  flex: 0 0 auto;
+  text-align: center;
 }
-.hero.no-art { grid-template-columns: 1fr; }
-.hero.no-art .hero-art { display: none; }
 .hero-copy { padding: 6px; }
 .hero-copy h1 { margin: 0 0 8px; font-size: 1.6rem; }
 .hero-copy p { margin: 0 0 16px; color: var(--muted); }
@@ -577,26 +583,6 @@ body::before {
   background: transparent; color: #cfe7ff; border: 1px solid rgba(255,255,255,.18);
   text-transform: none; font-weight: 600;
 }
-
-.hero-art{
-  position: relative; margin: 10px; border-radius: var(--radius-lg);
-  border: 1px solid rgba(255,255,255,.06); overflow: hidden; cursor: pointer;
-  transition: transform .2s;
-  background-size:cover; background-position:center;
-  border-radius:1.25rem; overflow:hidden;
-  aspect-ratio:16/9;
-  height: clamp(220px, 28vw, 420px);
-}
-.hero-art:hover{ transform: scale(1.02); }
-.hero-art:focus-visible{ outline: 2px solid var(--ring); }
-.hero-carousel{ position: relative; width: 100%; height: 100%; }
-.hero-carousel img{
-  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  object-fit: cover; opacity: 0; transition: opacity 1s ease-in-out;
-  width:100%; height:100%; border-radius:.75rem;
-}
-.hero-carousel img.active{ opacity: 1; }
-
 
 /* ---------- TW-Modal ---------- */
 .tw-modal{
@@ -1288,8 +1274,10 @@ body::before {
 
 /* ---------- Responsivo ---------- */
 @media (max-width: 920px) {
-  .hero { grid-template-columns: 1fr; }
-  .hero-art { min-height: 180px; }
+  .hero {
+    min-height: auto;
+    padding: 12px 0;
+  }
 }
 @media (max-width: 600px) {
   .side-nav { width: 56px; padding: 18px 6px; gap: 14px; border-radius: var(--radius-lg); }
@@ -1304,44 +1292,6 @@ body::before {
 .carousel.scrollable .tile,
 .carousel.scrollable .add-game-tile {
   scroll-snap-align: start;
-}
-
-/* Hero compacto */
-.hero { --hero-h: 260px; } /* ajusta a tu gusto */
-.hero-art {
-  height: var(--hero-h);
-  min-height: var(--hero-h);
-  border-radius: 14px;
-  position: relative;
-  background-size: cover;
-  background-position: center;
-}
-
-/* Etiqueta DESTACADOS con degradado magenta→azul y botón limpiar */
-.hero-art .hero-label {
-  position: absolute;
-  top: 10px; left: 12px;
-  padding: 6px 12px;
-  font-size: 12px; letter-spacing: .08em; font-weight: 700;
-  text-transform: uppercase;
-  border-radius: 999px;
-  background: var(--accent-gradient-135);
-  color: #091015;
-  border: 1px solid rgba(255,255,255,.12);
-  box-shadow: 0 8px 22px rgba(0,0,0,.35);
-  user-select: none; pointer-events: none;
-}
-.hero-art .hero-actions {
-  position: absolute; top: 10px; right: 12px; display: flex; gap: 8px;
-}
-.hero-actions .btn-clear-featured {
-  pointer-events: auto;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(15,18,22,.55);
-  color: #d9e7ff;
-  padding: 6px 10px; border-radius: 10px;
-  font-size: 12px; font-weight: 600;
-  backdrop-filter: blur(6px);
 }
 
 /* Estrellita en modal de edición */
@@ -1370,10 +1320,8 @@ body::before {
 
 /* --- Hero simple: solo leyenda + redes --- */
 .hero.hero--simple{
-  grid-template-columns: 1fr;
   min-height: auto;
 }
-.hero.hero--simple .hero-art{ display:none; }
 .hero.hero--simple .hero-copy{ 
   display:flex; flex-direction:column; align-items:center; text-align:center; 
 }
