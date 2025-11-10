@@ -1998,7 +1998,7 @@ body.modal-open { overflow: hidden; }
 }
 
 .comment-tab{
-    --comment-tab-width: 64px;
+    --comment-tab-width: 30px;
     --comment-toggle-height: 1px;
     --comment-panel-width: clamp(320px, 32vw, 420px);
 
