@@ -2595,9 +2595,7 @@ body.modal-open{ overflow:hidden; }
   align-items:center;
   justify-content:center;
   background: linear-gradient(140deg,
-              color-mix(in srgb, var(--badge-bg) 72%, transparent) 0%,
-              rgba(6,10,18,.96) 100%);
-  border:1px solid color-mix(in srgb, var(--badge-ring) 70%, transparent);
+   color-mix(in srgb, var(--badge-bg) 72%, #00000000) 0%, rgb(6 10 18 / 24%) 100%);
   box-shadow: 0 12px 22px rgba(0,0,0,.45), 0 0 16px var(--badge-glow);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
