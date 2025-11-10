@@ -2147,7 +2147,7 @@ body.modal-open { overflow: hidden; }
     justify-content: center;
     width: 100%;
     min-width: 0;
-    padding: 16px 22px;
+    padding: 10px 22px;
     /* border-radius: 18px 18px 0 0; */
     letter-spacing: .14em;
     transform-origin: center center;
