@@ -524,7 +524,7 @@ body::before {
 }
 .hero.no-art { grid-template-columns: 1fr; }
 .hero.no-art .hero-art { display: none; }
-.hero-copy { padding: 22px; }
+.hero-copy { padding: 6px; }
 .hero-copy h1 { margin: 0 0 8px; font-size: 1.6rem; }
 .hero-copy p { margin: 0 0 16px; color: var(--muted); }
 .hero .actions { display: flex; gap: 12px; flex-wrap: wrap; }
