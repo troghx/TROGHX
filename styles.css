@@ -2044,8 +2044,9 @@ body.modal-open { overflow: hidden; }
   padding: 24px 12px;
   border-radius: 0px 18px 18px 0px;
   box-shadow: 0 12px 20px rgba(229,57,53,.45);
-  transition: transform .2s ease, box-shadow .2s ease, border-radius .32s ease, width .38s ease,
-    min-width .38s ease, padding .38s ease, letter-spacing .38s ease;
+  transition: transform .3s ease, box-shadow .3s ease,
+              border-radius .3s ease, width .3s ease,
+              padding .3s ease, letter-spacing .3s ease;
   gap: 12px;
   transform-origin: center bottom;
 }
