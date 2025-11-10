@@ -1983,7 +1983,7 @@ body.modal-open { overflow: hidden; }
 
 .game-modal-body{
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,.18) transparent;
+  scrollbar-color: rgb(255 255 255 / 0%) transparent;
 }
 
 .game-modal-comments{
