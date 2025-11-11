@@ -254,6 +254,11 @@ const LS_ADMIN_USER = "tgx_admin_user";
 const LS_SOCIALS    = "tgx_socials";
 const LS_ADMIN_NOTIF = "tgx_admin_notifications_seen";
 
+/* ------- Cache / límites ------- */
+const POSTS_LIST_LIMIT = 120;
+const POSTS_CACHE_TTL = 1000 * 60 * 5; // 5 minutos
+const SOCIALS_CACHE_TTL = 1000 * 60 * 10; // 10 minutos
+
 /* ------- Endpoints ------- */
 const API_POSTS    = "/.netlify/functions/posts";
 const API_SOC      = "/.netlify/functions/socials";
@@ -308,6 +313,74 @@ let searchQuery = "";
 let recientesWheelCooldownTs = 0;
 const fullCache = new Map();
 const videoCache = new Map();
+const postsCache = new Map();
+const socialsCacheState = { ts: 0, data: [] };
+
+function persistPostsCache(){
+  if(typeof localStorage === "undefined") return;
+  try {
+    const payload = {
+      version: 1,
+      lastCategory: window.currentCategory || "game",
+      entries: {}
+    };
+    postsCache.forEach((entry, key)=>{
+      if(entry && Array.isArray(entry.data)){
+        payload.entries[key] = { ts: entry.ts || 0, data: entry.data };
+      }
+    });
+    localStorage.setItem(LS_RECENTES, JSON.stringify(payload));
+  } catch (err) {}
+}
+
+function getCachedPosts(category){
+  const cat = (category || "game").toLowerCase();
+  const entry = postsCache.get(cat);
+  if(!entry) return null;
+  if(entry.ts && Date.now() - entry.ts > POSTS_CACHE_TTL){
+    postsCache.delete(cat);
+    persistPostsCache();
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedPosts(category, data){
+  if(!Array.isArray(data)) return;
+  const cat = (category || "game").toLowerCase();
+  postsCache.set(cat, { ts: Date.now(), data });
+  persistPostsCache();
+}
+
+function invalidatePostsCache(category){
+  if(typeof category === "string" && category){
+    postsCache.delete(category.toLowerCase());
+  }else{
+    postsCache.clear();
+  }
+  persistPostsCache();
+}
+
+function persistSocialsCache(){
+  if(typeof localStorage === "undefined") return;
+  try {
+    const payload = { ts: socialsCacheState.ts || 0, data: Array.isArray(socialsCacheState.data) ? socialsCacheState.data : [] };
+    localStorage.setItem(LS_SOCIALS, JSON.stringify(payload));
+  } catch (err) {}
+}
+
+function getCachedSocials(){
+  if(!Array.isArray(socialsCacheState.data)) return null;
+  if(!socialsCacheState.ts) return null;
+  if(Date.now() - socialsCacheState.ts > SOCIALS_CACHE_TTL) return null;
+  return socialsCacheState.data;
+}
+
+function setCachedSocials(data){
+  socialsCacheState.ts = Date.now();
+  socialsCacheState.data = Array.isArray(data) ? data : [];
+  persistSocialsCache();
+}
 
 const adminNotifications = {
   wrap: null,
@@ -353,8 +426,67 @@ function recalcPageSize(){
    Utilidades base
    ========================= */
 function rehydrate() {
-  try { const saved = JSON.parse(localStorage.getItem(LS_RECENTES)||"[]"); if(Array.isArray(saved)) recientes = saved; } catch (err) {}
-  try { const savedS = JSON.parse(localStorage.getItem(LS_SOCIALS)||"[]"); if(Array.isArray(savedS)) socials = savedS; } catch (err) {}
+  if(typeof localStorage === "undefined") return;
+  const now = Date.now();
+  let migratePosts = false;
+  try {
+    const raw = localStorage.getItem(LS_RECENTES);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed)){
+        const cat = window.currentCategory || "game";
+        postsCache.set(cat.toLowerCase(), { ts: now, data: parsed });
+        migratePosts = true;
+      }else if(parsed && typeof parsed === "object"){
+        if(typeof parsed.lastCategory === "string" && parsed.lastCategory.trim()){
+          window.currentCategory = parsed.lastCategory.trim().toLowerCase();
+        }
+        const entries = parsed.entries && typeof parsed.entries === "object" ? parsed.entries : {};
+        Object.entries(entries).forEach(([key, value])=>{
+          if(!value || !Array.isArray(value.data)) return;
+          const normalizedKey = (key || "game").toLowerCase();
+          const ts = typeof value.ts === "number" && value.ts > 0 ? value.ts : now;
+          postsCache.set(normalizedKey, { ts, data: value.data });
+        });
+      }
+    }
+  } catch (err) {}
+
+  const preferredKey = (window.currentCategory || "game").toLowerCase();
+  const preferredEntry = postsCache.get(preferredKey);
+  if(preferredEntry && Array.isArray(preferredEntry.data)){
+    recientes = preferredEntry.data;
+    window.currentCategory = preferredKey;
+  }else{
+    for(const [key, entry] of postsCache.entries()){
+      if(entry && Array.isArray(entry.data)){
+        recientes = entry.data;
+        window.currentCategory = key;
+        break;
+      }
+    }
+  }
+  if(migratePosts) persistPostsCache();
+
+  let migrateSocials = false;
+  try {
+    const rawS = localStorage.getItem(LS_SOCIALS);
+    if(rawS){
+      const parsedS = JSON.parse(rawS);
+      if(Array.isArray(parsedS)){
+        socialsCacheState.ts = now;
+        socialsCacheState.data = parsedS;
+        socials = parsedS;
+        migrateSocials = true;
+      }else if(parsedS && typeof parsedS === "object" && Array.isArray(parsedS.data)){
+        socialsCacheState.ts = typeof parsedS.ts === "number" && parsedS.ts > 0 ? parsedS.ts : now;
+        socialsCacheState.data = parsedS.data;
+        socials = parsedS.data;
+      }
+    }
+  } catch (err) {}
+  if(migrateSocials) persistSocialsCache();
+
   isAdmin = localStorage.getItem(LS_ADMIN) === "1";
   try { const t=localStorage.getItem("tgx_admin_token"); if(!isAdmin && t && t.trim()) isAdmin=true; } catch (err) {}
 }
@@ -405,12 +537,24 @@ async function hashCreds(user,pin,salt){ const key=`${user}::${pin}::${salt}`; r
 /* =========================
    API: Posts
    ========================= */
-async function apiList(category = window.currentCategory) {
-  const qs = new URLSearchParams({ lite: "1", limit: "200", category });
-  const r = await fetch(`${API_POSTS}?${qs.toString()}`, { cache: "no-store" });
+async function apiList(category = window.currentCategory, { force = false } = {}) {
+  const cat = (category || "game").toLowerCase();
+  if(!force){
+    const cached = getCachedPosts(cat);
+    if(cached) return cached;
+  }
+
+  const qs = new URLSearchParams({ lite: "1", limit: String(POSTS_LIST_LIMIT) });
+  if(cat) qs.set("category", cat);
+  const options = force ? { cache: "no-store" } : undefined;
+  const r = await fetch(`${API_POSTS}?${qs.toString()}`, options);
   if (!r.ok) throw new Error("No se pudo listar posts");
   const j = await r.json();
-  return Array.isArray(j)?j.map(g=>({...g,link_ok:Boolean(g.link_ok),drive_id:g.drive_id||extractDriveId(g.first_link)})):j;
+  const data = Array.isArray(j)
+    ? j.map(g => ({ ...g, link_ok: Boolean(g.link_ok), drive_id: g.drive_id || extractDriveId(g.first_link) }))
+    : j;
+  if(Array.isArray(data)) setCachedPosts(cat, data);
+  return data;
 }
 async function apiCreate(data, token){
   const r = await fetch(API_POSTS, {
@@ -419,7 +563,9 @@ async function apiCreate(data, token){
     body: JSON.stringify(data)
   });
   if(!r.ok){ const t=await r.text().catch(()=> ""); throw new Error(`Crear falló: ${r.status} ${r.statusText} :: ${t}`); }
-  return r.json();
+  const result = await r.json();
+  invalidatePostsCache(data?.category);
+  return result;
 }
 async function apiGet(id){
   if(fullCache.has(id)) return fullCache.get(id);
@@ -446,22 +592,32 @@ async function apiUpdate(id, patch, token){
   });
   if(!r.ok){ const t=await r.text().catch(()=> ""); throw new Error(`Update falló: ${t}`); }
   fullCache.delete(id);
-  return r.json();
+  const result = await r.json();
+  invalidatePostsCache();
+  return result;
 }
 async function apiDelete(id, token){
   const r = await fetch(`${API_POSTS}/${id}`, { method:"DELETE", headers:{ "Authorization":`Bearer ${token||""}` } });
   if(!r.ok){ const t=await r.text().catch(()=> ""); throw new Error(`Delete falló: ${t}`); }
   fullCache.delete(id); videoCache.delete(id);
+  invalidatePostsCache();
   return r.json();
 }
 
 /* =========================
    API: Socials
    ========================= */
-async function socialsList(){
-  const r = await fetch(API_SOC);
+async function socialsList({ force = false } = {}){
+  if(!force){
+    const cached = getCachedSocials();
+    if(cached) return cached;
+  }
+  const options = force ? { cache: "no-store" } : undefined;
+  const r = await fetch(API_SOC, options);
   if(!r.ok) throw new Error("No se pudo listar socials");
-  return r.json();
+  const data = await r.json();
+  if(Array.isArray(data)) setCachedSocials(data);
+  return data;
 }
 async function socialsCreate(s, token){
   const r = await fetch(API_SOC, {
@@ -2430,7 +2586,7 @@ function openNewSocialModal(){
       try{
         const token=localStorage.getItem("tgx_admin_token")||"";
         await socialsCreate({ name, image: reader.result, url }, token);
-        socials = await socialsList();
+        socials = await socialsList({ force: true });
         renderSocialBar();
       }catch(err){ console.error(err); alert("Error al guardar red social."); }
       closeModal(node, removeTrap, onEscape);
@@ -2458,7 +2614,7 @@ function renderSocialBar(){
       del.addEventListener("click", async(e)=>{
         e.preventDefault(); e.stopPropagation();
         if(!confirm("¿Eliminar esta red social?")) return;
-        try{ const token=localStorage.getItem("tgx_admin_token")||""; await socialsDelete(s.id, token); socials=await socialsList(); renderSocialBar(); }
+        try{ const token=localStorage.getItem("tgx_admin_token")||""; await socialsDelete(s.id, token); socials=await socialsList({ force: true }); renderSocialBar(); }
         catch(err){ console.error(err); alert("No se pudo eliminar."); }
       });
       wrap.appendChild(del);
@@ -3936,7 +4092,7 @@ async function openAdminCenter(){
    Carga inicial
    ========================= */
 async function reloadData(){
-  try{ const data=await apiList(window.currentCategory); recientes=Array.isArray(data)?data:[]; }
+  try{ const data=await apiList(window.currentCategory, { force: true }); recientes=Array.isArray(data)?data:[]; }
   catch(e){ console.error("[reload posts]", e); recientes=[]; }
   renderRow();
   renderHeroCarousel();
@@ -3979,6 +4135,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
