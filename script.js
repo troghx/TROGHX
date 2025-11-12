@@ -277,8 +277,8 @@ window.activeDownloads = activeDownloads;
 let downloadsExpanded = false;
 const TOPBAR_LOGOS = {
   game: "assets/images/logotopbar.png",
-  app: "assets/images/trogh-app.png",
-  movie: "assets/images/trogh-movies.png"
+  app: "assets/images/logotopbar.png",
+  movie: "assets/images/logotopbar.png"
 };
 const CATEGORY_LABELS = {
   game: "Juego",
@@ -4135,6 +4135,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
