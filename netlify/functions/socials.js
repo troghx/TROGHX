@@ -2,8 +2,14 @@
 import { neon } from '@neondatabase/serverless';
 import { json as baseJson } from './utils.js';
 
-const json = (s, d, h = {}) =>
-  baseJson(s, d, { 'Cache-Control': 'no-store', ...h });
+const json = (status, data, headers = {}) =>
+  baseJson(status, data, {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Cache-Control': 'no-store',
+    ...headers,
+  });
 
 function getDbUrl() {
   const raw = process.env.DATABASE_URL || process.env.NETLIFY_DATABASE_URL || process.env.NETLIFY_DATABASE_URL_UNPOOLED || '';
@@ -13,7 +19,11 @@ function getDbUrl() {
 }
 const ok = d => json(200, d);
 const fail = e => { console.error('[socials.fn]', e); return json(500, { error: e.message || 'Internal Server Error' }); };
-const authed = (e) => (e.headers?.authorization||'').replace(/^Bearer\s+/i,'').trim() === (process.env.AUTH_TOKEN||'');
+const authed = (event) => {
+  const headerToken = (event.headers?.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  const envToken = (process.env.AUTH_TOKEN || '').trim();
+  return Boolean(envToken) && headerToken === envToken;
+};
 
 export async function handler(event){
   try{
