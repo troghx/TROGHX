@@ -352,6 +352,33 @@ function setCachedPosts(category, data){
   persistPostsCache();
 }
 
+function rememberCurrentCategory(){
+  if(typeof localStorage === "undefined") return;
+  try {
+    if(postsCache.size){
+      persistPostsCache();
+      return;
+    }
+
+    const raw = localStorage.getItem(LS_RECENTES);
+    if(raw){
+      try {
+        const parsed = JSON.parse(raw);
+        if(parsed && typeof parsed === "object" && !Array.isArray(parsed)){
+          parsed.lastCategory = window.currentCategory || "game";
+          if(typeof parsed.version !== "number") parsed.version = 1;
+          if(!parsed.entries || typeof parsed.entries !== "object") parsed.entries = {};
+          localStorage.setItem(LS_RECENTES, JSON.stringify(parsed));
+          return;
+        }
+      } catch(err) {}
+    }
+
+    const payload = { version: 1, lastCategory: window.currentCategory || "game", entries: {} };
+    localStorage.setItem(LS_RECENTES, JSON.stringify(payload));
+  } catch(err) {}
+}
+
 function invalidatePostsCache(category){
   if(typeof category === "string" && category){
     postsCache.delete(category.toLowerCase());
@@ -467,6 +494,7 @@ function rehydrate() {
     }
   }
   if(migratePosts) persistPostsCache();
+  rememberCurrentCategory();
 
   let migrateSocials = false;
   try {
@@ -2847,6 +2875,7 @@ function setupSideNav(){
       if(window.currentCategory === cat) return;
       window.currentCategory = cat;
       setActive(cat);
+      rememberCurrentCategory();
       try{
         const data = await apiList(cat);
         recientes = Array.isArray(data)?data:[];
@@ -4164,6 +4193,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
