@@ -570,7 +570,11 @@ async function apiCreate(data, token){
 async function apiGet(id){
   if(fullCache.has(id)) return fullCache.get(id);
   const r = await fetch(`${API_POSTS}/${id}`, { cache:"no-store" });
-  if(!r.ok) throw new Error("No se pudo obtener post");
+  if(r.status === 404){
+    fullCache.set(id, null);
+    return null;
+  }
+  if(!r.ok) throw new Error(`No se pudo obtener post (${r.status || ""})`);
   const j = await r.json();
   if(j&&typeof j==="object"){ j.link_ok=Boolean(j.link_ok); if(!j.drive_id && j.first_link) j.drive_id=extractDriveId(j.first_link); }
   fullCache.set(id, j);
@@ -1479,7 +1483,10 @@ function openGameLazy(game){
   if(hasFullData) return modal;
   apiGet(postId)
     .then(full => {
-      if(!full) return;
+      if(!full){
+        modal?.showError?.("Esta publicación ya no está disponible o fue eliminada.");
+        return;
+      }
       const data = { ...game, ...full };
       modal?.update?.(data);
     })
@@ -4157,6 +4164,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
