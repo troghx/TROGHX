@@ -886,8 +886,25 @@ function applyPlayerModeBadge(tile, game = {}){
   if(!badge) return;
 
   const category = (game?.category || window.currentCategory || "").toLowerCase();
+  if(category !== "game"){
+    badge.hidden = true;
+    delete badge.dataset.mode;
+    delete badge.dataset.label;
+    badge.removeAttribute("title");
+    badge.removeAttribute("aria-label");
+    badge.removeAttribute("role");
+    badge.setAttribute("aria-hidden", "true");
+    badge.removeAttribute("tabindex");
+    const img = badge.querySelector("img");
+    if(img){
+      img.removeAttribute("src");
+      img.removeAttribute("alt");
+    }
+    return;
+  }
+
   const rawMode = typeof game?.playerMode === "string" ? game.playerMode.trim() : "";
-  const mode = category === "game" ? rawMode.toLowerCase() : "";
+  const mode = rawMode.toLowerCase();
   const icon = PLAYER_MODE_ICONS[mode];
   const label = PLAYER_MODE_LABELS[mode];
   const img = badge.querySelector("img");
@@ -2384,7 +2401,9 @@ function initGameModal(initial = {}){
     const isGame = catValue === "game";
     if(isGame){
       playerModeField.hidden = false;
+      playerModeField.setAttribute("aria-hidden", "false");
       if(playerModeSelect){
+        playerModeSelect.disabled = false;
         const option = playerModeSelect.querySelector(`option[value="${lastPlayerModeValue}"]`);
         if(option){
           playerModeSelect.value = lastPlayerModeValue;
@@ -2396,8 +2415,11 @@ function initGameModal(initial = {}){
     }else{
       if(playerModeSelect){
         lastPlayerModeValue = playerModeSelect.value || lastPlayerModeValue;
+        playerModeSelect.value = "";
+        playerModeSelect.disabled = true;
       }
       playerModeField.hidden = true;
+      playerModeField.setAttribute("aria-hidden", "true");
     }
   };
 
@@ -2438,7 +2460,7 @@ async function gatherGameData(refs, { requireImage=true } = {}){
   const imageFile=imageInput?.files?.[0] || null;
   const trailerFile=trailerFileInput?.files?.[0] || null;
   const category = catSel.querySelector(".cat-select")?.value || "game";
-  const rawPlayerMode = playerModeSelect?.value || "";
+  const rawPlayerMode = playerModeSelect && !playerModeSelect.disabled ? playerModeSelect.value || "" : "";
   const playerMode = category === "game" && rawPlayerMode ? rawPlayerMode : null;
 
   if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return null; }
@@ -4135,6 +4157,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
