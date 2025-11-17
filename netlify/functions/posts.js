@@ -21,9 +21,12 @@ const json = (status, data, extra = {}) =>
     ...extra,
   });
 
-const cacheHdr = (sec = 60) => ({
-  "Cache-Control": `public, max-age=${sec}, stale-while-revalidate=30`,
-});
+const cacheHdr = (sec = 60, { noStore = false } = {}) => {
+  if (noStore) {
+    return { "Cache-Control": "no-store" };
+  }
+  return { "Cache-Control": `public, max-age=${sec}, stale-while-revalidate=30` };
+};
 
 // categorías válidas (ES/EN)
 const CATS = new Set(["game", "app", "movie"]);
@@ -149,7 +152,7 @@ export async function handler(event) {
           ORDER BY created_at DESC
           LIMIT ${limit}
         `;
-          return json(200, rows, cacheHdr(60));
+          return json(200, rows, cacheHdr(0, { noStore: true }));
         } else {
           const rows = await sql`
           SELECT id, title, category,
@@ -161,7 +164,7 @@ export async function handler(event) {
           ORDER BY created_at DESC
           LIMIT ${limit}
         `;
-          return json(200, rows, cacheHdr(20));
+          return json(200, rows, cacheHdr(0, { noStore: true }));
         }
       } catch (err) {
         console.error("[GET /posts]", err);
@@ -179,7 +182,7 @@ export async function handler(event) {
         if (p.video === "1") {
           const rows = await sql`SELECT preview_video FROM posts WHERE id=${id} LIMIT 1`;
           if (!rows.length) return json(404, { error: "not found" });
-          return json(200, { previewVideo: rows[0].preview_video || null }, cacheHdr(300));
+          return json(200, { previewVideo: rows[0].preview_video || null }, cacheHdr(0, { noStore: true }));
         }
         const rows = await sql`
           SELECT id, title, category,
@@ -188,7 +191,7 @@ export async function handler(event) {
           FROM posts WHERE id=${id} LIMIT 1
         `;
         if (!rows.length) return json(404, { error: "not found" });
-        return json(200, rows[0], cacheHdr(60));
+        return json(200, rows[0], cacheHdr(0, { noStore: true }));
       } catch (err) {
         console.error("[GET /posts/:id]", err);
         return json(500, { error: "Detail failed", detail: String(err.message || err) });
@@ -328,6 +331,7 @@ export async function handler(event) {
     return json(500, { error: "Internal Server Error", detail: String(err.message || err) });
   }
 }
+
 
 
 
