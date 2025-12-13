@@ -12,8 +12,6 @@ const newSocialModalTemplate = document.getElementById("new-social-modal-templat
 const dmcaModalTemplate = document.getElementById("dmca-modal-template");
 const faqModalTemplate = document.getElementById("faq-modal-template");
 
-initStarfield();
-
 function initStarfield() {
   const canvas = document.getElementById("star-canvas");
   if (!canvas) return;
@@ -188,6 +186,17 @@ function initStarfield() {
   }
 }
 
+function scheduleStarfield(){
+  if(typeof window === "undefined") return;
+  const start = ()=> initStarfield();
+  if(typeof window.requestIdleCallback === "function"){
+    window.requestIdleCallback(start, { timeout: 1200 });
+  }else{
+    window.setTimeout(start, 150);
+  }
+}
+scheduleStarfield();
+
 const dmcaTexts = {
   es: `
     <p><strong>TROGH</strong> no aloja archivos ni juegos con derechos de autor. Este sitio solo muestra metadatos y <em>enlaces</em> hacia servicios de terceros que alojan los contenidos bajo sus propios términos.</p>
@@ -265,6 +274,7 @@ const API_SOC      = "/.netlify/functions/socials";
 const API_LINK     = "/.netlify/functions/linkcheck";
 const API_ADM      = "/.netlify/functions/admins";
 const API_COMMENTS = "/.netlify/functions/comments";
+const STREAMSAVER_SRC = "https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSaver.min.js";
 
 /* ------- Estado ------- */
 let isAdmin = false;
@@ -522,6 +532,35 @@ rehydrate();
 
 function persistAdmin(flag){ try{ localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); }catch (err) {} }
 function preload(src){ const img = new Image(); img.src = src; }
+
+let streamSaverPromise = null;
+function loadStreamSaver(){
+  if(typeof window === "undefined" || typeof document === "undefined"){
+    return Promise.reject(new Error("StreamSaver no está disponible"));
+  }
+  if(typeof streamSaver !== "undefined" && streamSaver?.createWriteStream){
+    return Promise.resolve(streamSaver);
+  }
+  if(streamSaverPromise) return streamSaverPromise;
+  streamSaverPromise = new Promise((resolve, reject)=>{
+    const script = document.createElement("script");
+    script.src = STREAMSAVER_SRC;
+    script.async = true;
+    script.onload = ()=>{
+      if(typeof streamSaver !== "undefined" && streamSaver?.createWriteStream){
+        resolve(streamSaver);
+      }else{
+        reject(new Error("StreamSaver no se inicializó"));
+      }
+    };
+    script.onerror = ()=> reject(new Error("No se pudo cargar StreamSaver"));
+    document.head.appendChild(script);
+  }).catch(err => {
+    streamSaverPromise = null;
+    throw err;
+  });
+  return streamSaverPromise;
+}
 
 function loadAdminNotificationsSeen(){
   if(typeof localStorage === "undefined") return null;
@@ -3890,7 +3929,8 @@ async function downloadFromDrive(input){
     }
 
     dl.total = parts.reduce((s,p)=> s + ((p.end!=null?p.end:p.start) - (p.start||0) + 1),0);
-    const fileStream = streamSaver.createWriteStream(name, { size: dl.total });
+    const saver = await loadStreamSaver();
+    const fileStream = saver.createWriteStream(name, { size: dl.total });
     writer = fileStream.getWriter();
 
     let lastTime = performance.now(), lastLoaded = dl.loaded, lastSpeedTime = lastTime;
@@ -4193,6 +4233,7 @@ async function initData(){
 recalcPageSize();
 window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
 initData();
+
 
 
 
