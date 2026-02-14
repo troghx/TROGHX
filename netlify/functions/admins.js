@@ -8,6 +8,7 @@ const DB_URL =
   process.env.NETLIFY_DATABASE_URL_UNPOOLED;
 
 const sql = DB_URL ? neon(DB_URL) : null;
+let schemaReady = false;
 
 const json = (status, data, extra = {}) =>
   baseJson(status, data, {
@@ -51,11 +52,19 @@ export async function handler(event) {
     if (event.httpMethod === "OPTIONS") return json(204, {});
     if (!sql) return json(500, { error: "DB not configured" });
 
-    await ensureSchema();
+    if (!schemaReady) {
+      await ensureSchema();
+      schemaReady = true;
+    }
 
     // POST /admins/login  => {keyHash}  -> {ok:true/false}
     if (event.httpMethod === "POST" && event.path.endsWith("/admins/login")) {
-      const body = JSON.parse(event.body || "{}");
+      let body = {};
+      try {
+        body = JSON.parse(event.body || "{}");
+      } catch (_) {
+        return json(400, { ok: false, error: "invalid json" });
+      }
       const keyHash = (body.keyHash || "").trim();
       if (!keyHash) return json(400, { ok: false, error: "missing keyHash" });
       const rows =
@@ -75,7 +84,12 @@ export async function handler(event) {
     // POST /admins  (create)  {name, keyHash} -> {id}
     if (event.httpMethod === "POST" && event.path.endsWith("/admins")) {
       const g = requireBearer(event); if (!g.ok) return g.res;
-      const body = JSON.parse(event.body || "{}");
+      let body = {};
+      try {
+        body = JSON.parse(event.body || "{}");
+      } catch (_) {
+        return json(400, { error: "invalid json" });
+      }
       const name = (body.name || "").trim();
       const keyHash = (body.keyHash || "").trim();
       if (!keyHash) return json(400, { error: "missing keyHash" });
@@ -91,7 +105,7 @@ export async function handler(event) {
     if (event.httpMethod === "DELETE") {
       const g = requireBearer(event); if (!g.ok) return g.res;
       const id = getIdFromPath(event.path);
-      if (!id) return json(400, { error: "missing id" });
+      if (!id || !/^\d+$/.test(String(id))) return json(400, { error: "missing id" });
       await sql`UPDATE admin_keys SET revoked_at = now() WHERE id = ${id}`;
       return json(200, { ok: true });
     }

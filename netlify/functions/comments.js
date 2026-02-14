@@ -108,6 +108,21 @@ async function ensureSchema() {
       WHEN duplicate_object THEN NULL;
     END $$;
   `;
+  await sql`
+    DO $$
+    BEGIN
+      ALTER TABLE comments
+        ADD CONSTRAINT comments_post_fk
+        FOREIGN KEY (post_id)
+        REFERENCES posts(id)
+        ON DELETE CASCADE;
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+      WHEN undefined_table THEN NULL;
+    END $$;
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_comments_created_desc ON comments (created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_comments_post_pin_created ON comments (post_id, pinned_at DESC, created_at ASC)`;
 }
 
 function mapRow(row = {}) {

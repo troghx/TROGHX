@@ -1,4 +1,3 @@
-import { PassThrough } from "stream";
 import { GoogleAuth } from "google-auth-library";
 import { google } from "googleapis";
 import { neon, neonConfig } from "@neondatabase/serverless";
@@ -77,6 +76,60 @@ export async function handler(event) {
       }
     }
 
+    // ---- DOWNLOAD RANGE (proxy; no expone token) ----
+    if (p.id && p.range) {
+      const fileId = String(p.id).trim();
+      const range = String(p.range).trim();
+      const m = range.match(/^(\d+)-(\d+)$/);
+      if (!m) return json(400, { error: "invalid range" });
+      const start = Number(m[1]);
+      const end = Number(m[2]);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) {
+        return json(400, { error: "invalid range" });
+      }
+      const span = end - start + 1;
+      if (span > 16 * 1024 * 1024) {
+        return json(400, { error: "range too large" });
+      }
+
+      try {
+        const response = await drive.files.get(
+          { fileId, alt: "media" },
+          {
+            responseType: "arraybuffer",
+            headers: { Range: `bytes=${start}-${end}` },
+          }
+        );
+
+        const payload = Buffer.from(response?.data || "");
+        const sourceHeaders = response?.headers || {};
+        const statusCode = Number(response?.status) || 206;
+        const headers = {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET,OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Content-Type": sourceHeaders["content-type"] || "application/octet-stream",
+          "Cache-Control": "no-store",
+        };
+        if (sourceHeaders["content-range"]) headers["Content-Range"] = sourceHeaders["content-range"];
+        if (sourceHeaders["content-length"]) headers["Content-Length"] = sourceHeaders["content-length"];
+        if (sourceHeaders["accept-ranges"]) headers["Accept-Ranges"] = sourceHeaders["accept-ranges"];
+
+        return {
+          statusCode,
+          headers,
+          body: payload.toString("base64"),
+          isBase64Encoded: true,
+        };
+      } catch (err) {
+        console.error("[drive range]", err);
+        return json(500, {
+          error: "range failed",
+          detail: String(err.message || err),
+        });
+      }
+    }
+
     // ---- GET FILE META ----
     if (p.id) {
       const fileId = String(p.id).trim();
@@ -97,13 +150,10 @@ export async function handler(event) {
             null;
           await sql`INSERT INTO downloads (file_id, name, ip) VALUES (${fileId}, ${name}, ${ip})`;
         }
-
-        const token = await auth.getAccessToken();
         return json(200, {
           name: file.data.name,
           size: file.data.size,
           mimeType: file.data.mimeType,
-          token,
         });
       } catch (err) {
         console.error("[drive id]", err);

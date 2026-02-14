@@ -64,17 +64,12 @@
             </svg>
           </button>
 
-    <button class="yt-channel-badge" type="button" aria-label="Descargas">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 16.5a1 1 0 0 1-.7-.29l-5-5a1 1 0 0 1 1.4-1.42L12 14.09l4.3-4.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-.7.29Z"/>
-      </svg>
-    </button>
   </aside>
 
   <main class="main">
     <header class="topbar">
       <div class="brand">
-        <img src="assets/images/logotopbar.png" alt="Logo de TROGH GAMES" class="logo" />
+        <img src="assets/images/logotopbar.png" alt="Logo de TGX GAMES" class="logo" />
       </div>
       <div class="search-box">
         <label class="search">
@@ -131,6 +126,12 @@
 
       <nav class="pager" id="gridPager" aria-label="Paginación de recientes">
         <span class="sr-only pager-live" aria-live="polite">Página 1 de 1</span>
+        <button class="pager-download-btn" type="button" aria-label="Descargas">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 16.5a1 1 0 0 1-.7-.29l-5-5a1 1 0 0 1 1.4-1.42L12 14.09l4.3-4.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-.7.29Z"/>
+          </svg>
+          <span>Descargas</span>
+        </button>
         <div class="pager-dashes" aria-hidden="true">
           <span class="pager-dash">—</span>
           <span class="pager-dash is-active">—</span>
@@ -213,6 +214,9 @@
               </div>
               <div class="comment-form-wrap" aria-hidden="true" data-form-open="false">
                 <button type="button" class="comment-form-toggle" aria-expanded="false">Comentar</button>
+                <button type="button" class="comment-form-handle" hidden aria-label="Ocultar cuadro de comentario">
+                  <span aria-hidden="true"></span>
+                </button>
                 <form class="comment-form" hidden>
                   <div class="comment-form-replying" hidden>
                     <span>Respondiendo a <strong class="comment-form-reply-target"></strong></span>

@@ -1,6 +1,7 @@
 // netlify/functions/linkcheck.js
 // Checa el estado de un enlace (HEAD con fallback GET de 1 byte) para evitar CORS desde el cliente.
 
+import { isIP } from "node:net";
 import { json as baseJson } from "./utils.js";
 
 const json = (s, d, extra = {}) =>
@@ -9,6 +10,52 @@ const json = (s, d, extra = {}) =>
     "Cache-Control": "no-store",
     ...extra,
   });
+
+const BLOCKED_HOSTS = new Set([
+  "localhost",
+  "127.0.0.1",
+  "0.0.0.0",
+  "::1",
+  "host.docker.internal",
+  "169.254.169.254",
+  "metadata.google.internal",
+]);
+
+function isPrivateIpv4(host) {
+  const parts = host.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return false;
+  }
+  const [a, b] = parts;
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
+function hasForbiddenHost(urlString) {
+  let parsed;
+  try {
+    parsed = new URL(urlString);
+  } catch {
+    return true;
+  }
+  if (!/^https?:$/i.test(parsed.protocol)) return true;
+
+  const hostname = (parsed.hostname || "").toLowerCase().trim();
+  if (!hostname) return true;
+  if (BLOCKED_HOSTS.has(hostname)) return true;
+  if (hostname.endsWith(".local") || hostname.endsWith(".internal")) return true;
+
+  const ipType = isIP(hostname);
+  if (ipType === 4 && isPrivateIpv4(hostname)) return true;
+  if (ipType === 6 && (hostname === "::1" || hostname.startsWith("fe80:") || hostname.startsWith("fc") || hostname.startsWith("fd"))) {
+    return true;
+  }
+  return false;
+}
 
 export async function handler(event) {
   try {
@@ -33,6 +80,7 @@ export async function handler(event) {
     }
     if (!url) return json(400, { error: "Missing url" });
     if (!/^https?:\/\//i.test(url)) return json(400, { error: "Invalid URL scheme" });
+    if (hasForbiddenHost(url)) return json(400, { error: "Forbidden host" });
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);

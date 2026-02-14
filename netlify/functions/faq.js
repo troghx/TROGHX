@@ -21,6 +21,15 @@ async function ensureSchema(){
   )`;
 }
 
+function sanitizeContent(value){
+  let html = String(value || '');
+  html = html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
+  html = html.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '');
+  html = html.replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '');
+  html = html.replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi, '');
+  return html;
+}
+
 function authed(event){
   const auth = event.headers?.authorization || '';
   const token = auth.replace(/^Bearer\s+/i,'').trim();
@@ -44,7 +53,7 @@ export async function handler(event){
     if(event.httpMethod === 'PUT'){
       if(!authed(event)) return json(401, { error: 'Unauthorized' });
       const body = JSON.parse(event.body || '{}');
-      const content = body.content || '';
+      const content = sanitizeContent(body.content || '');
       const rows = await sql`SELECT id FROM faq LIMIT 1`;
       if(rows.length){
         await sql`UPDATE faq SET content=${content} WHERE id=${rows[0].id}`;

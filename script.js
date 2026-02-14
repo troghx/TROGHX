@@ -1,5 +1,5 @@
 /* =========================
-   TROGH — script.js (Lite grid + thumbs + video on-demand + link_ok)
+   TGX — script.js (Lite grid + thumbs + video on-demand + link_ok)
    ========================= */
 
 /* ------- Templates del HTML ------- */
@@ -24,6 +24,7 @@ function initStarfield() {
 
   const state = {
     stars: [],
+    shootingStars: [],
     width: 0,
     height: 0,
     pixelRatio: 1,
@@ -31,11 +32,22 @@ function initStarfield() {
     centerY: 0,
     maxOrbit: 0,
     lastTime: 0,
-    animationId: 0
+    animationId: 0,
+    nextShootingStarIn: 0
   };
 
   const ROTATION_BASE = 0.03;
   const ROTATION_VARIANCE = 0.045;
+  const SHOOTING_COLORS = [
+    [255, 255, 255], // blanca
+    [146, 198, 255], // azul
+    [255, 128, 128], // roja
+    [140, 255, 178]  // verde
+  ];
+
+  function randomShootingDelay() {
+    return 3.8 + Math.random() * 10.5;
+  }
 
   function createStar() {
     const distanceRatio = Math.pow(Math.random(), 0.45);
@@ -58,6 +70,94 @@ function initStarfield() {
     star.radius = Math.max(0.35, star.baseSize * star.depth) * state.pixelRatio;
     const depthSpeed = 0.6 + star.depth * 0.4;
     star.angularVelocity = (ROTATION_BASE + ROTATION_VARIANCE * star.rotationFactor) * depthSpeed;
+  }
+
+  function createShootingStar() {
+    const fromLeft = Math.random() < 0.5;
+    const angle = (Math.PI / 180) * (8 + Math.random() * 14);
+    const dirX = fromLeft ? Math.cos(angle) : -Math.cos(angle);
+    const dirY = Math.sin(angle);
+    const length = (92 + Math.random() * 150) * state.pixelRatio;
+    const speed = (460 + Math.random() * 430) * state.pixelRatio;
+    const life = 0.66 + Math.random() * 0.9;
+    const thickness = (1.2 + Math.random() * 1.6) * state.pixelRatio;
+    const [r, g, b] = SHOOTING_COLORS[Math.floor(Math.random() * SHOOTING_COLORS.length)];
+    const useTopBand = Math.random() < 0.82;
+    const yRatio = useTopBand
+      ? (0.03 + Math.random() * 0.18)
+      : (0.2 + Math.random() * 0.2);
+    return {
+      x: fromLeft ? -length : canvas.width + length,
+      y: yRatio * canvas.height,
+      dirX,
+      dirY,
+      length,
+      speed,
+      life,
+      thickness,
+      r,
+      g,
+      b,
+      baseAlpha: 0.5 + Math.random() * 0.28,
+      age: 0
+    };
+  }
+
+  function updateShootingStars(delta) {
+    if (delta <= 0) return;
+    state.nextShootingStarIn -= delta;
+    if (state.nextShootingStarIn <= 0) {
+      if (state.shootingStars.length < 2) {
+        state.shootingStars.push(createShootingStar());
+      }
+      state.nextShootingStarIn = randomShootingDelay();
+    }
+
+    const alive = [];
+    for (const shooting of state.shootingStars) {
+      shooting.age += delta;
+      shooting.x += shooting.dirX * shooting.speed * delta;
+      shooting.y += shooting.dirY * shooting.speed * delta;
+      if (shooting.age < shooting.life) {
+        alive.push(shooting);
+      }
+    }
+    state.shootingStars = alive;
+  }
+
+  function paintShootingStars() {
+    for (const shooting of state.shootingStars) {
+      const progress = shooting.age / shooting.life;
+      const fadeIn = Math.min(1, progress * 4);
+      const fadeOut = Math.max(0, 1 - progress);
+      const alpha = shooting.baseAlpha * fadeIn * fadeOut * fadeOut;
+      if (alpha <= 0.01) continue;
+
+      const headX = shooting.x;
+      const headY = shooting.y;
+      const tailX = headX - shooting.dirX * shooting.length;
+      const tailY = headY - shooting.dirY * shooting.length;
+      const gradient = ctx.createLinearGradient(tailX, tailY, headX, headY);
+      gradient.addColorStop(0, `rgba(${shooting.r}, ${shooting.g}, ${shooting.b}, 0)`);
+      gradient.addColorStop(0.65, `rgba(${shooting.r}, ${shooting.g}, ${shooting.b}, ${alpha * 0.55})`);
+      gradient.addColorStop(1, `rgba(${shooting.r}, ${shooting.g}, ${shooting.b}, ${alpha})`);
+
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = shooting.thickness;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(headX, headY);
+      ctx.stroke();
+
+      const headGlow = ctx.createRadialGradient(headX, headY, 0, headX, headY, shooting.thickness * 6.2);
+      headGlow.addColorStop(0, `rgba(${shooting.r}, ${shooting.g}, ${shooting.b}, ${alpha * 0.95})`);
+      headGlow.addColorStop(1, `rgba(${shooting.r}, ${shooting.g}, ${shooting.b}, 0)`);
+      ctx.fillStyle = headGlow;
+      ctx.beginPath();
+      ctx.arc(headX, headY, shooting.thickness * 6.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function adjustStarCount(target) {
@@ -85,6 +185,8 @@ function initStarfield() {
     state.centerX = displayWidth / 2;
     state.centerY = displayHeight / 2;
     state.maxOrbit = Math.hypot(displayWidth, displayHeight) / 2;
+    state.shootingStars.length = 0;
+    state.nextShootingStarIn = randomShootingDelay();
 
     const density = 0.000085;
     const target = Math.round(Math.min(360, Math.max(140, state.width * state.height * density)));
@@ -93,6 +195,9 @@ function initStarfield() {
   }
 
   function paintStars(delta, advance = true) {
+    if (advance) {
+      updateShootingStars(delta);
+    }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -124,6 +229,7 @@ function initStarfield() {
       ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
       ctx.fill();
     }
+    paintShootingStars();
 
     ctx.restore();
   }
@@ -199,7 +305,7 @@ scheduleStarfield();
 
 const dmcaTexts = {
   es: `
-    <p><strong>TROGH</strong> no aloja archivos ni juegos con derechos de autor. Este sitio solo muestra metadatos y <em>enlaces</em> hacia servicios de terceros que alojan los contenidos bajo sus propios términos.</p>
+    <p><strong>TGX</strong> no aloja archivos ni juegos con derechos de autor. Este sitio solo muestra metadatos y <em>enlaces</em> hacia servicios de terceros que alojan los contenidos bajo sus propios términos.</p>
 
     <p>Si eres titular de derechos y consideras que un enlace publicado aquí apunta a material que infringe tus derechos, retiraremos los <em>enlaces</em> del sitio al recibir un <strong>Aviso DMCA válido</strong>.</p>
 
@@ -207,7 +313,7 @@ const dmcaTexts = {
     <p>Para procesarlo, incluye lo siguiente:</p>
     <ol>
       <li>Identificación de la obra protegida (título, descripción y, si aplica, registro).</li>
-      <li>URL(s) exacta(s) de <strong>TROGH GAMES</strong> donde aparece el/los enlace(s) a retirar.</li>
+      <li>URL(s) exacta(s) de <strong>TGX GAMES</strong> donde aparece el/los enlace(s) a retirar.</li>
       <li>URL(s) de origen en el servicio de terceros (si las conoces).</li>
       <li>Datos de contacto: nombre, cargo (si actúas en representación), organización, país y correo electrónico.</li>
       <li>Declaración de buena fe de que el uso no está autorizado por el titular, su agente o la ley.</li>
@@ -226,7 +332,7 @@ const dmcaTexts = {
     <p>Podemos limitar publicaciones o accesos de usuarios/colaboradores que incurran reiteradamente en infracciones.</p>
   `,
   en: `
-    <p><strong>TROGH</strong> does not host copyrighted files. We only display metadata and <em>links</em> to third-party services that host the content under their own terms.</p>
+    <p><strong>TGX</strong> does not host copyrighted files. We only display metadata and <em>links</em> to third-party services that host the content under their own terms.</p>
 
     <p>If you are a copyright owner and believe a link on our site points to infringing material, we will remove such <em>links</em> upon receiving a <strong>valid DMCA Notice</strong>.</p>
 
@@ -234,7 +340,7 @@ const dmcaTexts = {
     <p>Please include:</p>
     <ol>
       <li>Identification of the copyrighted work (title, description, and registration if applicable).</li>
-      <li>Exact <strong>TROGH GAMES</strong> URL(s) where the link(s) appear.</li>
+      <li>Exact <strong>TGX GAMES</strong> URL(s) where the link(s) appear.</li>
       <li>Source hosting URL(s) on the third-party service (if known).</li>
       <li>Contact info: name, role (if acting on behalf), organization, country, and email.</li>
       <li>A good-faith statement that the use is not authorized by the owner, its agent, or the law.</li>
@@ -262,6 +368,7 @@ const LS_ADMIN_SALT = "tgx_admin_salt";
 const LS_ADMIN_USER = "tgx_admin_user";
 const LS_SOCIALS    = "tgx_socials";
 const LS_ADMIN_NOTIF = "tgx_admin_notifications_seen";
+const ADMIN_TOKEN_SESSION_KEY = "tgx_admin_token_session";
 
 /* ------- Cache / límites ------- */
 const POSTS_LIST_LIMIT = 120;
@@ -280,6 +387,7 @@ const STREAMSAVER_SRC = "https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSa
 let isAdmin = false;
 let recientes = [];
 let socials  = [];
+let adminSessionToken = "";
 window.currentCategory = "game";
 // Descargas en curso
 const activeDownloads = window.activeDownloads || [];
@@ -311,9 +419,9 @@ function updateTopbarLogo(cat){
   const src = TOPBAR_LOGOS[cat] || TOPBAR_LOGOS.game;
   logoEl.src = src;
   const altMap = {
-    game: 'Logo de TROGH GAMES',
-    app: 'Logo de TROGH APPS',
-    movie: 'Logo de TROGH MOVIES'
+    game: 'Logo de TGX GAMES',
+    app: 'Logo de TGX APPS',
+    movie: 'Logo de TGX MOVIES'
   };
   logoEl.alt = altMap[cat] || altMap.game;
 }
@@ -449,9 +557,15 @@ function recalcPageSize(){
   const rowGap = parseFloat(styles.rowGap) || 0;
   const gridW  = grid.clientWidth;
   const gridH  = grid.clientHeight;
-  const minTileW = 260; // coincide con minmax del CSS
-
-  const cols = Math.max(1, Math.floor((gridW + colGap) / (minTileW + colGap)));
+  const templateCols = (styles.gridTemplateColumns || "").trim();
+  let cols = 0;
+  if(templateCols && templateCols !== "none"){
+    cols = templateCols.split(/\s+/).filter(Boolean).length;
+  }
+  if(!cols){
+    const minTileW = window.matchMedia("(max-width: 480px)").matches ? 180 : 260;
+    cols = Math.max(1, Math.floor((gridW + colGap) / (minTileW + colGap)));
+  }
   const tileW = (gridW - colGap * (cols - 1)) / cols;
   const tileH = tileW * 9 / 16; // aspect-ratio 16:9
   const rows = Math.max(1, Math.floor((gridH + rowGap) / (tileH + rowGap)));
@@ -526,11 +640,53 @@ function rehydrate() {
   if(migrateSocials) persistSocialsCache();
 
   isAdmin = localStorage.getItem(LS_ADMIN) === "1";
-  try { const t=localStorage.getItem("tgx_admin_token"); if(!isAdmin && t && t.trim()) isAdmin=true; } catch (err) {}
+  try {
+    const t = getAdminToken();
+    if(!isAdmin && t) isAdmin = true;
+  } catch (err) {}
 }
 rehydrate();
 
 function persistAdmin(flag){ try{ localStorage.setItem(LS_ADMIN, flag ? "1" : "0"); }catch (err) {} }
+function getAdminToken(){
+  if(adminSessionToken && adminSessionToken.trim()) return adminSessionToken.trim();
+  let token = "";
+  try {
+    if(typeof sessionStorage !== "undefined"){
+      token = (sessionStorage.getItem(ADMIN_TOKEN_SESSION_KEY) || "").trim();
+    }
+  } catch (err) {}
+  if(!token){
+    // Migraci�n de sesiones antiguas: una sola vez desde localStorage.
+    try {
+      token = (localStorage.getItem("tgx_admin_token") || "").trim();
+      if(token){
+        setAdminToken(token);
+      }
+    } catch (err) {}
+  }
+  adminSessionToken = token || "";
+  return adminSessionToken;
+}
+function setAdminToken(value){
+  const token = String(value || "").trim();
+  adminSessionToken = token;
+  try {
+    if(typeof sessionStorage !== "undefined"){
+      if(token) sessionStorage.setItem(ADMIN_TOKEN_SESSION_KEY, token);
+      else sessionStorage.removeItem(ADMIN_TOKEN_SESSION_KEY);
+    }
+  } catch (err) {}
+  try {
+    // Evita persistencia larga del token en navegador.
+    localStorage.removeItem("tgx_admin_token");
+  } catch (err) {}
+}
+function clearAdminToken(){
+  adminSessionToken = "";
+  try { if(typeof sessionStorage !== "undefined") sessionStorage.removeItem(ADMIN_TOKEN_SESSION_KEY); } catch (err) {}
+  try { localStorage.removeItem("tgx_admin_token"); } catch (err) {}
+}
 function preload(src){ const img = new Image(); img.src = src; }
 
 let streamSaverPromise = null;
@@ -816,6 +972,47 @@ function escapeHtml(str){
     "'":"&#39;",
     '"':"&quot;"
   })[ch] || ch);
+}
+
+function sanitizeRichHtml(input){
+  const template = document.createElement("template");
+  template.innerHTML = String(input || "");
+  if(typeof NodeFilter === "undefined"){
+    return template.innerHTML;
+  }
+  const blockedTags = new Set(["script", "style", "iframe", "object", "embed", "link", "meta", "base", "form"]);
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT);
+  const toRemove = [];
+
+  while (walker.nextNode()) {
+    const el = walker.currentNode;
+    const tag = (el.tagName || "").toLowerCase();
+    if (blockedTags.has(tag)) {
+      toRemove.push(el);
+      continue;
+    }
+    for (const attr of Array.from(el.attributes || [])) {
+      const name = attr.name.toLowerCase();
+      const value = String(attr.value || "").trim();
+      if (name.startsWith("on")) {
+        el.removeAttribute(attr.name);
+        continue;
+      }
+      if ((name === "href" || name === "src" || name === "xlink:href") && value) {
+        const lower = value.toLowerCase();
+        if (lower.startsWith("javascript:") || lower.startsWith("data:text/html")) {
+          el.removeAttribute(attr.name);
+        }
+      }
+    }
+    if (tag === "a") {
+      el.setAttribute("rel", "noopener noreferrer");
+      if (!el.getAttribute("target")) el.setAttribute("target", "_blank");
+    }
+  }
+
+  toRemove.forEach((node) => node.remove());
+  return template.innerHTML;
 }
 
 function insertLinkChip(editorArea){
@@ -1396,11 +1593,17 @@ function setModalDescription(descEl, html, game){
   const finalHtml = (html === undefined || html === null || (typeof html === "string" && html.trim() === ""))
     ? "Sin descripción"
     : html;
-  target.innerHTML = finalHtml;
+  target.innerHTML = sanitizeRichHtml(finalHtml);
   bindModalChipLinks(target, game);
 }
 
 const commentCache = new Map();
+
+function normalizeIdentifier(value){
+  if(value === undefined || value === null) return null;
+  const normalized = String(value).trim();
+  return normalized ? normalized : null;
+}
 
 function normalizeComment(entry = {}){
   if(!entry || typeof entry !== "object") return null;
@@ -1408,13 +1611,15 @@ function normalizeComment(entry = {}){
   const messageRaw = typeof entry.message === "string" ? entry.message : "";
   const roleRaw = typeof entry.role === "string" ? entry.role.toLowerCase() : "user";
   const created = entry.createdAt || entry.created_at || null;
-  const parentId = entry.parentId || entry.parent_id || null;
+  const id = normalizeIdentifier(entry.id ?? entry.commentId ?? entry.comment_id);
+  const postId = normalizeIdentifier(entry.postId ?? entry.post_id);
+  const parentId = normalizeIdentifier(entry.parentId ?? entry.parent_id);
   const pinnedAt = entry.pinnedAt || entry.pinned_at || null;
   const postTitleRaw = typeof entry.postTitle === "string" ? entry.postTitle : (typeof entry.post_title === "string" ? entry.post_title : "");
   const postCategoryRaw = typeof entry.postCategory === "string" ? entry.postCategory : (typeof entry.post_category === "string" ? entry.post_category : "");
   return {
-    id: entry.id || entry.commentId || entry.comment_id || null,
-    postId: entry.postId || entry.post_id || null,
+    id,
+    postId,
     alias: aliasRaw || "Anónimo",
     message: messageRaw,
     role: roleRaw === "admin" ? "admin" : "user",
@@ -1479,11 +1684,12 @@ async function commentsCreate(postId, payload = {}){
 }
 
 async function commentsDelete(commentId, postId, token){
-  if(!commentId) throw new Error("Falta el ID del comentario");
+  const commentKey = normalizeIdentifier(commentId);
+  if(!commentKey) throw new Error("Falta el ID del comentario");
   if(!token) throw new Error("Falta AUTH_TOKEN");
   const cacheKey = postId ? String(postId) : null;
   const qs = cacheKey ? `?postId=${encodeURIComponent(cacheKey)}` : "";
-  const res = await fetch(`${API_COMMENTS}/${commentId}${qs}`, {
+  const res = await fetch(`${API_COMMENTS}/${encodeURIComponent(commentKey)}${qs}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` }
   });
@@ -1494,18 +1700,19 @@ async function commentsDelete(commentId, postId, token){
   if(cacheKey && commentCache.has(cacheKey)){
     const next = commentCache
       .get(cacheKey)
-      .filter(entry => entry?.id !== commentId && entry?.parentId !== commentId);
+      .filter(entry => String(entry?.id || "") !== commentKey && String(entry?.parentId || "") !== commentKey);
     commentCache.set(cacheKey, next);
   }
   return true;
 }
 
 async function commentsPin(commentId, postId, pinned, token){
-  if(!commentId) throw new Error("Falta el ID del comentario");
+  const commentKey = normalizeIdentifier(commentId);
+  if(!commentKey) throw new Error("Falta el ID del comentario");
   if(!token) throw new Error("Falta AUTH_TOKEN");
   const cacheKey = postId ? String(postId) : null;
   const qs = cacheKey ? `?postId=${encodeURIComponent(cacheKey)}` : "";
-  const res = await fetch(`${API_COMMENTS}/${commentId}${qs}`, {
+  const res = await fetch(`${API_COMMENTS}/${encodeURIComponent(commentKey)}${qs}`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1522,7 +1729,7 @@ async function commentsPin(commentId, postId, pinned, token){
   if(cacheKey && commentCache.has(cacheKey) && normalized){
     const next = commentCache
       .get(cacheKey)
-      .map(entry => entry?.id === normalized.id ? normalized : entry);
+      .map(entry => String(entry?.id || "") === String(normalized.id || "") ? normalized : entry);
     commentCache.set(cacheKey, next);
   }
   return normalized;
@@ -1579,6 +1786,7 @@ function openGame(initialGame, options = {}){
   const commentFormWrap = commentSection?.querySelector(".comment-form-wrap") || null;
   const commentForm = commentSection?.querySelector(".comment-form") || null;
   const commentFormToggle = commentSection?.querySelector(".comment-form-toggle") || null;
+  const commentFormHandle = commentSection?.querySelector(".comment-form-handle") || null;
   const commentCountBadge = commentSection?.querySelector(".comment-count") || null;
   const commentCountLabel = commentSection?.querySelector(".comment-count-label") || null;
   const commentStatus = commentSection?.querySelector(".comment-status") || null;
@@ -1666,6 +1874,9 @@ function openGame(initialGame, options = {}){
       commentFormToggle.hidden = isExpanded;
       commentFormToggle.setAttribute("aria-expanded", String(isExpanded));
     }
+    if(commentFormHandle){
+      commentFormHandle.hidden = !isExpanded;
+    }
     if(isExpanded){
       if(focus) focusCommentTextarea();
     }else if(focus){
@@ -1681,7 +1892,7 @@ function openGame(initialGame, options = {}){
     if(commentTabAnimationTimer) timerHost.clearTimeout(commentTabAnimationTimer);
     commentTabAnimationTimer = timerHost.setTimeout(()=>{
       commentTab.classList.remove(className);
-    }, isOpen ? 720 : 560);
+    }, isOpen ? 520 : 440);
   };
 
   const setCommentTabHeaderState = (enabled, delay = 0)=>{
@@ -1785,6 +1996,11 @@ function openGame(initialGame, options = {}){
     setCommentFormExpanded(true, { focus: true });
   });
 
+  commentFormHandle?.addEventListener("click", ()=>{
+    if(!commentTab?.classList.contains("is-open")) return;
+    setCommentFormExpanded(false, { focus: true });
+  });
+
   modalNode?.addEventListener("click", (ev)=>{
     if(!ev.target.closest(".comment-actions")){
       closeOpenActionsMenu();
@@ -1801,11 +2017,13 @@ function openGame(initialGame, options = {}){
     const roots = [];
     (items || []).forEach(entry => {
       if(!entry || !entry.id) return;
-      map.set(entry.id, { ...entry, replies: [] });
+      const key = String(entry.id);
+      map.set(key, { ...entry, id: key, parentId: entry.parentId ? String(entry.parentId) : null, replies: [] });
     });
     map.forEach(node => {
-      if(node.parentId && map.has(node.parentId)){
-        map.get(node.parentId).replies.push(node);
+      const parentKey = node.parentId ? String(node.parentId) : null;
+      if(parentKey && map.has(parentKey)){
+        map.get(parentKey).replies.push(node);
       }else{
         roots.push(node);
       }
@@ -1840,12 +2058,12 @@ function openGame(initialGame, options = {}){
     if(!comment?.id) return;
     const postId = currentGame?.id ?? null;
     if(!postId) return;
-    const token = localStorage.getItem("tgx_admin_token") || "";
+    const token = getAdminToken();
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
     try{
       const updated = await commentsPin(comment.id, postId, shouldPin, token);
       if(updated){
-        commentsState.items = commentsState.items.map(item => item?.id === updated.id ? { ...updated } : item);
+        commentsState.items = commentsState.items.map(item => String(item?.id || "") === String(updated.id || "") ? { ...updated } : item);
         renderComments();
       }
     }catch(err){
@@ -1862,11 +2080,11 @@ function openGame(initialGame, options = {}){
     if(!commentId || !postId) return;
     const confirmMessage = "¿Eliminar este comentario?";
     if(typeof window !== "undefined" && !window.confirm(confirmMessage)) return;
-    const token = localStorage.getItem("tgx_admin_token") || "";
+    const token = getAdminToken();
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
     try{
       await commentsDelete(commentId, postId, token);
-      commentsState.items = commentsState.items.filter(item => item?.id !== commentId && item?.parentId !== commentId);
+      commentsState.items = commentsState.items.filter(item => String(item?.id || "") !== commentId && String(item?.parentId || "") !== commentId);
       expandedReplies.delete(commentId);
       if(comment?.parentId) expandedReplies.delete(String(comment.parentId));
       if(replyTargetId && (replyTargetId === commentId || replyTargetId === String(comment?.parentId))){
@@ -1965,7 +2183,7 @@ function openGame(initialGame, options = {}){
     item.dataset.role = role;
     if(role === "admin") item.classList.add("is-admin");
     if(!isReply && comment?.pinnedAt) item.classList.add("is-pinned");
-    if(!isReply && replyTargetId && comment?.id === replyTargetId) item.classList.add("is-reply-target");
+    if(!isReply && replyTargetId && String(comment?.id || "") === replyTargetId) item.classList.add("is-reply-target");
 
     const meta = document.createElement("div");
     meta.className = "comment-meta";
@@ -2237,7 +2455,7 @@ function openGame(initialGame, options = {}){
     const emailValue = String(formData.get("email") || "").trim();
     if(commentSubmitButton) commentSubmitButton.disabled = true;
     try{
-      const token = isAdmin ? (localStorage.getItem("tgx_admin_token") || "") : "";
+      const token = isAdmin ? getAdminToken() : "";
       const parentId = replyTargetId ? String(replyTargetId) : undefined;
       const created = await commentsCreate(postId, { alias: aliasValue, email: emailValue, message, token, parentId });
       if(created){
@@ -2309,6 +2527,7 @@ function openGame(initialGame, options = {}){
     }
   };
 
+  let adminPanelOutsideClickHandler = null;
   if(isAdmin){
     const kebabBtn=document.createElement("button");
     kebabBtn.className="tw-modal-menu";
@@ -2323,7 +2542,10 @@ function openGame(initialGame, options = {}){
     `;
 
     kebabBtn.addEventListener("click",(e)=>{ e.stopPropagation(); panel.classList.toggle("show"); });
-    document.addEventListener("click",(e)=>{ if(!panel.contains(e.target) && e.target!==kebabBtn) panel.classList.remove("show"); });
+    adminPanelOutsideClickHandler = (e)=>{
+      if(!panel.contains(e.target) && e.target!==kebabBtn) panel.classList.remove("show");
+    };
+    document.addEventListener("click", adminPanelOutsideClickHandler);
 
     panel.addEventListener("click",(e)=>{
       const action=e.target?.dataset?.action;
@@ -2345,6 +2567,10 @@ function openGame(initialGame, options = {}){
   const cleanupModal = ()=>{
     if(typeof window !== "undefined"){
       window.removeEventListener("resize", handleResize);
+    }
+    if(adminPanelOutsideClickHandler){
+      document.removeEventListener("click", adminPanelOutsideClickHandler);
+      adminPanelOutsideClickHandler = null;
     }
   };
   const performClose = ()=>{
@@ -2407,7 +2633,7 @@ function openGame(initialGame, options = {}){
 }
 function deleteGame(game){
   if(!game.id){ alert("No se encontró ID."); return; }
-  const token = localStorage.getItem("tgx_admin_token") || "";
+  const token = getAdminToken();
   if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
   apiDelete(game.id, token)
     .then(()=> reloadData())
@@ -2576,7 +2802,7 @@ function openNewGameModal(){
     const data = await gatherGameData(refs);
     if(!data) return;
 
-    const token=localStorage.getItem("tgx_admin_token")||"";
+    const token=getAdminToken();
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
     const newGame = {
@@ -2638,7 +2864,7 @@ function openEditGame(original){
     }
     patch.bump = true;
 
-    const token=localStorage.getItem("tgx_admin_token")||"";
+    const token=getAdminToken();
     if(!token){ alert("Falta AUTH_TOKEN. Inicia sesión admin y pégalo."); return; }
 
     try{
@@ -2680,7 +2906,7 @@ function openNewSocialModal(){
     const reader=new FileReader();
     reader.onload = async ()=>{
       try{
-        const token=localStorage.getItem("tgx_admin_token")||"";
+        const token=getAdminToken();
         await socialsCreate({ name, image: reader.result, url }, token);
         socials = await socialsList({ force: true });
         renderSocialBar();
@@ -2710,7 +2936,7 @@ function renderSocialBar(){
       del.addEventListener("click", async(e)=>{
         e.preventDefault(); e.stopPropagation();
         if(!confirm("¿Eliminar esta red social?")) return;
-        try{ const token=localStorage.getItem("tgx_admin_token")||""; await socialsDelete(s.id, token); socials=await socialsList({ force: true }); renderSocialBar(); }
+        try{ const token=getAdminToken(); await socialsDelete(s.id, token); socials=await socialsList({ force: true }); renderSocialBar(); }
         catch(err){ console.error(err); alert("No se pudo eliminar."); }
       });
       wrap.appendChild(del);
@@ -2736,12 +2962,12 @@ function openDmcaModal(){
   const modalClose = modal.querySelector('.tw-modal-close');
 
   let current = 'es';
-  if(desc) desc.innerHTML = dmcaTexts[current];
+  if(desc) desc.innerHTML = sanitizeRichHtml(dmcaTexts[current]);
   if(btnToggle) btnToggle.textContent = 'EN';
 
   btnToggle?.addEventListener('click', ()=>{
     current = current === 'es' ? 'en' : 'es';
-    if(desc) desc.innerHTML = dmcaTexts[current];
+    if(desc) desc.innerHTML = sanitizeRichHtml(dmcaTexts[current]);
     if(btnToggle) btnToggle.textContent = current === 'es' ? 'EN' : 'ES';
   });
 
@@ -2783,7 +3009,7 @@ function openFaqModal(){
       const res = await fetch('/.netlify/functions/faq');
       if(res.ok){
         const data = await res.json();
-        if(content) content.innerHTML = data.content || '';
+        if(content) content.innerHTML = sanitizeRichHtml(data.content || '');
       }else{
         if(content) content.textContent = 'No se pudo cargar.';
       }
@@ -2841,19 +3067,19 @@ async function openFaqEditor(){
   const editorRoot = frag.querySelector('.rich-editor');
   const editorAPI = initRichEditor(editorRoot);
   const contentEl = document.querySelector('.faq-content');
-  if(contentEl) editorAPI.setHTML(contentEl.innerHTML);
+  if(contentEl) editorAPI.setHTML(sanitizeRichHtml(contentEl.innerHTML));
 
   saveBtn?.addEventListener('click', async ()=>{
-    const content = editorAPI.getHTML();
+    const content = sanitizeRichHtml(editorAPI.getHTML());
     try{
-      const token=localStorage.getItem('tgx_admin_token')||'';
+      const token=getAdminToken();
       const res = await fetch('/.netlify/functions/faq', {
         method:'PUT',
         headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
         body:JSON.stringify({content})
       });
       if(res.ok){
-        if(contentEl) contentEl.innerHTML = content;
+        if(contentEl) contentEl.innerHTML = sanitizeRichHtml(content);
         closeModal(node, removeTrap, onEscape);
       }else{
         alert('No se pudo guardar.');
@@ -2899,6 +3125,34 @@ function setupFaqButton(){
     openFaqModal();
   });
 }
+
+function isMobileNavViewport(){
+  return typeof window !== "undefined"
+    && typeof window.matchMedia === "function"
+    && window.matchMedia("(max-width: 760px)").matches;
+}
+
+function setDesktopSideNavCollapsed(collapsed){
+  const rail = document.querySelector(".side-nav");
+  const isCollapsed = Boolean(collapsed);
+  rail?.classList.toggle("is-collapsed", isCollapsed);
+  document.body.classList.toggle("nav-collapsed", isCollapsed);
+}
+
+function setMobileSideNavOpen(open){
+  const rail = document.querySelector(".side-nav");
+  const brand = document.querySelector(".topbar .brand");
+  const isOpen = Boolean(open);
+  rail?.classList.toggle("is-mobile-open", isOpen);
+  document.body.classList.toggle("mobile-nav-open", isOpen);
+  if(brand){
+    brand.classList.toggle("is-mobile-open", isOpen);
+    if(brand.getAttribute("role") === "button"){
+      brand.setAttribute("aria-expanded", String(isOpen));
+    }
+  }
+}
+
 function setupSideNav(){
   const btns = Array.from(document.querySelectorAll('.side-nav .nav-btn'));
   if(!btns.length) return;
@@ -2921,6 +3175,11 @@ function setupSideNav(){
         page = 1;
         renderRow();
         renderHeroCarousel();
+        if(isMobileNavViewport()){
+          setMobileSideNavOpen(false);
+        }else{
+          setDesktopSideNavCollapsed(true);
+        }
       }catch(e){ console.error("[nav]", e); }
     });
   });
@@ -2928,13 +3187,90 @@ function setupSideNav(){
   setActive(window.currentCategory || "game");
 }
 
+function setupMobileNavToggle(){
+  const rail = document.querySelector(".side-nav");
+  const brand = document.querySelector(".topbar .brand");
+  if(!rail || !brand || typeof window.matchMedia !== "function") return;
+
+  const query = window.matchMedia("(max-width: 760px)");
+  let desktopCollapsed = true;
+
+  const updateBrandA11y = ()=>{
+    const expanded = query.matches
+      ? rail.classList.contains("is-mobile-open")
+      : !rail.classList.contains("is-collapsed");
+    brand.setAttribute("aria-expanded", String(expanded));
+    brand.setAttribute("aria-label", expanded ? "Ocultar menú de navegación" : "Mostrar menú de navegación");
+  };
+
+  const applyViewportState = ()=>{
+    brand.setAttribute("role", "button");
+    brand.setAttribute("tabindex", "0");
+    brand.setAttribute("aria-haspopup", "true");
+    if(query.matches){
+      setDesktopSideNavCollapsed(false);
+      setMobileSideNavOpen(false);
+    }else{
+      setMobileSideNavOpen(false);
+      setDesktopSideNavCollapsed(desktopCollapsed);
+    }
+    updateBrandA11y();
+  };
+
+  const toggleFromBrand = (ev)=>{
+    ev.preventDefault();
+    if(query.matches){
+      const isOpen = rail.classList.contains("is-mobile-open");
+      setMobileSideNavOpen(!isOpen);
+    }else{
+      desktopCollapsed = !rail.classList.contains("is-collapsed");
+      setDesktopSideNavCollapsed(desktopCollapsed);
+    }
+    updateBrandA11y();
+  };
+
+  brand.addEventListener("click", toggleFromBrand);
+  brand.addEventListener("keydown", (ev)=>{
+    if(ev.key === "Enter" || ev.key === " "){
+      toggleFromBrand(ev);
+    }
+  });
+
+  document.addEventListener("click", (ev)=>{
+    if(!query.matches) return;
+    if(!rail.classList.contains("is-mobile-open")) return;
+    const target = ev.target;
+    if(rail.contains(target) || brand.contains(target)) return;
+    setMobileSideNavOpen(false);
+    updateBrandA11y();
+  });
+
+  document.addEventListener("keydown", (ev)=>{
+    if(ev.key === "Escape" && query.matches){
+      setMobileSideNavOpen(false);
+      updateBrandA11y();
+    }
+  });
+
+  if(typeof query.addEventListener === "function"){
+    query.addEventListener("change", applyViewportState);
+  }else if(typeof query.addListener === "function"){
+    query.addListener(applyViewportState);
+  }
+
+  applyViewportState();
+}
+
 /* =========================
    Admin: Token y Login / Crear Usuario
    ========================= */
 function ensureAuthTokenPrompt(){
   try{
-    const k="tgx_admin_token"; let t=localStorage.getItem(k);
-    if(!t){ t = prompt("Pega tu AUTH_TOKEN de Netlify (requerido para publicar/editar/borrar):"); if(t) localStorage.setItem(k, t.trim()); }
+    let t = getAdminToken();
+    if(!t){
+      t = prompt("Pega tu AUTH_TOKEN de Netlify (solo para esta sesión):");
+      if(t) setAdminToken(t);
+    }
   }catch (err) {}
 }
 
@@ -3038,7 +3374,7 @@ function openAdminMenuModal(){
   if(btnLogout) btnLogout.addEventListener("click", ()=>{
     isAdmin=false; persistAdmin(false);
     try {
-      localStorage.removeItem("tgx_admin_token");
+      clearAdminToken();
       localStorage.removeItem(LS_ADMIN_HASH);
       localStorage.removeItem(LS_ADMIN_SALT);
       localStorage.removeItem(LS_ADMIN_USER);
@@ -3299,7 +3635,7 @@ async function openNotificationItem(notification){
   closeAdminNotificationsPanel();
 
   const postId = String(notification.postId);
-  let base = (Array.isArray(recientes) ? recientes : []).find(item => item?.id === postId);
+  let base = (Array.isArray(recientes) ? recientes : []).find(item => String(item?.id || "") === postId);
   let modal = null;
 
   try{
@@ -3441,13 +3777,13 @@ function setupAdminButton(){
 }
 
 /* =========================
-   Badge lateral → Descargas
+   Botón footer → Descargas
    ========================= */
 function ensureDownloadsBadge(){
-  const rail = document.querySelector(".side-nav");
-  if(!rail) return;
+  const pager = document.getElementById("gridPager");
+  if(!pager) return;
 
-  let el = rail.querySelector(".yt-channel-badge");
+  let el = pager.querySelector(".pager-download-btn");
   const svgMarkup = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16.5a1 1 0 0 1-.7-.29l-5-5a1 1 0 0 1 1.4-1.42L12 14.09l4.3-4.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-.7.29Z"/></svg>';
 
   // Si fuera <a>, lo convierto a <button> para abrir Descargas (sin romper estilos)
@@ -3463,10 +3799,15 @@ function ensureDownloadsBadge(){
   if (!el) {
     el = document.createElement("button");
     el.type = "button";
-    el.className = "yt-channel-badge";
-    rail.appendChild(el);
+    el.className = "pager-download-btn";
+    const dashes = pager.querySelector(".pager-dashes");
+    if(dashes){
+      pager.insertBefore(el, dashes);
+    }else{
+      pager.appendChild(el);
+    }
   }
-  el.innerHTML = svgMarkup;
+  el.innerHTML = `${svgMarkup}<span>Descargas</span>`;
   el.setAttribute("aria-label", "Descargas");
   el.onclick = toggleDownloadsPanel;
   return el;
@@ -3604,7 +3945,7 @@ function toggleDownloadsPanel(){
     document.body.appendChild(panel);
   }
 
-  const badge = document.querySelector('.yt-channel-badge');
+  const badge = document.querySelector('.pager-download-btn');
 
   panel.querySelector('.clear-history').onclick = () => {
     localStorage.removeItem('tgx_downloads');
@@ -3628,8 +3969,11 @@ function toggleDownloadsPanel(){
   renderDownloadsPanel(panel);
   if(badge){
     const rect = badge.getBoundingClientRect();
-    panel.style.left = (rect.right + 8) + 'px';
-    panel.style.bottom = (window.innerHeight - rect.bottom) + 'px';
+    const panelWidth = Math.min(460, Math.max(280, window.innerWidth * 0.9));
+    panel.style.width = `${panelWidth}px`;
+    const left = Math.min(window.innerWidth - panelWidth - 12, Math.max(12, rect.left + (rect.width / 2) - (panelWidth / 2)));
+    panel.style.left = `${left}px`;
+    panel.style.bottom = `${Math.max(56, window.innerHeight - rect.top + 10)}px`;
   }
   panel.classList.add('open');
   panel._outsideHandler = onOutside;
@@ -3769,13 +4113,13 @@ async function downloadFromDrive(input){
     let id    = Array.isArray(input) ? input[0]?.id : input?.id;
     const resume = !!input?.resume;
     const skipHistory = !!input?.skipHistory;
-    let token, makeUrl;
+    let makeUrl;
     if(!id) throw new Error('missing id');
     const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
     if(!meta.ok) throw new Error('meta failed');
     const m = await meta.json();
     if (m.mimeType === 'application/vnd.google-apps.folder') {
-      const r = await fetch(`/.netlify/functions/drive?list=${id}`);
+      const r = await fetch(`/.netlify/functions/drive?list=${encodeURIComponent(id)}`);
       const data = await r.json();
       const files = data.files || [];
       const total = files.reduce((s,f)=>s + parseInt(f.size||0,10),0);
@@ -3801,9 +4145,8 @@ async function downloadFromDrive(input){
       return;
     }
     const name = m.name || input?.name || 'archivo.bin';
-    token = m.token;
     makeUrl = (start, end) =>
-      `https://www.googleapis.com/drive/v3/files/${id}?alt=media`;
+      `/.netlify/functions/drive?id=${encodeURIComponent(id)}&range=${start}-${end}`;
     if(!parts){
       const total = parseInt(m.size || '0', 10);
       const chunk = 8 * 1024 * 1024; // 8MB
@@ -3882,7 +4225,7 @@ async function downloadFromDrive(input){
       cleanupAndRemove('removed');
     };
     if(!existing) activeDownloads.push(dl);
-    const badge = document.querySelector('.yt-channel-badge');
+    const badge = document.querySelector('.pager-download-btn');
     if (badge && !resume) {
       document.querySelector('.dl-tip')?.remove();
       const tip = document.createElement('div');
@@ -3891,8 +4234,9 @@ async function downloadFromDrive(input){
       document.body.appendChild(tip);
       const rect = badge.getBoundingClientRect();
       const tipRect = tip.getBoundingClientRect();
-      tip.style.left = `${rect.right + 8}px`;
-      tip.style.top = `${rect.top + rect.height / 2 - tipRect.height / 2}px`;
+      const left = Math.min(window.innerWidth - tipRect.width - 8, Math.max(8, rect.left + (rect.width / 2) - (tipRect.width / 2)));
+      tip.style.left = `${left}px`;
+      tip.style.top = `${Math.max(8, rect.top - tipRect.height - 8)}px`;
       setTimeout(() => tip.remove(), 4000);
     }
 
@@ -3980,8 +4324,7 @@ async function downloadFromDrive(input){
       const maxRetries = 3;
       for(let attempt=0; attempt<maxRetries; attempt++){
         try{
-          const headers = { Authorization: `Bearer ${token}`, Range: `bytes=${part.start}-${part.end}` };
-          const res = await fetch(makeUrl(part.start, part.end), { headers, signal: controller.signal });
+          const res = await fetch(makeUrl(part.start, part.end), { signal: controller.signal });
           if(!res.ok) throw new Error(`HTTP ${res.status}`);
           const reader = res.body.getReader();
           const chunks = [];
@@ -4104,7 +4447,7 @@ function randomKey(len=28){
 
 async function openAdminCenter(){
   if(!isAdmin){ return; }
-  const token=localStorage.getItem("tgx_admin_token")||"";
+  const token=getAdminToken();
   if(!token){ alert("Falta AUTH_TOKEN de Netlify para gestionar llaves."); return; }
 
   const frag = document.createDocumentFragment();
@@ -4227,11 +4570,19 @@ async function initData(){
   setupFaqButton();
   setupAdminButton();
   setupSideNav();
+  setupMobileNavToggle();
 
   await Promise.allSettled([postsPromise, socialsPromise]);
 }
 recalcPageSize();
-window.addEventListener('resize', ()=>{ recalcPageSize(); renderRow(); });
+let resizeRenderTimer = null;
+window.addEventListener('resize', ()=>{
+  if(resizeRenderTimer) clearTimeout(resizeRenderTimer);
+  resizeRenderTimer = setTimeout(()=>{
+    recalcPageSize();
+    renderRow(true);
+  }, 120);
+});
 initData();
 
 
