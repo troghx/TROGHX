@@ -12,6 +12,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@neondatabase/serverless@^1.0.1",
+        "npm:google-auth-library@^10.5.0",
         "npm:googleapis@134"
       ]
     }

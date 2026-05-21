@@ -28,13 +28,12 @@ const cacheHdr = (sec = 60, { noStore = false } = {}) => {
   return { "Cache-Control": `public, max-age=${sec}, stale-while-revalidate=30` };
 };
 
-// categorías válidas (ES/EN)
-const CATS = new Set(["game", "app", "movie"]);
+// TGX sólo publica juegos por ahora.
+const CATS = new Set(["game"]);
 function normCat(v) {
   const s = String(v || "").toLowerCase().trim();
   if (CATS.has(s)) return s;
   if (s === "juego") return "game";
-  if (s === "pelicula" || s === "película") return "movie";
   return "game";
 }
 
@@ -80,6 +79,19 @@ function driveIdFrom(url = "") {
   if (m) return m[1];
   const m2 = s.match(/[?&]id=([A-Za-z0-9_-]+)/);
   return m2 ? m2[1] : null;
+}
+
+function parseLimit(value, fallback = 24, max = 48) {
+  return Math.min(Math.max(parseInt(value || String(fallback), 10) || fallback, 1), max);
+}
+
+function parseOffset(value) {
+  return Math.max(parseInt(value || "0", 10) || 0, 0);
+}
+
+function searchText(value = "") {
+  const s = String(value || "").replace(/[%_]/g, "").trim();
+  return s.length > 80 ? s.slice(0, 80).trim() : s;
 }
 
 function auth(event) {
@@ -137,34 +149,68 @@ export async function handler(event) {
     if (event.httpMethod === "GET" && event.path.endsWith("/posts")) {
       try {
         const p = qs(event);
-        const limit = Math.min(Math.max(parseInt(p.limit || "200", 10) || 200, 1), 200);
+        const offset = parseOffset(p.offset);
+        const paged = p.paged === "1" || p.paged === "true" || "offset" in p || "q" in p;
+        const limit = parseLimit(p.limit, paged ? 24 : 200, paged ? 48 : 200);
         const lite = p.lite === "1" || p.lite === "true";
         const category = normCat(p.category);
+        const q = searchText(p.q || p.search || "");
+        const pattern = `%${q}%`;
 
         if (lite) {
-          const rows = await sql`
-          SELECT id, title, category,
-                 player_mode AS "playerMode",
-                 COALESCE(image_thumb, image) AS image_thumb,
-                 created_at, link_ok, first_link, gofile_id, drive_id
-          FROM posts
-          WHERE category = ${category}
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `;
-          return json(200, rows, cacheHdr(0, { noStore: true }));
+          const rows = q
+            ? await sql`
+              SELECT id, title, category,
+                     player_mode AS "playerMode",
+                     COALESCE(image_thumb, image) AS image_thumb,
+                     created_at, link_ok, first_link, gofile_id, drive_id
+              FROM posts
+              WHERE category = ${category} AND title ILIKE ${pattern}
+              ORDER BY created_at DESC
+              LIMIT ${limit} OFFSET ${offset}
+            `
+            : await sql`
+              SELECT id, title, category,
+                     player_mode AS "playerMode",
+                     COALESCE(image_thumb, image) AS image_thumb,
+                     created_at, link_ok, first_link, gofile_id, drive_id
+              FROM posts
+              WHERE category = ${category}
+              ORDER BY created_at DESC
+              LIMIT ${limit} OFFSET ${offset}
+            `;
+          if (!paged) return json(200, rows, cacheHdr(0, { noStore: true }));
+          const totalRows = q
+            ? await sql`SELECT COUNT(*)::int AS total FROM posts WHERE category = ${category} AND title ILIKE ${pattern}`
+            : await sql`SELECT COUNT(*)::int AS total FROM posts WHERE category = ${category}`;
+          return json(200, { items: rows, total: totalRows[0]?.total || 0, limit, offset }, cacheHdr(0, { noStore: true }));
         } else {
-          const rows = await sql`
-          SELECT id, title, category,
-                 player_mode AS "playerMode",
-                 image, description, preview_video,
-                 created_at, link_ok, first_link, gofile_id, drive_id
-          FROM posts
-          WHERE category = ${category}
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `;
-          return json(200, rows, cacheHdr(0, { noStore: true }));
+          const rows = q
+            ? await sql`
+              SELECT id, title, category,
+                     player_mode AS "playerMode",
+                     image, description, preview_video,
+                     created_at, link_ok, first_link, gofile_id, drive_id
+              FROM posts
+              WHERE category = ${category} AND title ILIKE ${pattern}
+              ORDER BY created_at DESC
+              LIMIT ${limit} OFFSET ${offset}
+            `
+            : await sql`
+              SELECT id, title, category,
+                     player_mode AS "playerMode",
+                     image, description, preview_video,
+                     created_at, link_ok, first_link, gofile_id, drive_id
+              FROM posts
+              WHERE category = ${category}
+              ORDER BY created_at DESC
+              LIMIT ${limit} OFFSET ${offset}
+            `;
+          if (!paged) return json(200, rows, cacheHdr(0, { noStore: true }));
+          const totalRows = q
+            ? await sql`SELECT COUNT(*)::int AS total FROM posts WHERE category = ${category} AND title ILIKE ${pattern}`
+            : await sql`SELECT COUNT(*)::int AS total FROM posts WHERE category = ${category}`;
+          return json(200, { items: rows, total: totalRows[0]?.total || 0, limit, offset }, cacheHdr(0, { noStore: true }));
         }
       } catch (err) {
         console.error("[GET /posts]", err);

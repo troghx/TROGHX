@@ -3,73 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TGX</title>
-  <link rel="icon" href="assets/images/logo.png" type="image/x-icon" />
-  <link rel="stylesheet" href="styles.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600&display=swap" rel="stylesheet">
+  <title>TGX — Descargas verificadas</title>
+  <meta name="description" content="TGX reúne publicaciones de juegos con enlaces verificados, descripciones y comentarios de la comunidad." />
+  <meta name="theme-color" content="#05070f" />
+  <link rel="icon" href="assets/images/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="styles.css?v=20260506-3" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600&display=swap" rel="stylesheet" />
 </head>
 <body>
   <canvas id="star-canvas" aria-hidden="true"></canvas>
-  <aside class="side-nav" aria-label="Navegación principal">
-          <button class="nav-btn active" aria-label="Juegos" data-cat="game">
-            <svg viewBox="35 0 1130 506" preserveAspectRatio="xMidYMid meet">
-              <rect x="16" y="27" width="1095" height="469" fill="#ffffff"/>
-              <g transform="translate(0,506) scale(0.1,-0.1)">
-                <path fill="#8d8d8d" d="M4940 4885 l0 -95 -2425 0 -2425 0 0 -2345 0 -2345 5540 0 5540 0 0
-                2345 0 2345 -2422 2 -2423 3 -3 93 -3 92 -689 0 -690 0 0 -95z m6168 -2443 l2
-                -2282 -5480 0 -5480 0 0 2278 c0 1253 3 2282 7 2285 3 4 2468 6 5477 5 l5471
-                -3 3 -2283z"/>
-                <path fill="#838383" d="M332 2443 l3 -2128 5295 0 5295 0 3 2128 2 2127 -5300 0 -5300 0 2
-                -2127z m10546 0 l2 -2073 -5250 0 -5250 0 0 2068 c0 1138 3 2072 7 2075 3 4
-                2365 6 5247 5 l5241 -3 3 -2072z"/>
-                <path fill="#e53935" d="M8596 3904 c-234 -56 -392 -288 -356 -521 39 -253 275 -432 523 -396
-                191 27 343 163 392 348 66 256 -100 519 -363 574 -68 14 -123 13 -196 -5z"/>
-                <path fill="#e53935" d="M7753 3135 c-251 -68 -402 -322 -338 -568 23 -88 62 -156 126 -219
-                251 -246 664 -139 774 201 14 42 16 76 13 157 -4 94 -8 110 -41 176 -99 201
-                -327 308 -534 253z"/>
-                <path fill="#e53935" d="M9455 3086 c-186 -61 -308 -203 -334 -389 -17 -122 24 -265 104 -363
-                78 -95 226 -164 354 -164 131 0 234 42 329 134 163 158 189 403 62 594 -49 73
-                -108 123 -197 165 -61 28 -79 32 -173 34 -67 2 -119 -2 -145 -11z"/>
-                <path fill="#e53935" d="M8654 2325 c-262 -57 -425 -316 -359 -570 66 -253 321 -405 570 -340
-                145 38 263 144 319 285 108 273 -76 587 -369 630 -85 12 -85 12 -161 -5z"/>
-                <path fill="#1e88e5" d="M4332 3649 c-59 -30 -85 -70 -90 -140 -6 -75 17 -123 77 -160 147
-                -94 321 67 245 226 -38 81 -149 116 -232 74z"/>
-                <path fill="#1e88e5" d="M5105 3663 c-60 -15 -125 -101 -125 -168 0 -46 34 -109 76 -141 32
-                -25 47 -29 99 -29 52 0 67 4 98 28 50 38 68 68 75 122 13 122 -100 218 -223
-                188z"/>
-                <path fill="#1e88e5" d="M5804 3651 c-49 -22 -80 -60 -95 -113 -28 -106 59 -217 170 -218 91
-                0 171 81 171 174 0 54 -16 89 -57 128 -54 51 -119 61 -189 29z"/>
-                <path fill="#1e88e5" d="M6551 3652 c-73 -37 -112 -116 -97 -197 9 -46 80 -120 126 -130 60
-                -13 121 3 161 44 89 89 70 223 -41 279 -53 26 -103 28 -149 4z"/>
-                <path fill="#666666" d="M2200 3260 l0 -340 -340 0 -340 0 2 -387 3 -388 338 -3 337 -2 0
-                -335 0 -335 390 0 390 0 2 336 3 335 321 -1 c177 0 328 2 338 6 14 6 16 43 16
-                390 l0 384 -337 2 -338 3 -3 338 -2 337 -390 0 -390 0 0 -340z"/>
-                <path fill="#1e88e5" d="M4055 1666 c-46 -21 -93 -76 -106 -127 -23 -86 24 -180 108 -215 26
-                -11 129 -14 498 -14 493 0 507 1 558 48 74 66 74 208 0 274 -52 47 -64 48
-                -560 48 -369 -1 -474 -4 -498 -14z"/>
-                <path fill="#1e88e5" d="M6200 1664 c-45 -20 -68 -41 -91 -86 -51 -100 3 -227 110 -259 24 -6
-                197 -9 507 -7 l471 3 40 28 c43 30 83 102 83 150 0 67 -45 138 -105 167 -40
-                19 -62 20 -511 20 -395 -1 -474 -3 -504 -16z"/>
-              </g>
-            </svg>
-          </button>
-          <button class="nav-btn" aria-label="Aplicaciones" data-cat="app">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>
-            </svg>
-          </button>
-          <button class="nav-btn" aria-label="Películas" data-cat="movie">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 8h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Zm0-2 2.5-3H10L7.5 6H3Zm6.5 0L12 3h4.5L14 6H9.5Zm6 0L18 3h2.5L19 6h-3.5Z"/>
-            </svg>
-          </button>
-
-  </aside>
-
   <main class="main">
     <header class="topbar">
       <div class="brand">
-        <img src="assets/images/logotopbar.png" alt="Logo de TGX GAMES" class="logo" />
+        <img src="assets/images/logotopbar.webp" alt="Logo de TGX GAMES" class="logo" decoding="async" fetchpriority="high" />
       </div>
       <div class="search-box">
         <label class="search">
@@ -107,7 +55,7 @@
     <section id="hero" class="hero card" aria-label="Destacado">
       <div class="hero-copy hero-banner">
         <div class="hero-message">
-          <h1>Descargas sin acortadores, verificadas y limpias✔️</h1>
+          <h1>Descargas sin acortadores, verificadas y limpias</h1>
           <p>Contáctanos en nuestras redes sociales para sugerir contenido o reportar problemas.</p>
           <div class="socials">
             <div class="social-bar" aria-label="Redes sociales"></div>
@@ -200,7 +148,9 @@
         <aside class="game-modal-comments" aria-label="Comentarios del juego">
           <div class="comment-tab" data-open="false">
             <button class="comment-tab-toggle" type="button" aria-expanded="false" aria-describedby="commentIntro">
-              <span>Comentarios</span>
+              <span class="comment-tab-label">Comentarios</span>
+              <span class="comment-count" aria-hidden="true">0</span>
+              <span class="sr-only comment-count-label">(0 comentarios)</span>
             </button>
             <div class="comment-tab-body" aria-hidden="true">
               <div class="comment-panel">
@@ -320,9 +270,9 @@
 
               <span class="rtb-sep"></span>
 
-              <button type="button" class="rtb-btn rtb-link"  title="Insertar enlace">🔗 Enlace</button>
+              <button type="button" class="rtb-btn rtb-link"  title="Insertar enlace">Enlace</button>
               <button type="button" class="rtb-btn rtb-video" title="Insertar video">▶ Video</button>
-              <button type="button" class="rtb-btn rtb-color" title="Color de texto">🎨 Color</button>
+              <button type="button" class="rtb-btn rtb-color" title="Color de texto">Color</button>
               <input type="color" class="rtb-color-input" value="#cfe3ff" hidden />
             </div>
 
@@ -369,7 +319,7 @@
     <div class="tw-modal" role="dialog" aria-label="Iniciar sesión administrador">
       <div class="tw-modal-content">
         <button class="tw-modal-close" aria-label="Cerrar">×</button>
-        <img class="tw-modal-image" src="assets/images/ui/admin-login.svg" alt="" />
+        <img class="tw-modal-image" src="assets/images/ui/admin-login.svg" alt="" loading="lazy" decoding="async" />
         <h2 class="tw-modal-title">Acceso administrador</h2>
         <form class="admin-login-form" autocomplete="off">
           <label>
@@ -389,6 +339,6 @@
     </div>
   </template>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=20260506-3"></script>
 </body>
 </html>

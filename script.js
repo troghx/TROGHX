@@ -12,6 +12,16 @@ const newSocialModalTemplate = document.getElementById("new-social-modal-templat
 const dmcaModalTemplate = document.getElementById("dmca-modal-template");
 const faqModalTemplate = document.getElementById("faq-modal-template");
 
+function shouldReduceMotion(){
+  return typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function motionAwareScrollBehavior(){
+  return shouldReduceMotion() ? "auto" : "smooth";
+}
+
 function initStarfield() {
   const canvas = document.getElementById("star-canvas");
   if (!canvas) return;
@@ -35,6 +45,7 @@ function initStarfield() {
     animationId: 0,
     nextShootingStarIn: 0
   };
+  let resizeTimer = 0;
 
   const ROTATION_BASE = 0.03;
   const ROTATION_VARIANCE = 0.045;
@@ -171,9 +182,11 @@ function initStarfield() {
   }
 
   function resize() {
-    state.pixelRatio = Math.min(window.devicePixelRatio || 1, 2.2);
-    state.width = window.innerWidth;
-    state.height = window.innerHeight;
+    const viewport = window.visualViewport || null;
+    state.width = Math.ceil(viewport?.width || window.innerWidth || canvas.clientWidth || 1);
+    state.height = Math.ceil(viewport?.height || window.innerHeight || canvas.clientHeight || 1);
+    const compactViewport = state.width < 640 || state.height < 640;
+    state.pixelRatio = Math.min(window.devicePixelRatio || 1, compactViewport ? 1.5 : 1.9);
     const displayWidth = Math.max(1, Math.floor(state.width * state.pixelRatio));
     const displayHeight = Math.max(1, Math.floor(state.height * state.pixelRatio));
 
@@ -188,8 +201,10 @@ function initStarfield() {
     state.shootingStars.length = 0;
     state.nextShootingStarIn = randomShootingDelay();
 
-    const density = 0.000085;
-    const target = Math.round(Math.min(360, Math.max(140, state.width * state.height * density)));
+    const density = compactViewport ? 0.00006 : 0.000085;
+    const minStars = compactViewport ? 70 : 140;
+    const maxStars = compactViewport ? 180 : 360;
+    const target = Math.round(Math.min(maxStars, Math.max(minStars, state.width * state.height * density)));
     adjustStarCount(target);
     state.stars.forEach(updateStarMetrics);
   }
@@ -257,31 +272,42 @@ function initStarfield() {
     }
   }
 
+  function syncAnimationState() {
+    const shouldRun = !(prefersReducedMotion && prefersReducedMotion.matches) &&
+      (typeof document === "undefined" || !document.hidden);
+    if (shouldRun) {
+      startAnimation();
+    } else {
+      stopAnimation();
+      paintStars(0, false);
+    }
+    canvas.style.opacity = "1";
+  }
+
+  function scheduleResize() {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      resizeTimer = 0;
+      resize();
+      paintStars(0, false);
+    }, 120);
+  }
+
   resize();
   paintStars(0, false);
   canvas.style.opacity = "1";
+  syncAnimationState();
 
-  const shouldReduceMotion = prefersReducedMotion && prefersReducedMotion.matches;
-  if (!shouldReduceMotion) {
-    startAnimation();
+  window.addEventListener("resize", scheduleResize, { passive: true });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", scheduleResize, { passive: true });
   }
-
-  window.addEventListener("resize", () => {
-    resize();
-    paintStars(0, false);
-  });
+  document.addEventListener("visibilitychange", syncAnimationState);
 
   if (prefersReducedMotion) {
-    const handler = (event) => {
-      if (event.matches) {
-        stopAnimation();
-        paintStars(0, false);
-        canvas.style.opacity = "1";
-      } else {
-        canvas.style.opacity = "1";
-        resize();
-        startAnimation();
-      }
+    const handler = () => {
+      resize();
+      syncAnimationState();
     };
 
     if (typeof prefersReducedMotion.addEventListener === "function") {
@@ -361,7 +387,7 @@ const dmcaTexts = {
 };
 
 /* ------- LocalStorage keys ------- */
-const LS_RECENTES   = "tgx_recientes";
+const LS_RECENTES   = "tgx_recientes_pages_v2";
 const LS_ADMIN      = "tgx_is_admin";
 const LS_ADMIN_HASH = "tgx_admin_hash";
 const LS_ADMIN_SALT = "tgx_admin_salt";
@@ -371,8 +397,9 @@ const LS_ADMIN_NOTIF = "tgx_admin_notifications_seen";
 const ADMIN_TOKEN_SESSION_KEY = "tgx_admin_token_session";
 
 /* ------- Cache / límites ------- */
-const POSTS_LIST_LIMIT = 120;
-const POSTS_CACHE_TTL = 1000 * 60 * 5; // 5 minutos
+const GAME_CATEGORY = "game";
+const POSTS_LIST_LIMIT = 24;
+const POSTS_CACHE_TTL = 1000 * 60 * 2; // 2 minutos
 const SOCIALS_CACHE_TTL = 1000 * 60 * 10; // 10 minutos
 
 /* ------- Endpoints ------- */
@@ -386,23 +413,16 @@ const STREAMSAVER_SRC = "https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSa
 /* ------- Estado ------- */
 let isAdmin = false;
 let recientes = [];
+let recientesTotal = 0;
+let recientesLoading = false;
+let recientesError = "";
 let socials  = [];
 let adminSessionToken = "";
-window.currentCategory = "game";
+window.currentCategory = GAME_CATEGORY;
 // Descargas en curso
 const activeDownloads = window.activeDownloads || [];
 window.activeDownloads = activeDownloads;
 let downloadsExpanded = false;
-const TOPBAR_LOGOS = {
-  game: "assets/images/logotopbar.png",
-  app: "assets/images/logotopbar.png",
-  movie: "assets/images/logotopbar.png"
-};
-const CATEGORY_LABELS = {
-  game: "Juego",
-  app: "Aplicación",
-  movie: "Película"
-};
 const PLAYER_MODE_ICONS = {
   single: "assets/images/player-modes/single.png",
   multi: "assets/images/player-modes/multi.png"
@@ -413,22 +433,13 @@ const PLAYER_MODE_LABELS = {
 };
 const ADMIN_NOTIF_LIMIT = 40;
 const ADMIN_NOTIF_POLL_INTERVAL = 45000;
-function updateTopbarLogo(cat){
-  const logoEl = document.querySelector('.topbar .logo');
-  if(!logoEl) return;
-  const src = TOPBAR_LOGOS[cat] || TOPBAR_LOGOS.game;
-  logoEl.src = src;
-  const altMap = {
-    game: 'Logo de TGX GAMES',
-    app: 'Logo de TGX APPS',
-    movie: 'Logo de TGX MOVIES'
-  };
-  logoEl.alt = altMap[cat] || altMap.game;
-}
 let PAGE_SIZE = 12;
 let page = 1;
 let searchQuery = "";
 let recientesWheelCooldownTs = 0;
+let renderRowTimer = null;
+const COVER_LAZY_ROOT_MARGIN = "240px";
+const SEARCH_RENDER_DEBOUNCE_MS = 90;
 const fullCache = new Map();
 const videoCache = new Map();
 const postsCache = new Map();
@@ -438,12 +449,11 @@ function persistPostsCache(){
   if(typeof localStorage === "undefined") return;
   try {
     const payload = {
-      version: 1,
-      lastCategory: window.currentCategory || "game",
+      version: 2,
       entries: {}
     };
     postsCache.forEach((entry, key)=>{
-      if(entry && Array.isArray(entry.data)){
+      if(entry && entry.data && Array.isArray(entry.data.items)){
         payload.entries[key] = { ts: entry.ts || 0, data: entry.data };
       }
     });
@@ -451,58 +461,34 @@ function persistPostsCache(){
   } catch (err) {}
 }
 
-function getCachedPosts(category){
-  const cat = (category || "game").toLowerCase();
-  const entry = postsCache.get(cat);
+function getPostsCacheKey({ search = "", offset = 0, limit = POSTS_LIST_LIMIT } = {}){
+  return [GAME_CATEGORY, String(search || "").trim().toLowerCase(), Math.max(0, offset), Math.max(1, limit)].join("|");
+}
+
+function getCachedPosts(cacheKey){
+  const entry = postsCache.get(cacheKey);
   if(!entry) return null;
   if(entry.ts && Date.now() - entry.ts > POSTS_CACHE_TTL){
-    postsCache.delete(cat);
+    postsCache.delete(cacheKey);
     persistPostsCache();
     return null;
   }
   return entry.data;
 }
 
-function setCachedPosts(category, data){
-  if(!Array.isArray(data)) return;
-  const cat = (category || "game").toLowerCase();
-  postsCache.set(cat, { ts: Date.now(), data });
+function setCachedPosts(cacheKey, data){
+  if(!data || !Array.isArray(data.items)) return;
+  postsCache.set(cacheKey, { ts: Date.now(), data });
   persistPostsCache();
 }
 
 function rememberCurrentCategory(){
-  if(typeof localStorage === "undefined") return;
-  try {
-    if(postsCache.size){
-      persistPostsCache();
-      return;
-    }
-
-    const raw = localStorage.getItem(LS_RECENTES);
-    if(raw){
-      try {
-        const parsed = JSON.parse(raw);
-        if(parsed && typeof parsed === "object" && !Array.isArray(parsed)){
-          parsed.lastCategory = window.currentCategory || "game";
-          if(typeof parsed.version !== "number") parsed.version = 1;
-          if(!parsed.entries || typeof parsed.entries !== "object") parsed.entries = {};
-          localStorage.setItem(LS_RECENTES, JSON.stringify(parsed));
-          return;
-        }
-      } catch(err) {}
-    }
-
-    const payload = { version: 1, lastCategory: window.currentCategory || "game", entries: {} };
-    localStorage.setItem(LS_RECENTES, JSON.stringify(payload));
-  } catch(err) {}
+  window.currentCategory = GAME_CATEGORY;
+  persistPostsCache();
 }
 
-function invalidatePostsCache(category){
-  if(typeof category === "string" && category){
-    postsCache.delete(category.toLowerCase());
-  }else{
-    postsCache.clear();
-  }
+function invalidatePostsCache(){
+  postsCache.clear();
   persistPostsCache();
 }
 
@@ -579,45 +565,22 @@ function recalcPageSize(){
 function rehydrate() {
   if(typeof localStorage === "undefined") return;
   const now = Date.now();
-  let migratePosts = false;
   try {
     const raw = localStorage.getItem(LS_RECENTES);
     if(raw){
       const parsed = JSON.parse(raw);
-      if(Array.isArray(parsed)){
-        const cat = window.currentCategory || "game";
-        postsCache.set(cat.toLowerCase(), { ts: now, data: parsed });
-        migratePosts = true;
-      }else if(parsed && typeof parsed === "object"){
-        if(typeof parsed.lastCategory === "string" && parsed.lastCategory.trim()){
-          window.currentCategory = parsed.lastCategory.trim().toLowerCase();
-        }
+      if(parsed && typeof parsed === "object" && !Array.isArray(parsed)){
         const entries = parsed.entries && typeof parsed.entries === "object" ? parsed.entries : {};
         Object.entries(entries).forEach(([key, value])=>{
-          if(!value || !Array.isArray(value.data)) return;
-          const normalizedKey = (key || "game").toLowerCase();
+          if(!value || !value.data || !Array.isArray(value.data.items)) return;
           const ts = typeof value.ts === "number" && value.ts > 0 ? value.ts : now;
-          postsCache.set(normalizedKey, { ts, data: value.data });
+          postsCache.set(key, { ts, data: value.data });
         });
       }
     }
   } catch (err) {}
 
-  const preferredKey = (window.currentCategory || "game").toLowerCase();
-  const preferredEntry = postsCache.get(preferredKey);
-  if(preferredEntry && Array.isArray(preferredEntry.data)){
-    recientes = preferredEntry.data;
-    window.currentCategory = preferredKey;
-  }else{
-    for(const [key, entry] of postsCache.entries()){
-      if(entry && Array.isArray(entry.data)){
-        recientes = entry.data;
-        window.currentCategory = key;
-        break;
-      }
-    }
-  }
-  if(migratePosts) persistPostsCache();
+  window.currentCategory = GAME_CATEGORY;
   rememberCurrentCategory();
 
   let migrateSocials = false;
@@ -657,7 +620,7 @@ function getAdminToken(){
     }
   } catch (err) {}
   if(!token){
-    // Migraci�n de sesiones antiguas: una sola vez desde localStorage.
+    // Migración de sesiones antiguas: una sola vez desde localStorage.
     try {
       token = (localStorage.getItem("tgx_admin_token") || "").trim();
       if(token){
@@ -748,8 +711,7 @@ function parseTime(value){
 }
 
 function formatCategoryLabel(cat){
-  const key = typeof cat === "string" ? cat.toLowerCase() : "";
-  return CATEGORY_LABELS[key] || CATEGORY_LABELS.game;
+  return "Juego";
 }
 
 function toHex(buf){ const v=new Uint8Array(buf); return Array.from(v).map(b=>b.toString(16).padStart(2,"0")).join(""); }
@@ -760,23 +722,49 @@ async function hashCreds(user,pin,salt){ const key=`${user}::${pin}::${salt}`; r
 /* =========================
    API: Posts
    ========================= */
-async function apiList(category = window.currentCategory, { force = false } = {}) {
-  const cat = (category || "game").toLowerCase();
+function normalizePostListPayload(payload, { limit, offset } = {}){
+  const rawItems = Array.isArray(payload) ? payload : (Array.isArray(payload?.items) ? payload.items : []);
+  const items = rawItems.map(g => ({
+    ...g,
+    category: GAME_CATEGORY,
+    link_ok: Boolean(g.link_ok),
+    drive_id: g.drive_id || extractDriveId(g.first_link)
+  }));
+  const total = Number.isFinite(Number(payload?.total))
+    ? Number(payload.total)
+    : offset + items.length;
+  return {
+    items,
+    total,
+    limit,
+    offset
+  };
+}
+
+async function apiList(category = GAME_CATEGORY, { force = false, limit = POSTS_LIST_LIMIT, offset = 0, search = "" } = {}) {
+  const normalizedLimit = Math.max(1, Math.min(parseInt(limit, 10) || POSTS_LIST_LIMIT, 48));
+  const normalizedOffset = Math.max(0, parseInt(offset, 10) || 0);
+  const normalizedSearch = String(search || "").trim();
+  const cacheKey = getPostsCacheKey({ search: normalizedSearch, offset: normalizedOffset, limit: normalizedLimit });
   if(!force){
-    const cached = getCachedPosts(cat);
+    const cached = getCachedPosts(cacheKey);
     if(cached) return cached;
   }
 
-  const qs = new URLSearchParams({ lite: "1", limit: String(POSTS_LIST_LIMIT) });
-  if(cat) qs.set("category", cat);
+  const qs = new URLSearchParams({
+    lite: "1",
+    paged: "1",
+    category: GAME_CATEGORY,
+    limit: String(normalizedLimit),
+    offset: String(normalizedOffset)
+  });
+  if(normalizedSearch) qs.set("q", normalizedSearch);
   const options = force ? { cache: "no-store" } : undefined;
   const r = await fetch(`${API_POSTS}?${qs.toString()}`, options);
   if (!r.ok) throw new Error("No se pudo listar posts");
   const j = await r.json();
-  const data = Array.isArray(j)
-    ? j.map(g => ({ ...g, link_ok: Boolean(g.link_ok), drive_id: g.drive_id || extractDriveId(g.first_link) }))
-    : j;
-  if(Array.isArray(data)) setCachedPosts(cat, data);
+  const data = normalizePostListPayload(j, { limit: normalizedLimit, offset: normalizedOffset });
+  setCachedPosts(cacheKey, data);
   return data;
 }
 async function apiCreate(data, token){
@@ -896,13 +884,26 @@ async function adminRevokeKey(id, token){
 /* =========================
    Helpers de modal / focus
    ========================= */
-function openModalFragment(fragment){ document.body.appendChild(fragment); setTimeout(()=>fragment.classList.add("active"),0); }
+function openModalFragment(fragment){
+  document.body.appendChild(fragment);
+  document.body.style.overflow = "hidden";
+  const activate = () => fragment.classList.add("active");
+  if(typeof requestAnimationFrame === "function"){
+    requestAnimationFrame(() => requestAnimationFrame(activate));
+  }else{
+    setTimeout(activate, 0);
+  }
+}
 function closeModal(modalNode, removeTrap, onEscape){
   modalNode.classList.remove("active");
-  document.body.style.overflow="";
   if(removeTrap) removeTrap();
   if(onEscape) modalNode.removeEventListener("keydown", onEscape);
-  setTimeout(()=>{ try{ modalNode.remove(); }catch (err) {} }, 250);
+  setTimeout(()=>{
+    try{ modalNode.remove(); }catch (err) {}
+    if(!document.querySelector(".tw-modal")){
+      document.body.style.overflow = "";
+    }
+  }, 250);
 }
 function trapFocus(modalNode){
   const selectors=["a[href]","button:not([disabled])","textarea:not([disabled])","input:not([disabled])","select:not([disabled])","[tabindex]:not([tabindex='-1'])"];
@@ -1308,10 +1309,169 @@ function initRichEditor(editorRoot){
 /* =========================
    GRID + Paginación (thumbs)
    ========================= */
+function cssUrlValue(src = ""){
+  const safe = String(src)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n|\r|\f/g, " ");
+  return `url("${safe}")`;
+}
+
+function loadTileCover(cover){
+  if(!cover) return;
+  const src = cover.dataset.coverSrc;
+  if(!src) return;
+  cover.style.backgroundImage = cssUrlValue(src);
+  delete cover.dataset.coverSrc;
+  cover.dataset.coverLoaded = "1";
+}
+
+function getCoverObserver(){
+  if(typeof window === "undefined" || !("IntersectionObserver" in window)) return null;
+  if(!window.__tgxCoverIO){
+    window.__tgxCoverIO = new IntersectionObserver((entries)=>{
+      for(const entry of entries){
+        if(!entry.isIntersecting) continue;
+        window.__tgxCoverIO.unobserve(entry.target);
+        loadTileCover(entry.target);
+      }
+    }, { rootMargin: COVER_LAZY_ROOT_MARGIN, threshold: 0.01 });
+  }
+  return window.__tgxCoverIO;
+}
+
+function setLazyCover(cover, src){
+  if(!cover) return;
+  const finalSrc = src || "assets/images/construction/en-proceso.svg";
+  cover.style.backgroundImage = "";
+  cover.dataset.coverLoaded = "0";
+  cover.dataset.coverSrc = finalSrc;
+  const observer = getCoverObserver();
+  if(observer){
+    observer.observe(cover);
+  }else{
+    loadTileCover(cover);
+  }
+}
+
+function cleanupGridTileResources(grid){
+  if(!grid) return;
+
+  const coverObserver = window.__tgxCoverIO;
+  if(coverObserver){
+    grid.querySelectorAll(".cover").forEach((cover)=>{
+      coverObserver.unobserve(cover);
+      delete cover.dataset.coverSrc;
+    });
+  }
+
+  const videoObserver = window.__tgxVidIO;
+  grid.querySelectorAll(".tile-video").forEach((vid)=>{
+    if(typeof vid.__cancel === "function"){
+      vid.__cancel();
+    }
+    if(videoObserver){
+      videoObserver.unobserve(vid);
+    }
+    try {
+      vid.pause();
+      vid.removeAttribute("src");
+      while(vid.firstChild) vid.removeChild(vid.firstChild);
+      vid.load();
+    } catch (err) {}
+    vid.__cancel = null;
+  });
+
+  if(window.__tgxCurrentVideo && grid.contains(window.__tgxCurrentVideo)){
+    window.__tgxCurrentVideo = null;
+  }
+}
+
+function schedulePostsLoad(keepScroll = false, delay = SEARCH_RENDER_DEBOUNCE_MS){
+  if(renderRowTimer) clearTimeout(renderRowTimer);
+  renderRowTimer = setTimeout(()=>{
+    renderRowTimer = null;
+    page = 1;
+    loadPostsPage({ keepScroll, force: true });
+  }, delay);
+}
+
 function getFilteredList(){
-  if(!searchQuery) return recientes;
-  const q = searchQuery.toLowerCase();
-  return recientes.filter(g => (g.title||"").toLowerCase().includes(q));
+  return recientes;
+}
+
+function getTotalPages(){
+  const total = Math.max(recientesTotal, recientes.length);
+  return Math.max(1, Math.ceil(total / Math.max(1, PAGE_SIZE)));
+}
+
+function renderGridState(grid, { kind = "empty", title = "", body = "", actionText = "", action = null } = {}){
+  cleanupGridTileResources(grid);
+  grid.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = `grid-state grid-state--${kind}`;
+  if(kind === "loading"){
+    wrap.innerHTML = `
+      <div class="grid-skeletons" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <strong>${escapeHtml(title || "Cargando publicaciones")}</strong>
+      <p>${escapeHtml(body || "Preparando la biblioteca…")}</p>
+    `;
+  }else{
+    const strong = document.createElement("strong");
+    strong.textContent = title;
+    const text = document.createElement("p");
+    text.textContent = body;
+    wrap.append(strong, text);
+    if(actionText && typeof action === "function"){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "grid-state-action";
+      btn.textContent = actionText;
+      btn.addEventListener("click", action);
+      wrap.appendChild(btn);
+    }
+  }
+  grid.appendChild(wrap);
+}
+
+async function loadPostsPage({ keepScroll = false, force = false } = {}){
+  recalcPageSize();
+  const totalPagesBefore = getTotalPages();
+  if(page > totalPagesBefore) page = totalPagesBefore;
+
+  recientesLoading = true;
+  recientesError = "";
+  renderRow(keepScroll);
+
+  const limit = Math.max(1, PAGE_SIZE);
+  const offset = (page - 1) * limit;
+
+  try{
+    const result = await apiList(GAME_CATEGORY, {
+      force,
+      limit,
+      offset,
+      search: searchQuery
+    });
+    recientes = result.items;
+    recientesTotal = result.total;
+    const totalPages = getTotalPages();
+    if(page > totalPages){
+      page = totalPages;
+      return loadPostsPage({ keepScroll, force });
+    }
+  }catch(e){
+    console.error("[posts page]", e);
+    recientes = [];
+    recientesTotal = 0;
+    recientesError = "No se pudieron cargar las publicaciones.";
+  }finally{
+    recientesLoading = false;
+    renderRow(keepScroll);
+    renderHeroCarousel();
+  }
 }
 function updatePager(totalPages){
   const pager  = document.getElementById("gridPager");
@@ -1428,8 +1588,7 @@ function setupRecientesWheelPager(){
   const grid = document.getElementById("gridRecientes");
   if(!grid) return;
 
-  const list = getFilteredList();
-  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const totalPages = getTotalPages();
 
   const removeHandler = () => {
     if(!grid.__wheelPagerHandler) return;
@@ -1446,8 +1605,7 @@ function setupRecientesWheelPager(){
   if(grid.__wheelPagerBound) return;
 
   const handler = (event) => {
-    const listInner = getFilteredList();
-    const totalPagesInner = Math.max(1, Math.ceil(listInner.length / PAGE_SIZE));
+    const totalPagesInner = getTotalPages();
     if(totalPagesInner <= 1){
       removeHandler();
       return;
@@ -1468,7 +1626,7 @@ function setupRecientesWheelPager(){
     }
 
     recientesWheelCooldownTs = now;
-    renderRow(true);
+    loadPostsPage({ keepScroll: true });
   };
 
   grid.__wheelPagerHandler = handler;
@@ -1479,16 +1637,59 @@ function setupRecientesWheelPager(){
 function renderRow(keepScroll=false){
   const grid = document.getElementById("gridRecientes");
   if(!grid) return;
+  if(renderRowTimer){
+    clearTimeout(renderRowTimer);
+    renderRowTimer = null;
+  }
   recalcPageSize();
 
   const list = getFilteredList();
-  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const totalPages = getTotalPages();
   if(page > totalPages) page = totalPages;
 
-  const start = (page-1) * PAGE_SIZE;
-  const slice = list.slice(start, start + PAGE_SIZE);
-
+  cleanupGridTileResources(grid);
   grid.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+
+  if(recientesLoading){
+    renderGridState(grid, { kind: "loading" });
+    updatePager(totalPages);
+    setupRecientesWheelPager();
+    return;
+  }
+
+  if(recientesError){
+    renderGridState(grid, {
+      kind: "error",
+      title: "No pudimos cargar la biblioteca",
+      body: recientesError,
+      actionText: "Reintentar",
+      action: () => loadPostsPage({ force: true })
+    });
+    updatePager(totalPages);
+    setupRecientesWheelPager();
+    return;
+  }
+
+  if(!list.length){
+    const hasSearch = Boolean(searchQuery.trim());
+    renderGridState(grid, {
+      kind: "empty",
+      title: hasSearch ? "Sin resultados" : "Sin publicaciones todavía",
+      body: hasSearch ? `No encontramos juegos para “${searchQuery.trim()}”.` : "Cuando haya juegos publicados aparecerán aquí.",
+      actionText: hasSearch ? "Limpiar búsqueda" : "",
+      action: hasSearch ? () => {
+        const input = document.getElementById("searchInput");
+        if(input) input.value = "";
+        searchQuery = "";
+        page = 1;
+        loadPostsPage({ force: true });
+      } : null
+    });
+    updatePager(totalPages);
+    setupRecientesWheelPager();
+    return;
+  }
 
   if(isAdmin){
     const addTile = document.createElement("div");
@@ -1496,12 +1697,12 @@ function renderRow(keepScroll=false){
     addTile.tabIndex = 0;
     addTile.innerHTML = "<span>+</span>";
     addTile.addEventListener("click", openNewGameModal);
-    grid.appendChild(addTile);
+    fragment.appendChild(addTile);
   }
 
   const placeholder = "assets/images/construction/en-proceso.svg";
 
-  slice.forEach((g)=>{
+  list.forEach((g)=>{
     const node = template.content.cloneNode(true);
     const tile = node.querySelector(".tile");
     const cover= node.querySelector(".cover");
@@ -1510,44 +1711,24 @@ function renderRow(keepScroll=false){
 
     title.textContent = g.title || "";
     tile.tabIndex=0;
+    tile.setAttribute("aria-label", `Abrir ${g.title || "publicación"}`);
     tile.addEventListener("click", ()=> openGameLazy(g));
 
     // Miniatura (sin pedir detalle)
-    cover.style.backgroundImage = `url(${g.image_thumb || placeholder})`;
+    setLazyCover(cover, g.image_thumb || placeholder);
 
     // Badge de estado (usando first_link/link_ok del lite)
     applyStatusBadge(tile, g.first_link || "", g.link_ok);
     applyPlayerModeBadge(tile, g);
 
-    grid.appendChild(node);
+    fragment.appendChild(node);
     attachHoverVideo(tile, g, vid);
   });
 
-  const tiles = grid.querySelectorAll('.tile');
-  const third = tiles[2];        // tercera portada (índice 2)
-  if(third && !window.__previewHintShown){
-    window.__previewHintShown = true;
-    setTimeout(()=>{
-      const bubble = document.createElement('div');
-      bubble.className = 'preview-bubble';
-      bubble.textContent = '¿Quieres ver una preview del juego? ¡Pon el mouse sobre la portada!';
-      document.body.appendChild(bubble);
-      const rect = third.getBoundingClientRect();
-      bubble.style.left = `${rect.left + rect.width/2}px`;
-      bubble.style.top  = `${rect.top}px`;
-      bubble.style.transform = 'translate(-50%, -100%)';
-      requestAnimationFrame(()=> bubble.classList.add('show'));
-      const hide = ()=>{
-        bubble.remove();
-        third.removeEventListener('pointerenter', onEnter);
-      };
-      const onEnter = ()=>{ hide(); clearTimeout(hideTimer); };
-      const hideTimer = setTimeout(hide, 8000);
-      third.addEventListener('pointerenter', onEnter, { once: true });
-    }, 3000);
-  }
+  grid.appendChild(fragment);
+
   updatePager(totalPages);
-  if(!keepScroll) grid.scrollTo({ top: 0, behavior: "smooth" });
+  if(!keepScroll) grid.scrollTo({ top: 0, behavior: motionAwareScrollBehavior() });
   setupRecientesWheelPager();
 }
 
@@ -1801,7 +1982,6 @@ function openGame(initialGame, options = {}){
   let commentTabOpenState = false;
   let commentFormExpanded = false;
   let commentTabAnimationTimer = null;
-  let commentTabHeadingTimer = null;
   let commentsState = { items: [], loading: false, error: null };
   let lastLoadedPostId = null;
   const expandedReplies = new Set();
@@ -1892,20 +2072,73 @@ function openGame(initialGame, options = {}){
     if(commentTabAnimationTimer) timerHost.clearTimeout(commentTabAnimationTimer);
     commentTabAnimationTimer = timerHost.setTimeout(()=>{
       commentTab.classList.remove(className);
-    }, isOpen ? 520 : 440);
+    }, isOpen ? 620 : 500);
   };
 
-  const setCommentTabHeaderState = (enabled, delay = 0)=>{
-    if(!commentTab) return;
-    if(commentTabHeadingTimer) timerHost.clearTimeout(commentTabHeadingTimer);
-    const apply = ()=>{
-      commentTab.classList.toggle("is-header-open", Boolean(enabled));
-      commentTabHeadingTimer = null;
+  const animateCommentRailTransition = (fromRect, isOpen)=>{
+    if(!fromRect || !commentToggle || shouldReduceMotion()) return;
+    if(commentSection?.classList.contains("is-stacked")) return;
+    const host = modalNode || document.body;
+    if(typeof document === "undefined" || typeof document.createElement !== "function") return;
+    if(typeof Element === "undefined" || typeof Element.prototype.animate !== "function") return;
+    const run = ()=>{
+      const toRect = commentToggle.getBoundingClientRect();
+      if(!toRect.width || !toRect.height || !fromRect.width || !fromRect.height) return;
+      const proxy = document.createElement("div");
+      proxy.className = "comment-rail-proxy";
+      proxy.setAttribute("aria-hidden", "true");
+      Object.assign(proxy.style, {
+        left: `${toRect.left}px`,
+        top: `${toRect.top}px`,
+        width: `${toRect.width}px`,
+        height: `${toRect.height}px`
+      });
+      host.appendChild(proxy);
+      commentTab.classList.add("is-rail-proxy-active");
+
+      const compactWidth = Math.min(56, Math.max(42, Math.min(fromRect.width, toRect.width)));
+      const compactHeight = Math.min(56, Math.max(42, Math.min(fromRect.width, toRect.height)));
+      const compactLeft = isOpen ? fromRect.left : toRect.left;
+      const compactTop = isOpen ? toRect.top : fromRect.top;
+      const firstRadius = isOpen ? "0 16px 16px 0" : "18px 18px 0 0";
+      const midRadius = "16px";
+      const finalRadius = getComputedStyle(commentToggle).borderRadius;
+      const frameFor = (rect, radius)=>({
+        transform: `translate(${rect.left - toRect.left}px, ${rect.top - toRect.top}px) scale(${rect.width / toRect.width}, ${rect.height / toRect.height})`,
+        borderRadius: radius
+      });
+      const compactFrame = frameFor({
+        left: compactLeft,
+        top: compactTop,
+        width: compactWidth,
+        height: compactHeight
+      }, midRadius);
+      const frames = isOpen
+        ? [
+            { ...frameFor(fromRect, firstRadius), offset: 0, easing: "cubic-bezier(.62, 0, .2, 1)" },
+            { ...compactFrame, offset: .42, easing: "cubic-bezier(.16, 1, .3, 1)" },
+            { ...compactFrame, offset: .52, easing: "cubic-bezier(.16, 1, .3, 1)" },
+            { ...frameFor(toRect, finalRadius), offset: 1 }
+          ]
+        : [
+            { ...frameFor(fromRect, firstRadius), offset: 0, easing: "cubic-bezier(.62, 0, .2, 1)" },
+            { ...compactFrame, offset: .44, easing: "cubic-bezier(.16, 1, .3, 1)" },
+            { ...compactFrame, offset: .52, easing: "cubic-bezier(.16, 1, .3, 1)" },
+            { ...frameFor(toRect, finalRadius), offset: 1 }
+          ];
+      const animation = proxy.animate(frames, {
+        duration: isOpen ? 620 : 500
+      });
+      const cleanup = ()=>{
+        proxy.remove();
+        commentTab.classList.remove("is-rail-proxy-active");
+      };
+      animation.finished.then(cleanup).catch(cleanup);
     };
-    if(delay > 0){
-      commentTabHeadingTimer = timerHost.setTimeout(apply, delay);
+    if(typeof timerHost?.requestAnimationFrame === "function"){
+      timerHost.requestAnimationFrame(run);
     }else{
-      apply();
+      timerHost.setTimeout(run, 0);
     }
   };
 
@@ -2051,7 +2284,7 @@ function openGame(initialGame, options = {}){
     }
     setCommentFormExpanded(true, { focus: true });
     renderComments();
-    commentForm?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    commentForm?.scrollIntoView({ behavior: motionAwareScrollBehavior(), block: "nearest" });
   };
 
   const handlePin = async (comment, shouldPin)=>{
@@ -2350,7 +2583,7 @@ function openGame(initialGame, options = {}){
         target.classList.add("is-highlighted");
         if(highlightPendingScroll){
           highlightPendingScroll = false;
-          target.scrollIntoView({ behavior: "smooth", block: "center" });
+          target.scrollIntoView({ behavior: motionAwareScrollBehavior(), block: "center" });
         }
       }
     });
@@ -2394,26 +2627,27 @@ function openGame(initialGame, options = {}){
     if(!commentTab || !commentToggle || !commentFormWrap) return;
     const isOpen = Boolean(open);
     const shouldAnimate = animate && commentTabOpenState !== isOpen;
+    const railFromRect = shouldAnimate && !commentSection?.classList.contains("is-stacked")
+      ? commentToggle.getBoundingClientRect()
+      : null;
     commentTab.dataset.open = String(isOpen);
     commentToggle.setAttribute("aria-expanded", String(isOpen));
+    commentToggle.setAttribute("aria-label", isOpen ? "Cerrar comentarios" : "Abrir comentarios");
     commentTab.classList.toggle("is-open", isOpen);
+    commentTab.classList.remove("is-header-open");
     commentTabBody?.setAttribute("aria-hidden", String(!isOpen));
     commentFormWrap.setAttribute("aria-hidden", String(!isOpen));
     if(isOpen){
-      if(shouldAnimate){
-        setCommentTabHeaderState(false);
-        setCommentTabHeaderState(true, 320);
-      }else{
-        setCommentTabHeaderState(true);
-      }
       setCommentFormExpanded(commentFormExpanded);
     }else{
-      setCommentTabHeaderState(false);
       setCommentFormExpanded(false);
     }
-    if(shouldAnimate) triggerCommentTabAnimation(isOpen);
     commentTabOpenState = isOpen;
     updateCommentLayout();
+    if(shouldAnimate){
+      triggerCommentTabAnimation(isOpen);
+      animateCommentRailTransition(railFromRect, isOpen);
+    }
   };
   setCommentTabState(false, { animate: false });
   commentToggle?.addEventListener("click", ()=>{
@@ -2617,7 +2851,7 @@ function openGame(initialGame, options = {}){
 
     const bubble = document.createElement("div");
     bubble.className = "discord-bubble";
-    bubble.textContent = "Preguntas?🤨 pásate por el Discord";
+    bubble.textContent = "¿Preguntas? pásate por Discord";
     ctaWrap.appendChild(bubble);
 
     modalContent.appendChild(ctaWrap);
@@ -2642,25 +2876,6 @@ function deleteGame(game){
 }
 
 /* =========================
-   Selector de categoría
-   ========================= */
-function makeCategorySelect(current="game"){
-  const wrap=document.createElement("label");
-  wrap.style.display="block";
-  wrap.style.marginTop=".6rem";
-  wrap.innerHTML=`
-    <span style="display:block;font-size:.85rem;opacity:.8;margin-bottom:.25rem">Tipo</span>
-    <select class="cat-select" style="width:100%;background:#11161b;border:1px solid #2a323a;border-radius:10px;padding:.6rem .7rem;color:#cfe3ff">
-      <option value="game">Juego</option>
-      <option value="app">App</option>
-      <option value="movie">Película</option>
-    </select>
-  `;
-  wrap.querySelector("select").value = current || "game";
-  return wrap;
-}
-
-/* =========================
    Nuevo / Editar (genera thumb + link_ok)
    ========================= */
 function initGameModal(initial = {}){
@@ -2678,54 +2893,17 @@ function initGameModal(initial = {}){
   const editorRoot = fragment.querySelector(".rich-editor");
   const editorAPI  = initRichEditor(editorRoot);
 
-  const catSel = makeCategorySelect(initial.category || "game");
-  form.querySelector(".new-game-title")?.parentElement?.appendChild(catSel);
-
-  const catSelectEl = catSel.querySelector(".cat-select");
-
-  let lastPlayerModeValue = initial.playerMode || playerModeSelect?.value || "single";
-  if(playerModeSelect){
-    if(playerModeSelect.querySelector(`option[value="${lastPlayerModeValue}"]`)){
-      playerModeSelect.value = lastPlayerModeValue;
-    }else if(playerModeSelect.options.length){
-      playerModeSelect.value = playerModeSelect.options[0].value;
-      lastPlayerModeValue = playerModeSelect.value;
-    }
-    playerModeSelect.addEventListener("change", (e)=>{
-      lastPlayerModeValue = e.target.value;
-    });
+  if(playerModeField){
+    playerModeField.hidden = false;
+    playerModeField.setAttribute("aria-hidden", "false");
   }
-
-  const updatePlayerModeVisibility = (catValue)=>{
-    if(!playerModeField) return;
-    const isGame = catValue === "game";
-    if(isGame){
-      playerModeField.hidden = false;
-      playerModeField.setAttribute("aria-hidden", "false");
-      if(playerModeSelect){
-        playerModeSelect.disabled = false;
-        const option = playerModeSelect.querySelector(`option[value="${lastPlayerModeValue}"]`);
-        if(option){
-          playerModeSelect.value = lastPlayerModeValue;
-        }else if(playerModeSelect.options.length){
-          playerModeSelect.value = playerModeSelect.options[0].value;
-          lastPlayerModeValue = playerModeSelect.value;
-        }
-      }
-    }else{
-      if(playerModeSelect){
-        lastPlayerModeValue = playerModeSelect.value || lastPlayerModeValue;
-        playerModeSelect.value = "";
-        playerModeSelect.disabled = true;
-      }
-      playerModeField.hidden = true;
-      playerModeField.setAttribute("aria-hidden", "true");
+  if(playerModeSelect){
+    playerModeSelect.disabled = false;
+    const value = initial.playerMode || playerModeSelect.value || "single";
+    if(playerModeSelect.querySelector(`option[value="${value}"]`)){
+      playerModeSelect.value = value;
     }
-  };
-
-  catSelectEl?.addEventListener("change", (e)=> updatePlayerModeVisibility(e.target.value));
-
-  updatePlayerModeVisibility(catSelectEl?.value || "game");
+  }
 
   if(trailerUrlInput){
     trailerUrlInput.value=""; trailerUrlInput.disabled=true;
@@ -2736,7 +2914,7 @@ function initGameModal(initial = {}){
   if(initial.description) editorAPI.setHTML(initial.description);
   if(imageInput && initial.image !== undefined) imageInput.required=false;
 
-  return { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, playerModeField, playerModeSelect };
+  return { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, playerModeField, playerModeSelect };
 }
 
 async function compressCoverAndThumb(imageFile){
@@ -2753,15 +2931,15 @@ async function readTrailerFile(trailerFile){
 }
 
 async function gatherGameData(refs, { requireImage=true } = {}){
-  const { titleInput, imageInput, trailerFileInput, editorAPI, catSel, playerModeSelect } = refs;
+  const { titleInput, imageInput, trailerFileInput, editorAPI, playerModeSelect } = refs;
 
   const title=(titleInput?.value||"").trim();
   const descHTML=editorAPI.getHTML();
   const imageFile=imageInput?.files?.[0] || null;
   const trailerFile=trailerFileInput?.files?.[0] || null;
-  const category = catSel.querySelector(".cat-select")?.value || "game";
+  const category = GAME_CATEGORY;
   const rawPlayerMode = playerModeSelect && !playerModeSelect.disabled ? playerModeSelect.value || "" : "";
-  const playerMode = category === "game" && rawPlayerMode ? rawPlayerMode : null;
+  const playerMode = rawPlayerMode || null;
 
   if(!title){ alert("Título es obligatorio."); titleInput?.focus?.(); return null; }
   if(requireImage && !imageFile){ alert("Selecciona una imagen de portada."); imageInput?.focus?.(); return null; }
@@ -2791,7 +2969,7 @@ async function gatherGameData(refs, { requireImage=true } = {}){
 
 function openNewGameModal(){
   const refs = initGameModal();
-  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, playerModeSelect, playerModeField } = refs;
+  const { node, form, modalClose } = refs;
 
   const removeTrap=trapFocus(node);
   const onEscape=(e)=>{ if(e.key==="Escape") closeModal(node, removeTrap, onEscape); };
@@ -2831,7 +3009,7 @@ function openNewGameModal(){
 }
 function openEditGame(original){
   const refs = initGameModal(original);
-  const { node, form, titleInput, imageInput, trailerFileInput, modalClose, editorAPI, catSel, playerModeSelect, playerModeField  } = refs;
+  const { node, form, trailerFileInput, modalClose } = refs;
 
   let clearTrailerCb=null;
   {
@@ -2928,7 +3106,14 @@ function renderSocialBar(){
     wrap.className="social-tile-wrap"; wrap.style.position="relative"; wrap.style.display="inline-block";
     const a=document.createElement("a"); a.href=s.url; a.target="_blank"; a.rel="noopener";
     const tile=document.createElement("div"); tile.className="social-tile";
-    const img=document.createElement("img"); img.src=s.image; img.className="social-img";
+    const img=document.createElement("img");
+    img.src=s.image;
+    img.className="social-img";
+    img.alt=s.name || "Red social";
+    img.decoding="async";
+    img.fetchPriority="low";
+    img.width=64;
+    img.height=64;
     tile.appendChild(img); a.appendChild(tile); wrap.appendChild(a);
     if(isAdmin && s.id){
       const del=document.createElement("button");
@@ -3050,8 +3235,8 @@ async function openFaqEditor(){
             <span class="rtb-sep"></span>
             <button type="button" class="rtb-btn" data-list="ul">• Lista</button>
             <span class="rtb-sep"></span>
-            <button type="button" class="rtb-btn rtb-link">🔗 Enlace</button>
-            <button type="button" class="rtb-btn rtb-color">🎨 Color</button>
+            <button type="button" class="rtb-btn rtb-link">Enlace</button>
+            <button type="button" class="rtb-btn rtb-color">Color</button>
             <input type="color" class="rtb-color-input" value="#cfe3ff" hidden />
           </div>
           <div class="editor-area" contenteditable="true" aria-label="FAQ contenido"></div>
@@ -3098,7 +3283,7 @@ async function openFaqEditor(){
 }
 
 /* =========================
-   Búsqueda + SideNav
+   Búsqueda
    ========================= */
 function setupSearch(){
   const input=document.getElementById("searchInput");
@@ -3106,7 +3291,7 @@ function setupSearch(){
   input.addEventListener("input", ()=>{
     searchQuery = input.value.trim();
     page = 1;
-    renderRow();
+    schedulePostsLoad();
   });
 }
 
@@ -3124,141 +3309,6 @@ function setupFaqButton(){
   btn.addEventListener('click', ()=>{
     openFaqModal();
   });
-}
-
-function isMobileNavViewport(){
-  return typeof window !== "undefined"
-    && typeof window.matchMedia === "function"
-    && window.matchMedia("(max-width: 760px)").matches;
-}
-
-function setDesktopSideNavCollapsed(collapsed){
-  const rail = document.querySelector(".side-nav");
-  const isCollapsed = Boolean(collapsed);
-  rail?.classList.toggle("is-collapsed", isCollapsed);
-  document.body.classList.toggle("nav-collapsed", isCollapsed);
-}
-
-function setMobileSideNavOpen(open){
-  const rail = document.querySelector(".side-nav");
-  const brand = document.querySelector(".topbar .brand");
-  const isOpen = Boolean(open);
-  rail?.classList.toggle("is-mobile-open", isOpen);
-  document.body.classList.toggle("mobile-nav-open", isOpen);
-  if(brand){
-    brand.classList.toggle("is-mobile-open", isOpen);
-    if(brand.getAttribute("role") === "button"){
-      brand.setAttribute("aria-expanded", String(isOpen));
-    }
-  }
-}
-
-function setupSideNav(){
-  const btns = Array.from(document.querySelectorAll('.side-nav .nav-btn'));
-  if(!btns.length) return;
-
-  function setActive(cat){
-    btns.forEach(b=> b.classList.toggle("active", (b.dataset.cat||"game")===cat));
-    updateTopbarLogo(cat);
-  }
-
-  btns.forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      const cat = btn.dataset.cat || "game";
-      if(window.currentCategory === cat) return;
-      window.currentCategory = cat;
-      setActive(cat);
-      rememberCurrentCategory();
-      try{
-        const data = await apiList(cat);
-        recientes = Array.isArray(data)?data:[];
-        page = 1;
-        renderRow();
-        renderHeroCarousel();
-        if(isMobileNavViewport()){
-          setMobileSideNavOpen(false);
-        }else{
-          setDesktopSideNavCollapsed(true);
-        }
-      }catch(e){ console.error("[nav]", e); }
-    });
-  });
-
-  setActive(window.currentCategory || "game");
-}
-
-function setupMobileNavToggle(){
-  const rail = document.querySelector(".side-nav");
-  const brand = document.querySelector(".topbar .brand");
-  if(!rail || !brand || typeof window.matchMedia !== "function") return;
-
-  const query = window.matchMedia("(max-width: 760px)");
-  let desktopCollapsed = true;
-
-  const updateBrandA11y = ()=>{
-    const expanded = query.matches
-      ? rail.classList.contains("is-mobile-open")
-      : !rail.classList.contains("is-collapsed");
-    brand.setAttribute("aria-expanded", String(expanded));
-    brand.setAttribute("aria-label", expanded ? "Ocultar menú de navegación" : "Mostrar menú de navegación");
-  };
-
-  const applyViewportState = ()=>{
-    brand.setAttribute("role", "button");
-    brand.setAttribute("tabindex", "0");
-    brand.setAttribute("aria-haspopup", "true");
-    if(query.matches){
-      setDesktopSideNavCollapsed(false);
-      setMobileSideNavOpen(false);
-    }else{
-      setMobileSideNavOpen(false);
-      setDesktopSideNavCollapsed(desktopCollapsed);
-    }
-    updateBrandA11y();
-  };
-
-  const toggleFromBrand = (ev)=>{
-    ev.preventDefault();
-    if(query.matches){
-      const isOpen = rail.classList.contains("is-mobile-open");
-      setMobileSideNavOpen(!isOpen);
-    }else{
-      desktopCollapsed = !rail.classList.contains("is-collapsed");
-      setDesktopSideNavCollapsed(desktopCollapsed);
-    }
-    updateBrandA11y();
-  };
-
-  brand.addEventListener("click", toggleFromBrand);
-  brand.addEventListener("keydown", (ev)=>{
-    if(ev.key === "Enter" || ev.key === " "){
-      toggleFromBrand(ev);
-    }
-  });
-
-  document.addEventListener("click", (ev)=>{
-    if(!query.matches) return;
-    if(!rail.classList.contains("is-mobile-open")) return;
-    const target = ev.target;
-    if(rail.contains(target) || brand.contains(target)) return;
-    setMobileSideNavOpen(false);
-    updateBrandA11y();
-  });
-
-  document.addEventListener("keydown", (ev)=>{
-    if(ev.key === "Escape" && query.matches){
-      setMobileSideNavOpen(false);
-      updateBrandA11y();
-    }
-  });
-
-  if(typeof query.addEventListener === "function"){
-    query.addEventListener("change", applyViewportState);
-  }else if(typeof query.addListener === "function"){
-    query.addListener(applyViewportState);
-  }
-
-  applyViewportState();
 }
 
 /* =========================
@@ -4533,24 +4583,10 @@ async function openAdminCenter(){
    Carga inicial
    ========================= */
 async function reloadData(){
-  try{ const data=await apiList(window.currentCategory, { force: true }); recientes=Array.isArray(data)?data:[]; }
-  catch(e){ console.error("[reload posts]", e); recientes=[]; }
-  renderRow();
-  renderHeroCarousel();
+  await loadPostsPage({ force: true });
 }
 async function initData(){
-  const postsPromise = (async ()=>{
-    try{
-      const data = await apiList(window.currentCategory);
-      recientes = Array.isArray(data)?data:[];
-    }catch(e){
-      console.error("[initData posts]", e);
-      recientes = [];
-    }finally{
-      renderRow();
-      renderHeroCarousel();
-    }
-  })();
+  const postsPromise = loadPostsPage();
 
   renderSocialBar();
   const socialsPromise = (async ()=>{
@@ -4569,8 +4605,6 @@ async function initData(){
   setupDmcaButton();
   setupFaqButton();
   setupAdminButton();
-  setupSideNav();
-  setupMobileNavToggle();
 
   await Promise.allSettled([postsPromise, socialsPromise]);
 }
@@ -4579,26 +4613,16 @@ let resizeRenderTimer = null;
 window.addEventListener('resize', ()=>{
   if(resizeRenderTimer) clearTimeout(resizeRenderTimer);
   resizeRenderTimer = setTimeout(()=>{
+    const prevPageSize = PAGE_SIZE;
     recalcPageSize();
-    renderRow(true);
+    if(prevPageSize !== PAGE_SIZE){
+      loadPostsPage({ keepScroll: true });
+    }else{
+      renderRow(true);
+    }
   }, 120);
 });
 initData();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
