@@ -1,4 +1,5 @@
 // netlify/functions/admins.js
+import { timingSafeEqual } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 import { json as baseJson } from "./utils.js";
 
@@ -9,6 +10,10 @@ const DB_URL =
 
 const sql = DB_URL ? neon(DB_URL) : null;
 let schemaReady = false;
+const rateBuckets = new Map();
+const RATE_WINDOW_MS = 60 * 1000;
+const LOGIN_RATE_LIMIT = 10;
+const CREATE_GATE_RATE_LIMIT = 6;
 
 const json = (status, data, extra = {}) =>
   baseJson(status, data, {
@@ -37,11 +42,45 @@ function getIdFromPath(path) {
   const id = idx >= 0 ? parts[idx + 1] : null;
   return id || null;
 }
+
+function getAdminCreatePin() {
+  return String(process.env.ADMIN_CREATE_PIN || process.env.ADMIN_CREATION_PIN || "").trim();
+}
+
+function safeCompareSecret(received, expected) {
+  const a = Buffer.from(String(received || "").trim());
+  const b = Buffer.from(String(expected || "").trim());
+  if (!a.length || !b.length || a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+function clientKey(event, scope) {
+  const forwarded = event.headers?.["x-forwarded-for"] || event.headers?.["client-ip"] || "";
+  const ip = String(forwarded).split(",")[0].trim() || event.headers?.["x-nf-client-connection-ip"] || "unknown";
+  return `${scope}:${ip}`;
+}
+
+function checkRateLimit(event, scope, limit) {
+  const key = clientKey(event, scope);
+  const now = Date.now();
+  const current = rateBuckets.get(key);
+  if (!current || now > current.resetAt) {
+    rateBuckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return null;
+  }
+  current.count += 1;
+  if (current.count > limit) {
+    const retryAfter = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
+    return json(429, { ok: false, error: "Demasiados intentos. Espera un minuto." }, { "Retry-After": String(retryAfter) });
+  }
+  return null;
+}
+
 function requireBearer(event) {
   const auth = event.headers?.authorization || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
   const envToken = process.env.AUTH_TOKEN || "";
-  if (!envToken || token !== envToken) {
+  if (!envToken || !safeCompareSecret(token, envToken)) {
     return { ok: false, res: json(401, { error: "Unauthorized" }) };
   }
   return { ok: true };
@@ -50,6 +89,33 @@ function requireBearer(event) {
 export async function handler(event) {
   try {
     if (event.httpMethod === "OPTIONS") return json(204, {});
+
+    // POST /admins/create-gate  => {pin} -> {ok:true/false}
+    if (event.httpMethod === "POST" && event.path.endsWith("/admins/create-gate")) {
+      const limited = checkRateLimit(event, "admin-create-gate", CREATE_GATE_RATE_LIMIT);
+      if (limited) return limited;
+      let body = {};
+      try {
+        body = JSON.parse(event.body || "{}");
+      } catch (_) {
+        return json(400, { ok: false, error: "invalid json" });
+      }
+      const expectedPin = getAdminCreatePin();
+      if (!expectedPin) {
+        return json(500, { ok: false, error: "Admin create PIN not configured" });
+      }
+      if (!safeCompareSecret(body.pin, expectedPin)) {
+        return json(401, { ok: false, error: "PIN incorrecto" });
+      }
+      return json(200, { ok: true });
+    }
+
+    // GET /admins/session => valida AUTH_TOKEN sin exponer datos
+    if (event.httpMethod === "GET" && event.path.endsWith("/admins/session")) {
+      const g = requireBearer(event); if (!g.ok) return g.res;
+      return json(200, { ok: true });
+    }
+
     if (!sql) return json(500, { error: "DB not configured" });
 
     if (!schemaReady) {
@@ -59,6 +125,8 @@ export async function handler(event) {
 
     // POST /admins/login  => {keyHash}  -> {ok:true/false}
     if (event.httpMethod === "POST" && event.path.endsWith("/admins/login")) {
+      const limited = checkRateLimit(event, "admin-login", LOGIN_RATE_LIMIT);
+      if (limited) return limited;
       let body = {};
       try {
         body = JSON.parse(event.body || "{}");
@@ -67,6 +135,7 @@ export async function handler(event) {
       }
       const keyHash = (body.keyHash || "").trim();
       if (!keyHash) return json(400, { ok: false, error: "missing keyHash" });
+      if (!/^[a-f0-9]{64}$/i.test(keyHash)) return json(200, { ok: false });
       const rows =
         await sql`SELECT id, revoked_at FROM admin_keys WHERE key_hash = ${keyHash} LIMIT 1`;
       const ok = rows.length > 0 && rows[0].revoked_at == null;

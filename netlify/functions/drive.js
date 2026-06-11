@@ -130,7 +130,7 @@ export async function handler(event) {
       }
     }
 
-    // ---- GET FILE META ----
+    // ---- GET FILE META / RECORD COMPLETED DOWNLOAD ----
     if (p.id) {
       const fileId = String(p.id).trim();
       try {
@@ -139,7 +139,8 @@ export async function handler(event) {
           fields: "id,name,size,mimeType",
         });
         const name = file.data?.name || null;
-        if (sql) {
+        const shouldLog = p.log === "1" || p.log === "true";
+        if (shouldLog && sql) {
           if (!schemaReady) {
             await ensureSchema();
             schemaReady = true;

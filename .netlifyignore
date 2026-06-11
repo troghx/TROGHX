@@ -1,8 +1,5 @@
-# Local Netlify folder
-.netlify
 .env
 .env.*
 .admin-reset.env
-!.env.example
 node_modules/
 ADMIN-CREDENTIALS.local.txt

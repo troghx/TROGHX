@@ -18,9 +18,35 @@ function shouldReduceMotion(){
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+function ensureCommentGooeyFilter(){
+  if(typeof document === "undefined") return;
+  if(document.getElementById("comment-gooey-filter-svg")) return;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.id = "comment-gooey-filter-svg";
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  svg.setAttribute("width", "0");
+  svg.setAttribute("height", "0");
+  svg.style.position = "absolute";
+  svg.style.width = "0";
+  svg.style.height = "0";
+  svg.style.overflow = "hidden";
+  svg.innerHTML = `
+    <defs>
+      <filter id="comment-gooey-filter">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur"></feGaussianBlur>
+        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" result="goo"></feColorMatrix>
+        <feComposite in="SourceGraphic" in2="goo" operator="atop"></feComposite>
+      </filter>
+    </defs>
+  `;
+  document.body?.appendChild(svg);
+}
+
 function motionAwareScrollBehavior(){
   return shouldReduceMotion() ? "auto" : "smooth";
 }
+
 
 function initStarfield() {
   const canvas = document.getElementById("star-canvas");
@@ -395,6 +421,340 @@ const LS_ADMIN_USER = "tgx_admin_user";
 const LS_SOCIALS    = "tgx_socials";
 const LS_ADMIN_NOTIF = "tgx_admin_notifications_seen";
 const ADMIN_TOKEN_SESSION_KEY = "tgx_admin_token_session";
+const LS_LANG = "tgx_lang";
+
+const I18N = {
+  es: {
+    "lang.toggle": "Cambiar idioma",
+    "search.placeholder": "Buscar juegos…",
+    "search.aria": "Buscar",
+    "nav.faq": "FAQ",
+    "hero.title": "Juegos listos para descargar, sin vueltas",
+    "hero.subtitle": "Contenido revisado, enlaces claros y soporte directo con la comunidad TGX.",
+    "section.recent": "Recientes",
+    "footer.disclaimer": "TGX no aloja archivos. Organizamos enlaces públicos y reportes de la comunidad.",
+    "pager.initial": "Página 1 de 1",
+    "pager.current": "Página {page} de {total}",
+    "downloads.title": "Descargas",
+    "downloads.activeAria": "Descargas, {count} en progreso",
+    "game.open": "Abrir juego",
+    "game.openNamed": "Abrir {title}",
+    "game.ready": "Listo para jugar",
+    "game.available": "Disponible",
+    "game.verify": "Verificar",
+    "mode.single": "Un jugador",
+    "mode.multi": "Multijugador",
+    "game.moreContent": "Bajar para ver más contenido",
+    "game.addTitle": "Publicar juego",
+    "game.titleField": "Título",
+    "game.mode": "Modo de juego",
+    "game.description": "Descripción",
+    "game.cover": "Imagen de portada",
+    "game.trailerFile": "Trailer (archivo .mp4, opcional)",
+    "game.trailerUrl": "URL del trailer (opcional)",
+    "game.publish": "Publicar",
+    "modal.close": "Cerrar",
+    "common.save": "Guardar",
+    "common.cancel": "Cancelar",
+    "common.retry": "Reintentar",
+    "common.urlPlaceholder": "https://...",
+    "comments.area": "Comentarios del juego",
+    "comments.title": "Comentarios",
+    "comments.help": "Comparte tu experiencia con otros jugadores.",
+    "comments.retryAria": "Reintentar carga de comentarios",
+    "comments.empty": "Todavía no hay comentarios.",
+    "comments.comment": "Comentar",
+    "comments.hideBox": "Ocultar cuadro de comentario",
+    "comments.replying": "Respondiendo a",
+    "comments.fieldComment": "Comentario",
+    "comments.placeholder": "Escribe tu comentario…",
+    "comments.alias": "Alias",
+    "comments.aliasPlaceholder": "Tu nickname",
+    "comments.email": "Correo",
+    "comments.emailPlaceholder": "tucorreo@example.com",
+    "comments.publish": "Publicar",
+    "comments.countZero": "Sin comentarios",
+    "comments.countOne": "1 comentario",
+    "comments.countMany": "{count} comentarios",
+    "comments.loading": "Cargando comentarios…",
+    "comments.loadError": "No se pudieron cargar los comentarios.",
+    "admin.loginAria": "Iniciar sesión como administrador",
+    "admin.notifications": "Notificaciones",
+    "admin.refresh": "Actualizar",
+    "admin.noNewComments": "Sin comentarios nuevos.",
+    "admin.menuTitle": "Menú administrador",
+    "admin.loginTitle": "Iniciar sesión administrador",
+    "admin.accessTitle": "Acceso administrador",
+    "admin.user": "Usuario",
+    "admin.pinHint": "PIN numérico de 4 a 6 dígitos.",
+    "admin.enter": "Entrar",
+    "admin.accessKey": "Llave de acceso",
+    "admin.accessHint": "Se valida contra el servidor y puede revocarse.",
+    "admin.authTokenHint": "Sólo se guarda en esta pestaña para crear, editar o borrar.",
+    "admin.createToggle": "Crear o cambiar usuario local",
+    "admin.createPin": "PIN de creación",
+    "admin.validatePin": "Validar PIN",
+    "admin.createUser": "Crear usuario",
+    "admin.confirmPin": "Confirmar PIN",
+    "admin.confirmPinHint": "Repite el PIN local de 4 a 6 dígitos.",
+    "admin.createTitle": "Crear usuario administrador",
+    "admin.enterTitle": "Entrar como administrador",
+    "admin.verifyTitle": "Verificación administrador",
+    "admin.defineLocal": "Define el usuario local de este dispositivo y valida la llave del servidor.",
+    "admin.savedPrompt": "Ingresa tu usuario local, PIN, llave de acceso y AUTH_TOKEN de sesión.",
+    "admin.firstSetup": "Primero valida el PIN de creación para configurar este dispositivo.",
+    "admin.setupUser": "Configurar usuario administrador",
+    "admin.pinValidated": "PIN validado.",
+    "admin.validating": "Validando...",
+    "admin.entering": "Admin verificado. Entrando...",
+    "admin.createdEntering": "Usuario creado. Entrando...",
+    "admin.createAndEnter": "Crear y entrar",
+    "admin.logout": "Cerrar sesión",
+    "admin.keys": "Ver llaves de acceso",
+    "admin.forget": "Olvidar este dispositivo",
+    "social.addTitle": "Gestionar red social",
+    "social.name": "Nombre (opcional)",
+    "social.namePlaceholder": "Instagram, X, TikTok…",
+    "social.image": "Imagen de la red (icono o logo)",
+    "social.imageHint": "Se recomienda imagen cuadrada. Se ajustará al cuadro con recorte.",
+    "social.url": "Enlace a la red",
+    "dmca.notice": "Aviso DMCA",
+    "drive.helper": "Asistente de publicación con Drive",
+    "drive.title": "Asistente Drive",
+    "drive.copy": "Para contenido autorizado: crea carpeta, sube el archivo y pega aquí el ID.",
+    "drive.openRoot": "Abrir Drive raíz",
+    "drive.idOrUrl": "ID o URL de Drive",
+    "drive.type": "Tipo",
+    "drive.folder": "Carpeta",
+    "drive.file": "Archivo",
+    "drive.buttonText": "Texto del botón",
+    "drive.insertLink": "Insertar link Drive",
+    "drive.insertTemplate": "Insertar plantilla",
+    "editor.font": "Fuente",
+    "editor.list": "• Lista",
+    "editor.link": "Enlace",
+    "editor.video": "▶ Video",
+    "editor.color": "Color",
+    "grid.loadErrorTitle": "No pudimos cargar la biblioteca",
+    "grid.retry": "Reintentar",
+    "grid.noResults": "Sin resultados",
+    "grid.emptyTitle": "Sin publicaciones todavía",
+    "grid.noResultsBody": "No encontramos juegos para “{query}”.",
+    "grid.emptyBody": "Cuando haya juegos publicados aparecerán aquí.",
+    "grid.clearSearch": "Limpiar búsqueda"
+  },
+  en: {
+    "lang.toggle": "Change language",
+    "search.placeholder": "Search games…",
+    "search.aria": "Search",
+    "nav.faq": "FAQ",
+    "hero.title": "Games ready to download, no runaround",
+    "hero.subtitle": "Reviewed content, clear links, and direct support from the TGX community.",
+    "section.recent": "Recent",
+    "footer.disclaimer": "TGX does not host files. We organize public links and community reports.",
+    "pager.initial": "Page 1 of 1",
+    "pager.current": "Page {page} of {total}",
+    "downloads.title": "Downloads",
+    "downloads.activeAria": "Downloads, {count} in progress",
+    "game.open": "Open game",
+    "game.openNamed": "Open {title}",
+    "game.ready": "Ready to play",
+    "game.available": "Available",
+    "game.verify": "Verify",
+    "mode.single": "Single player",
+    "mode.multi": "Multiplayer",
+    "game.moreContent": "Scroll for more content",
+    "game.addTitle": "Publish game",
+    "game.titleField": "Title",
+    "game.mode": "Game mode",
+    "game.description": "Description",
+    "game.cover": "Cover image",
+    "game.trailerFile": "Trailer (.mp4 file, optional)",
+    "game.trailerUrl": "Trailer URL (optional)",
+    "game.publish": "Publish",
+    "modal.close": "Close",
+    "common.save": "Save",
+    "common.cancel": "Cancel",
+    "common.retry": "Retry",
+    "common.urlPlaceholder": "https://...",
+    "comments.area": "Game comments",
+    "comments.title": "Comments",
+    "comments.help": "Share your experience with other players.",
+    "comments.retryAria": "Retry loading comments",
+    "comments.empty": "No comments yet.",
+    "comments.comment": "Comment",
+    "comments.hideBox": "Hide comment box",
+    "comments.replying": "Replying to",
+    "comments.fieldComment": "Comment",
+    "comments.placeholder": "Write your comment…",
+    "comments.alias": "Alias",
+    "comments.aliasPlaceholder": "Your nickname",
+    "comments.email": "Email",
+    "comments.emailPlaceholder": "you@example.com",
+    "comments.publish": "Publish",
+    "comments.countZero": "No comments",
+    "comments.countOne": "1 comment",
+    "comments.countMany": "{count} comments",
+    "comments.loading": "Loading comments…",
+    "comments.loadError": "Comments could not be loaded.",
+    "admin.loginAria": "Sign in as admin",
+    "admin.notifications": "Notifications",
+    "admin.refresh": "Refresh",
+    "admin.noNewComments": "No new comments.",
+    "admin.menuTitle": "Admin menu",
+    "admin.loginTitle": "Admin sign in",
+    "admin.accessTitle": "Admin access",
+    "admin.user": "User",
+    "admin.pinHint": "4 to 6 digit numeric PIN.",
+    "admin.enter": "Enter",
+    "admin.accessKey": "Access key",
+    "admin.accessHint": "Validated server-side and revocable.",
+    "admin.authTokenHint": "Only stored in this tab to create, edit, or delete.",
+    "admin.createToggle": "Create or change local user",
+    "admin.createPin": "Creation PIN",
+    "admin.validatePin": "Validate PIN",
+    "admin.createUser": "Create user",
+    "admin.confirmPin": "Confirm PIN",
+    "admin.confirmPinHint": "Repeat the local 4 to 6 digit PIN.",
+    "admin.createTitle": "Create admin user",
+    "admin.enterTitle": "Sign in as admin",
+    "admin.verifyTitle": "Admin verification",
+    "admin.defineLocal": "Set the local user for this device and validate the server key.",
+    "admin.savedPrompt": "Enter your local user, PIN, access key, and session AUTH_TOKEN.",
+    "admin.firstSetup": "Validate the creation PIN first to configure this device.",
+    "admin.setupUser": "Configure admin user",
+    "admin.pinValidated": "PIN validated.",
+    "admin.validating": "Validating...",
+    "admin.entering": "Admin verified. Entering...",
+    "admin.createdEntering": "User created. Entering...",
+    "admin.createAndEnter": "Create and enter",
+    "admin.logout": "Sign out",
+    "admin.keys": "View access keys",
+    "admin.forget": "Forget this device",
+    "social.addTitle": "Manage social link",
+    "social.name": "Name (optional)",
+    "social.namePlaceholder": "Instagram, X, TikTok…",
+    "social.image": "Social image (icon or logo)",
+    "social.imageHint": "Square image recommended. It will be cropped to fit.",
+    "social.url": "Social link",
+    "dmca.notice": "DMCA notice",
+    "drive.helper": "Drive publishing assistant",
+    "drive.title": "Drive assistant",
+    "drive.copy": "For authorized content: create a folder, upload the file, and paste the ID here.",
+    "drive.openRoot": "Open Drive root",
+    "drive.idOrUrl": "Drive ID or URL",
+    "drive.type": "Type",
+    "drive.folder": "Folder",
+    "drive.file": "File",
+    "drive.buttonText": "Button text",
+    "drive.insertLink": "Insert Drive link",
+    "drive.insertTemplate": "Insert template",
+    "editor.font": "Font",
+    "editor.list": "• List",
+    "editor.link": "Link",
+    "editor.video": "▶ Video",
+    "editor.color": "Color",
+    "grid.loadErrorTitle": "We couldn't load the library",
+    "grid.retry": "Retry",
+    "grid.noResults": "No results",
+    "grid.emptyTitle": "No posts yet",
+    "grid.noResultsBody": "No games matched “{query}”.",
+    "grid.emptyBody": "Published games will appear here.",
+    "grid.clearSearch": "Clear search"
+  }
+};
+
+let currentLang = "es";
+
+function formatText(value, replacements = {}){
+  return String(value || "").replace(/\{(\w+)\}/g, (_, key)=> replacements[key] ?? "");
+}
+
+function t(key, replacements = {}){
+  const dict = I18N[currentLang] || I18N.es;
+  return formatText(dict[key] || I18N.es[key] || key, replacements);
+}
+
+function readLanguage(){
+  try{
+    const saved = localStorage.getItem(LS_LANG);
+    if(saved === "en" || saved === "es") return saved;
+  }catch(err){}
+  return "es";
+}
+
+function applyLanguage(root = document){
+  if(!root || typeof root.querySelectorAll !== "function") return;
+  const scope = root;
+  const collect = (selector)=> {
+    const items = Array.from(scope.querySelectorAll(selector));
+    if(scope.nodeType === 1 && scope.matches?.(selector)) items.unshift(scope);
+    return items;
+  };
+  collect("[data-i18n]").forEach((el)=>{
+    el.textContent = t(el.dataset.i18n);
+  });
+  collect("[data-i18n-placeholder]").forEach((el)=>{
+    el.setAttribute("placeholder", t(el.dataset.i18nPlaceholder));
+  });
+  collect("[data-i18n-aria]").forEach((el)=>{
+    el.setAttribute("aria-label", t(el.dataset.i18nAria));
+  });
+  const code = scope.querySelector(".lang-toggle-code");
+  if(code) code.textContent = currentLang.toUpperCase();
+  if(scope === document){
+    document.documentElement.lang = currentLang;
+  }
+}
+
+function setLanguage(lang){
+  currentLang = lang === "en" ? "en" : "es";
+  try{ localStorage.setItem(LS_LANG, currentLang); }catch(err){}
+  applyLanguage();
+  updatePager(getTotalPages());
+  renderRow(true);
+  syncDownloadsButtonState();
+  setupAdminButton();
+}
+
+function setupLanguageToggle(){
+  currentLang = readLanguage();
+  const btn = document.querySelector(".lang-toggle");
+  if(btn){
+    btn.onclick = ()=>{
+      setLanguage(currentLang === "es" ? "en" : "es");
+    };
+  }
+  applyLanguage();
+}
+
+function shouldExposeAdminEntry(){
+  if(isAdmin) return true;
+  try{
+    const params = new URLSearchParams(window.location.search || "");
+    if(params.get("admin") === "1") return true;
+    if(String(window.location.hash || "").toLowerCase() === "#admin") return true;
+  }catch(err){}
+  return false;
+}
+
+let adminShortcutBound = false;
+function setupAdminShortcut(){
+  if(adminShortcutBound) return;
+  adminShortcutBound = true;
+  document.addEventListener("keydown", (event)=>{
+    const key = String(event.key || "").toLowerCase();
+    const code = String(event.code || "").toLowerCase();
+    const isAdminShortcut = event.altKey && event.shiftKey && (key === "a" || code === "keya");
+    if(!isAdminShortcut) return;
+    event.preventDefault();
+    if(isAdmin){
+      openAdminMenuModal();
+    }else{
+      openAdminLoginModal();
+    }
+  });
+}
 
 /* ------- Cache / límites ------- */
 const GAME_CATEGORY = "game";
@@ -414,6 +774,7 @@ const STREAMSAVER_SRC = "https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSa
 let isAdmin = false;
 let recientes = [];
 let recientesTotal = 0;
+let recientesLoadedPageSize = 0;
 let recientesLoading = false;
 let recientesError = "";
 let socials  = [];
@@ -423,13 +784,16 @@ window.currentCategory = GAME_CATEGORY;
 const activeDownloads = window.activeDownloads || [];
 window.activeDownloads = activeDownloads;
 let downloadsExpanded = false;
+let downloadsRenderFrame = 0;
+const DOWNLOADS_HISTORY_KEY = 'tgx_downloads';
+const DRIVE_STATE_PREFIX = 'tgx_drive_';
 const PLAYER_MODE_ICONS = {
   single: "assets/images/player-modes/single.png",
   multi: "assets/images/player-modes/multi.png"
 };
 const PLAYER_MODE_LABELS = {
-  single: "Un jugador",
-  multi: "Multijugador"
+  single: "mode.single",
+  multi: "mode.multi"
 };
 const ADMIN_NOTIF_LIMIT = 40;
 const ADMIN_NOTIF_POLL_INTERVAL = 45000;
@@ -437,6 +801,12 @@ let PAGE_SIZE = 12;
 let page = 1;
 let searchQuery = "";
 let recientesWheelCooldownTs = 0;
+const RECENTES_WHEEL_EDGE_SLACK = 2;
+const RECENTES_WHEEL_MOUSE_THRESHOLD = 70;
+const RECENTES_WHEEL_TRACKPAD_THRESHOLD = 170;
+const RECENTES_WHEEL_MOUSE_COOLDOWN_MS = 280;
+const RECENTES_WHEEL_TRACKPAD_COOLDOWN_MS = 560;
+const RECENTES_WHEEL_RESET_MS = 180;
 let renderRowTimer = null;
 const COVER_LAZY_ROOT_MARGIN = "240px";
 const SEARCH_RENDER_DEBOUNCE_MS = 90;
@@ -536,13 +906,15 @@ const adminNotifications = {
 // Recalcula el tamaño de página en función del espacio disponible en la cuadrícula
 function recalcPageSize(){
   const grid = document.querySelector('.grid');
-  if(!grid) return;
+  if(!grid) return PAGE_SIZE;
 
   const styles = getComputedStyle(grid);
   const colGap = parseFloat(styles.columnGap) || 0;
   const rowGap = parseFloat(styles.rowGap) || 0;
   const gridW  = grid.clientWidth;
   const gridH  = grid.clientHeight;
+  if(gridW <= 0 || gridH <= 0) return PAGE_SIZE;
+
   const templateCols = (styles.gridTemplateColumns || "").trim();
   let cols = 0;
   if(templateCols && templateCols !== "none"){
@@ -557,6 +929,30 @@ function recalcPageSize(){
   const rows = Math.max(1, Math.floor((gridH + rowGap) / (tileH + rowGap)));
 
   PAGE_SIZE = rows * cols;
+  return PAGE_SIZE;
+}
+
+let pageSizeSyncTimer = null;
+function schedulePageSizeSync(delay = 80){
+  if(pageSizeSyncTimer) clearTimeout(pageSizeSyncTimer);
+  pageSizeSyncTimer = setTimeout(()=>{
+    pageSizeSyncTimer = null;
+    recalcPageSize();
+    if(PAGE_SIZE === recientesLoadedPageSize) return;
+    if(recientesLoading){
+      schedulePageSizeSync(120);
+      return;
+    }
+    loadPostsPage({ keepScroll: true });
+  }, delay);
+}
+
+function setupGridResizeObserver(){
+  const grid = document.getElementById("gridRecientes");
+  if(!grid || typeof ResizeObserver === "undefined") return;
+  if(grid.__pageSizeObserver) return;
+  grid.__pageSizeObserver = new ResizeObserver(()=> schedulePageSizeSync());
+  grid.__pageSizeObserver.observe(grid);
 }
 
 /* =========================
@@ -602,10 +998,10 @@ function rehydrate() {
   } catch (err) {}
   if(migrateSocials) persistSocialsCache();
 
-  isAdmin = localStorage.getItem(LS_ADMIN) === "1";
+  isAdmin = localStorage.getItem(LS_ADMIN) === "1" && Boolean(localStorage.getItem(LS_ADMIN_HASH)) && Boolean(getAdminToken());
   try {
     const t = getAdminToken();
-    if(!isAdmin && t) isAdmin = true;
+    if(!t) persistAdmin(false);
   } catch (err) {}
 }
 rehydrate();
@@ -861,6 +1257,35 @@ async function adminLoginByKeyHash(keyHash) {
   if (!r.ok) return { ok: false };
   return r.json();
 }
+
+async function adminVerifyCreatePin(pin){
+  const r = await fetch(`${API_ADM}/create-gate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pin })
+  });
+  const data = await r.json().catch(()=> ({}));
+  if(!r.ok || !data?.ok){
+    throw new Error(data?.error || "PIN incorrecto");
+  }
+  return data;
+}
+
+async function adminVerifyAuthToken(token){
+  const r = await fetch(`${API_ADM}/session`, {
+    method: "GET",
+    headers: { "Authorization": `Bearer ${String(token || "").trim()}` },
+    cache: "no-store"
+  });
+  if(!r.ok){
+    const data = await r.json().catch(()=> ({}));
+    throw new Error(data?.error === "Unauthorized" ? "AUTH_TOKEN inválido" : (data?.error || "No se pudo validar AUTH_TOKEN"));
+  }
+  const data = await r.json().catch(()=> ({}));
+  if(!data?.ok) throw new Error("AUTH_TOKEN inválido");
+  return data;
+}
+
 async function adminListKeys(token){
   const r = await fetch(`${API_ADM}`, { headers:{ "Authorization":`Bearer ${token||""}` } });
   if(!r.ok) throw new Error("No se pudo listar llaves");
@@ -885,6 +1310,7 @@ async function adminRevokeKey(id, token){
    Helpers de modal / focus
    ========================= */
 function openModalFragment(fragment){
+  applyLanguage(fragment);
   document.body.appendChild(fragment);
   document.body.style.overflow = "hidden";
   const activate = () => fragment.classList.add("active");
@@ -965,6 +1391,18 @@ function platformFromUrl(u){
   if (s.includes("pixeldrain.com")) return "pixeldrain";
   return "generic";
 }
+
+function normalizeDriveLinkInput(raw, kind = "folder"){
+  const value = String(raw || "").trim();
+  if(!value) return null;
+  const id = extractDriveId(value) || (/^[A-Za-z0-9_-]{10,}$/.test(value) ? value : null);
+  if(!id) return null;
+  const url = kind === "file"
+    ? `https://drive.google.com/file/d/${id}`
+    : `https://drive.google.com/drive/folders/${id}`;
+  return { id, url };
+}
+
 function escapeHtml(str){
   return String(str ?? "").replace(/[&<>'"]/g, (ch)=>({
     "&":"&amp;",
@@ -1034,8 +1472,83 @@ function insertLinkChip(editorArea){
   if(driveId) url=`https://drive.google.com/file/d/${driveId}`;
   if(!/^https?:\/\//i.test(url) && !url.startsWith("magnet:")) url="https://"+url;
   const plat=driveId ? "drive" : platformFromUrl(url);
-  const html=`<a href="${url.replace(/"/g,"&quot;")}" target="_blank" rel="noopener" class="link-chip chip-${plat}"><span class="chip-dot"></span>${text.replace(/[<>]/g,"")}</a>`;
+  const html=buildLinkChipHtml({ text, url, platform: plat });
+  insertEditorHtml(editorArea, html);
+}
+
+function buildLinkChipHtml({ text, url, platform } = {}){
+  const label = String(text || "Link").trim() || "Link";
+  const href = String(url || "").trim();
+  const plat = platform || platformFromUrl(href);
+  return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener" class="link-chip chip-${plat}"><span class="chip-dot"></span>${escapeHtml(label)}</a>`;
+}
+
+function insertEditorHtml(editorArea, html){
+  if(!editorArea || !html) return;
+  editorArea.focus();
   document.execCommand("insertHTML", false, html);
+}
+
+function buildGamePostTemplate(title = ""){
+  const gameTitle = String(title || "").trim() || "NOMBRE DEL JUEGO";
+  return [
+    `<h2>INFORMACIÓN DEL JUEGO</h2>`,
+    `<ul>`,
+    `<li>PLATAFORMA: PC</li>`,
+    `<li>FORMATO: pendiente</li>`,
+    `<li>TEXTOS: pendiente</li>`,
+    `<li>AUDIO: pendiente</li>`,
+    `<li>FECHA DE ACTUALIZACIÓN: pendiente</li>`,
+    `</ul>`,
+    `<h2>ESTA VERSIÓN INCLUYE</h2>`,
+    `<ul><li>${escapeHtml(gameTitle)}</li></ul>`,
+    `<h2>INSTALACIÓN</h2>`,
+    `<ul>`,
+    `<li>Descargar el archivo</li>`,
+    `<li>Seguir las instrucciones del contenido autorizado</li>`,
+    `</ul>`,
+    `<h2>DESCARGA</h2>`
+  ].join("");
+}
+
+function initPublishingHelper({ root, editorRoot, titleInput } = {}){
+  if(!root || !editorRoot) return;
+  const editorArea = editorRoot.querySelector(".editor-area");
+  const driveInput = root.querySelector(".drive-helper-id");
+  const kindSelect = root.querySelector(".drive-helper-kind");
+  const labelInput = root.querySelector(".drive-helper-label");
+  const insertBtn = root.querySelector(".drive-helper-insert");
+  const templateBtn = root.querySelector(".drive-helper-template");
+  const status = root.querySelector(".drive-helper-status");
+  const setStatus = (text, tone = "") => {
+    if(!status) return;
+    status.textContent = text || "";
+    status.dataset.tone = tone;
+  };
+
+  insertBtn?.addEventListener("click", () => {
+    const parsed = normalizeDriveLinkInput(driveInput?.value, kindSelect?.value || "folder");
+    if(!parsed){
+      setStatus("Pega un ID o URL válido de Drive.", "error");
+      driveInput?.focus();
+      return;
+    }
+    const label = (labelInput?.value || "DRIVE").trim() || "DRIVE";
+    insertEditorHtml(editorArea, buildLinkChipHtml({ text: label, url: parsed.url, platform: "drive" }));
+    setStatus(`Link Drive insertado (${parsed.id.slice(0, 6)}…).`, "ok");
+  });
+
+  templateBtn?.addEventListener("click", () => {
+    const current = (editorArea?.innerHTML || "").trim();
+    const html = buildGamePostTemplate(titleInput?.value || "");
+    if(current){
+      insertEditorHtml(editorArea, html);
+    }else if(editorArea){
+      editorArea.innerHTML = html;
+      editorArea.focus();
+    }
+    setStatus("Plantilla agregada.", "ok");
+  });
 }
 
 async function insertVideoPreview(editorArea){
@@ -1175,8 +1688,15 @@ function applyPlayerModeBadge(tile, game = {}){
   const rawMode = typeof game?.playerMode === "string" ? game.playerMode.trim() : "";
   const mode = rawMode.toLowerCase();
   const icon = PLAYER_MODE_ICONS[mode];
-  const label = PLAYER_MODE_LABELS[mode];
+  const labelKey = PLAYER_MODE_LABELS[mode];
+  const label = labelKey ? t(labelKey) : "";
   const img = badge.querySelector("img");
+  let labelEl = badge.querySelector(".player-mode-label");
+  if(!labelEl){
+    labelEl = document.createElement("span");
+    labelEl.className = "player-mode-label";
+    badge.appendChild(labelEl);
+  }
 
   if(!icon || !label){
     badge.hidden = true;
@@ -1191,6 +1711,7 @@ function applyPlayerModeBadge(tile, game = {}){
       img.removeAttribute("src");
       img.removeAttribute("alt");
     }
+    if(labelEl) labelEl.textContent = "";
     return;
   }
 
@@ -1203,6 +1724,7 @@ function applyPlayerModeBadge(tile, game = {}){
   badge.hidden = false;
   badge.dataset.mode = mode;
   badge.dataset.label = label;
+  if(labelEl) labelEl.textContent = label;
   badge.title = label;
   badge.setAttribute("aria-label", label);
   badge.setAttribute("role", "img");
@@ -1243,10 +1765,10 @@ function applyStatusBadge(tile, first_link, link_ok){
 
     if (link_ok) {
       badge.classList.add("status-ok");
-      badge.querySelector(".pill-text").textContent = "Disponible";
+      badge.querySelector(".pill-text").textContent = t("game.available");
     } else {
       badge.classList.add("status-checking");
-      badge.querySelector(".pill-text").textContent = "Verificar";
+      badge.querySelector(".pill-text").textContent = t("game.verify");
     }
   }
 
@@ -1457,6 +1979,7 @@ async function loadPostsPage({ keepScroll = false, force = false } = {}){
     });
     recientes = result.items;
     recientesTotal = result.total;
+    recientesLoadedPageSize = limit;
     const totalPages = getTotalPages();
     if(page > totalPages){
       page = totalPages;
@@ -1501,7 +2024,7 @@ function updatePager(totalPages){
   }
 
   if(liveStatus) {
-    liveStatus.textContent = `Página ${page} de ${totalPages}`;
+    liveStatus.textContent = t("pager.current", { page, total: totalPages });
   }
 
   pager.style.display = (totalPages>1) ? "flex" : "none";
@@ -1595,6 +2118,10 @@ function setupRecientesWheelPager(){
     grid.removeEventListener("wheel", grid.__wheelPagerHandler);
     grid.__wheelPagerHandler = null;
     grid.__wheelPagerBound = false;
+    if(grid.__wheelPagerState?.resetTimer){
+      clearTimeout(grid.__wheelPagerState.resetTimer);
+    }
+    grid.__wheelPagerState = null;
   };
 
   if(totalPages <= 1){
@@ -1604,6 +2131,29 @@ function setupRecientesWheelPager(){
 
   if(grid.__wheelPagerBound) return;
 
+  grid.__wheelPagerState = grid.__wheelPagerState || {
+    accumulated: 0,
+    direction: 0,
+    resetTimer: null,
+    inputType: "mouse"
+  };
+
+  const resetWheelIntent = () => {
+    const state = grid.__wheelPagerState;
+    if(!state) return;
+    state.accumulated = 0;
+    state.direction = 0;
+    if(state.resetTimer){
+      clearTimeout(state.resetTimer);
+      state.resetTimer = null;
+    }
+  };
+
+  const normalizeWheelDelta = (event) => {
+    const modeFactor = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? Math.max(grid.clientHeight, 1) : 1;
+    return event.deltaY * modeFactor;
+  };
+
   const handler = (event) => {
     const totalPagesInner = getTotalPages();
     if(totalPagesInner <= 1){
@@ -1611,13 +2161,41 @@ function setupRecientesWheelPager(){
       return;
     }
 
+    if(Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+
+    const rawDelta = normalizeWheelDelta(event);
+    const direction = rawDelta > 0 ? 1 : rawDelta < 0 ? -1 : 0;
+    if(direction === 0) return;
+
+    const atTop = grid.scrollTop <= RECENTES_WHEEL_EDGE_SLACK;
+    const atBottom = grid.scrollTop + grid.clientHeight >= grid.scrollHeight - RECENTES_WHEEL_EDGE_SLACK;
+    const canScrollInside = direction > 0 ? !atBottom : !atTop;
+    if(canScrollInside){
+      resetWheelIntent();
+      return;
+    }
+
     event.preventDefault();
 
     const now = Date.now();
-    if(now - recientesWheelCooldownTs < 200) return;
+    const state = grid.__wheelPagerState;
+    const absDelta = Math.abs(rawDelta);
+    const isLikelyTrackpad = event.deltaMode === 0 && absDelta < 50;
+    state.inputType = isLikelyTrackpad ? "trackpad" : "mouse";
+    const cooldownMs = isLikelyTrackpad ? RECENTES_WHEEL_TRACKPAD_COOLDOWN_MS : RECENTES_WHEEL_MOUSE_COOLDOWN_MS;
+    if(now - recientesWheelCooldownTs < cooldownMs) return;
 
-    const direction = event.deltaY > 0 ? 1 : event.deltaY < 0 ? -1 : 0;
-    if(direction === 0) return;
+    if(state.direction !== direction){
+      state.accumulated = 0;
+      state.direction = direction;
+    }
+    state.accumulated += absDelta;
+
+    if(state.resetTimer) clearTimeout(state.resetTimer);
+    state.resetTimer = setTimeout(resetWheelIntent, RECENTES_WHEEL_RESET_MS);
+
+    const threshold = isLikelyTrackpad ? RECENTES_WHEEL_TRACKPAD_THRESHOLD : RECENTES_WHEEL_MOUSE_THRESHOLD;
+    if(state.accumulated < threshold) return;
 
     if(direction > 0){
       page = page === totalPagesInner ? 1 : page + 1;
@@ -1626,6 +2204,7 @@ function setupRecientesWheelPager(){
     }
 
     recientesWheelCooldownTs = now;
+    resetWheelIntent();
     loadPostsPage({ keepScroll: true });
   };
 
@@ -1661,9 +2240,9 @@ function renderRow(keepScroll=false){
   if(recientesError){
     renderGridState(grid, {
       kind: "error",
-      title: "No pudimos cargar la biblioteca",
+      title: t("grid.loadErrorTitle"),
       body: recientesError,
-      actionText: "Reintentar",
+      actionText: t("grid.retry"),
       action: () => loadPostsPage({ force: true })
     });
     updatePager(totalPages);
@@ -1675,9 +2254,9 @@ function renderRow(keepScroll=false){
     const hasSearch = Boolean(searchQuery.trim());
     renderGridState(grid, {
       kind: "empty",
-      title: hasSearch ? "Sin resultados" : "Sin publicaciones todavía",
-      body: hasSearch ? `No encontramos juegos para “${searchQuery.trim()}”.` : "Cuando haya juegos publicados aparecerán aquí.",
-      actionText: hasSearch ? "Limpiar búsqueda" : "",
+      title: hasSearch ? t("grid.noResults") : t("grid.emptyTitle"),
+      body: hasSearch ? t("grid.noResultsBody", { query: searchQuery.trim() }) : t("grid.emptyBody"),
+      actionText: hasSearch ? t("grid.clearSearch") : "",
       action: hasSearch ? () => {
         const input = document.getElementById("searchInput");
         if(input) input.value = "";
@@ -1704,6 +2283,7 @@ function renderRow(keepScroll=false){
 
   list.forEach((g)=>{
     const node = template.content.cloneNode(true);
+    applyLanguage(node);
     const tile = node.querySelector(".tile");
     const cover= node.querySelector(".cover");
     const title= node.querySelector(".title");
@@ -1711,7 +2291,7 @@ function renderRow(keepScroll=false){
 
     title.textContent = g.title || "";
     tile.tabIndex=0;
-    tile.setAttribute("aria-label", `Abrir ${g.title || "publicación"}`);
+    tile.setAttribute("aria-label", t("game.openNamed", { title: g.title || "publicación" }));
     tile.addEventListener("click", ()=> openGameLazy(g));
 
     // Miniatura (sin pedir detalle)
@@ -1736,7 +2316,7 @@ function renderRow(keepScroll=false){
    HERO simple
    ========================= */
 function renderHeroCarousel(){
-  const hero = document.querySelector(".hero");
+  const hero = document.querySelector("#hero.hero.card");
   if(!hero) return;
   const sideAds = hero.querySelectorAll(".business-slot-left, .business-slot-right");
   hero.classList.toggle("hero--simple", sideAds.length === 0);
@@ -1954,9 +2534,12 @@ function openGameLazy(game){
 function openGame(initialGame, options = {}){
   const modal = modalTemplate.content.cloneNode(true);
   const modalNode    = modal.querySelector(".tw-modal");
+  const modalShell   = modal.querySelector(".game-modal-shell");
   const modalContent = modal.querySelector(".tw-modal-content");
   const modalTitle   = modal.querySelector(".tw-modal-title");
   const modalDesc    = modal.querySelector(".tw-modal-description");
+  const modalBody    = modal.querySelector(".game-modal-body");
+  const scrollCue    = modal.querySelector(".game-scroll-cue");
   const modalClose   = modal.querySelector(".tw-modal-close");
   const commentSection = modal.querySelector(".game-modal-comments");
   const commentList = commentSection?.querySelector(".comment-list") || null;
@@ -1982,6 +2565,7 @@ function openGame(initialGame, options = {}){
   let commentTabOpenState = false;
   let commentFormExpanded = false;
   let commentTabAnimationTimer = null;
+  let lastCommentPointer = null;
   let commentsState = { items: [], loading: false, error: null };
   let lastLoadedPostId = null;
   const expandedReplies = new Set();
@@ -1994,6 +2578,37 @@ function openGame(initialGame, options = {}){
   const commentPanelMinWidth = 280;
   const commentPanelMaxWidth = 420;
   const commentPanelGutter = 32;
+  const commentTabMotion = {
+    openMs: 540,
+    closeMs: 360,
+    foldEase: "cubic-bezier(.4, 0, .2, 1)",
+    settleEase: "cubic-bezier(0, 0, .2, 1)",
+    exitEase: "cubic-bezier(.4, 0, 1, 1)"
+  };
+  ensureCommentGooeyFilter();
+
+  const syncScrollCue = ()=>{
+    if(!scrollCue || !modalBody) return;
+    const overflow = modalBody.scrollHeight > modalBody.clientHeight + 12;
+    const atEnd = modalBody.scrollTop + modalBody.clientHeight >= modalBody.scrollHeight - 18;
+    scrollCue.hidden = !overflow || atEnd;
+  };
+  const scheduleScrollCueSync = ()=>{
+    if(typeof window !== "undefined" && typeof window.requestAnimationFrame === "function"){
+      window.requestAnimationFrame(syncScrollCue);
+    }else{
+      syncScrollCue();
+    }
+  };
+  scrollCue?.addEventListener("click", ()=>{
+    if(!modalBody) return;
+    const nextTop = Math.min(
+      modalBody.scrollTop + Math.max(modalBody.clientHeight * 0.72, 220),
+      modalBody.scrollHeight - modalBody.clientHeight
+    );
+    modalBody.scrollTo({ top: nextTop, behavior: motionAwareScrollBehavior() });
+  });
+  modalBody?.addEventListener("scroll", syncScrollCue, { passive: true });
 
   const getViewportWidth = ()=>{
     if(typeof window !== "undefined" && Number.isFinite(window.innerWidth)){
@@ -2007,14 +2622,18 @@ function openGame(initialGame, options = {}){
     const viewportWidth = getViewportWidth();
     if(!viewportWidth) return;
     const rect = modalContent.getBoundingClientRect();
-    const available = viewportWidth - rect.right - commentPanelGutter;
+    const modalWidth = rect.width || modalContent.offsetWidth || 0;
+    const available = viewportWidth - modalWidth - (commentPanelGutter * 2);
     const shouldStack = available < commentPanelMinWidth;
     commentSection.classList.toggle("is-stacked", shouldStack);
+    modalNode?.classList.toggle("has-stacked-comments", shouldStack);
     if(shouldStack){
       commentTab.style.removeProperty("--comment-panel-width");
+      modalNode?.style.removeProperty("--comment-open-shift");
     }else{
       const width = Math.max(commentPanelMinWidth, Math.min(commentPanelMaxWidth, available));
       commentTab.style.setProperty("--comment-panel-width", `${Math.round(width)}px`);
+      modalNode?.style.setProperty("--comment-open-shift", `${Math.round(width / -2)}px`);
     }
   };
 
@@ -2039,6 +2658,95 @@ function openGame(initialGame, options = {}){
       focusTask();
     }
   };
+
+  const resetCommentJelly = ()=>{
+    if(!commentToggle) return;
+    lastCommentPointer = null;
+    commentToggle.classList.remove("is-jelly-hover", "is-jelly-pressed");
+    commentToggle.style.setProperty("--comment-jelly-x", "0px");
+    commentToggle.style.setProperty("--comment-jelly-y", "0px");
+    commentToggle.style.setProperty("--comment-jelly-body-x", "0px");
+    commentToggle.style.setProperty("--comment-jelly-body-y", "0px");
+    commentToggle.style.setProperty("--comment-jelly-label-x", "0px");
+    commentToggle.style.setProperty("--comment-jelly-label-y", "0px");
+    commentToggle.style.setProperty("--comment-jelly-origin-x", "50%");
+    commentToggle.style.setProperty("--comment-jelly-origin-y", "50%");
+  };
+
+  const isCommentPointerInside = (pointer, rect, slack = 2)=>{
+    if(!pointer || !rect) return false;
+    return pointer.clientX >= rect.left - slack &&
+      pointer.clientX <= rect.right + slack &&
+      pointer.clientY >= rect.top - slack &&
+      pointer.clientY <= rect.bottom + slack;
+  };
+
+  const updateCommentJelly = (event)=>{
+    if(!commentToggle || shouldReduceMotion()) return;
+    const clientX = Number(event?.clientX);
+    const clientY = Number(event?.clientY);
+    if(!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
+    lastCommentPointer = { clientX, clientY };
+    const rect = commentToggle.getBoundingClientRect();
+    if(!rect.width || !rect.height) return;
+    const localX = clientX - rect.left;
+    const localY = clientY - rect.top;
+    const offsetX = localX - rect.width / 2;
+    const offsetY = localY - rect.height / 2;
+    const originX = Math.max(12, Math.min(88, localX / Math.max(rect.width, 1) * 100));
+    const originY = Math.max(18, Math.min(82, localY / Math.max(rect.height, 1) * 100));
+    const bodyX = Math.max(-2.5, Math.min(2.5, offsetX / Math.max(rect.width, 1) * 5));
+    const bodyY = Math.max(-1.5, Math.min(1.5, offsetY / Math.max(rect.height, 1) * 3));
+    commentToggle.style.setProperty("--comment-jelly-x", `${offsetX.toFixed(2)}px`);
+    commentToggle.style.setProperty("--comment-jelly-y", `${offsetY.toFixed(2)}px`);
+    commentToggle.style.setProperty("--comment-jelly-body-x", `${bodyX.toFixed(2)}px`);
+    commentToggle.style.setProperty("--comment-jelly-body-y", `${bodyY.toFixed(2)}px`);
+    commentToggle.style.setProperty("--comment-jelly-label-x", `${(offsetX * 0.05).toFixed(2)}px`);
+    commentToggle.style.setProperty("--comment-jelly-label-y", `${(offsetY * 0.05).toFixed(2)}px`);
+    commentToggle.style.setProperty("--comment-jelly-origin-x", `${originX.toFixed(2)}%`);
+    commentToggle.style.setProperty("--comment-jelly-origin-y", `${originY.toFixed(2)}%`);
+  };
+
+  const refreshCommentJelly = ()=>{
+    if(!commentToggle || !lastCommentPointer || shouldReduceMotion()) return;
+    const rect = commentToggle.getBoundingClientRect();
+    if(!rect.width || !rect.height || !isCommentPointerInside(lastCommentPointer, rect)){
+      resetCommentJelly();
+      return;
+    }
+    commentToggle.classList.add("is-jelly-hover");
+    updateCommentJelly(lastCommentPointer);
+  };
+
+  const scheduleCommentJellyRefresh = ()=>{
+    if(!lastCommentPointer) return;
+    if(typeof timerHost?.requestAnimationFrame === "function"){
+      timerHost.requestAnimationFrame(()=>{
+        refreshCommentJelly();
+        timerHost.requestAnimationFrame(refreshCommentJelly);
+      });
+    }else{
+      timerHost.setTimeout(refreshCommentJelly, 0);
+    }
+  };
+
+  commentToggle?.addEventListener("pointerenter", (event)=>{
+    if(shouldReduceMotion()) return;
+    commentToggle.classList.add("is-jelly-hover");
+    updateCommentJelly(event);
+  });
+  commentToggle?.addEventListener("pointermove", updateCommentJelly);
+  commentToggle?.addEventListener("pointerleave", resetCommentJelly);
+  commentToggle?.addEventListener("pointercancel", resetCommentJelly);
+  commentToggle?.addEventListener("pointerdown", (event)=>{
+    if(shouldReduceMotion()) return;
+    commentToggle.classList.add("is-jelly-pressed");
+    updateCommentJelly(event);
+  });
+  commentToggle?.addEventListener("pointerup", (event)=>{
+    commentToggle?.classList.remove("is-jelly-pressed");
+    updateCommentJelly(event);
+  });
 
   const setCommentFormExpanded = (expanded, { focus = false } = {})=>{
     const isExpanded = Boolean(expanded);
@@ -2072,68 +2780,94 @@ function openGame(initialGame, options = {}){
     if(commentTabAnimationTimer) timerHost.clearTimeout(commentTabAnimationTimer);
     commentTabAnimationTimer = timerHost.setTimeout(()=>{
       commentTab.classList.remove(className);
-    }, isOpen ? 620 : 500);
+    }, isOpen ? commentTabMotion.openMs : commentTabMotion.closeMs);
   };
 
-  const animateCommentRailTransition = (fromRect, isOpen)=>{
+  const animateCommentRailTransition = (fromGeometry, isOpen)=>{
+    const fromRect = fromGeometry?.rect || fromGeometry;
     if(!fromRect || !commentToggle || shouldReduceMotion()) return;
     if(commentSection?.classList.contains("is-stacked")) return;
-    const host = modalNode || document.body;
+    const host = modalShell || modalNode || document.body;
     if(typeof document === "undefined" || typeof document.createElement !== "function") return;
     if(typeof Element === "undefined" || typeof Element.prototype.animate !== "function") return;
+    const toLocalRect = (rect, hostRect)=>({
+      left: rect.left - hostRect.left,
+      top: rect.top - hostRect.top,
+      width: rect.width,
+      height: rect.height
+    });
     const run = ()=>{
       const toRect = commentToggle.getBoundingClientRect();
       if(!toRect.width || !toRect.height || !fromRect.width || !fromRect.height) return;
+      const currentHostRect = host.getBoundingClientRect();
+      const fromHostRect = fromGeometry?.hostRect || currentHostRect;
+      const fromLocalRect = toLocalRect(fromRect, fromHostRect);
+      const toLocal = toLocalRect(toRect, currentHostRect);
       const proxy = document.createElement("div");
       proxy.className = "comment-rail-proxy";
       proxy.setAttribute("aria-hidden", "true");
       Object.assign(proxy.style, {
-        left: `${toRect.left}px`,
-        top: `${toRect.top}px`,
-        width: `${toRect.width}px`,
-        height: `${toRect.height}px`
+        position: host === modalShell ? "absolute" : "fixed",
+        left: `${toLocal.left}px`,
+        top: `${toLocal.top}px`,
+        width: `${toLocal.width}px`,
+        height: `${toLocal.height}px`
       });
       host.appendChild(proxy);
       commentTab.classList.add("is-rail-proxy-active");
 
-      const compactWidth = Math.min(56, Math.max(42, Math.min(fromRect.width, toRect.width)));
-      const compactHeight = Math.min(56, Math.max(42, Math.min(fromRect.width, toRect.height)));
-      const compactLeft = isOpen ? fromRect.left : toRect.left;
-      const compactTop = isOpen ? toRect.top : fromRect.top;
-      const firstRadius = isOpen ? "0 16px 16px 0" : "18px 18px 0 0";
-      const midRadius = "16px";
-      const finalRadius = getComputedStyle(commentToggle).borderRadius;
-      const frameFor = (rect, radius)=>({
-        transform: `translate(${rect.left - toRect.left}px, ${rect.top - toRect.top}px) scale(${rect.width / toRect.width}, ${rect.height / toRect.height})`,
-        borderRadius: radius
+      proxy.classList.toggle("is-opening", Boolean(isOpen));
+      proxy.classList.toggle("is-closing", !isOpen);
+
+      const compactSize = Math.round(Math.min(52, Math.max(42, Math.min(fromLocalRect.width, toLocal.height))));
+      const railRadius = "0 16px 16px 0";
+      const headerRadius = "0 18px 18px 0";
+      const startRadius = isOpen ? railRadius : headerRadius;
+      const finalRadius = isOpen ? headerRadius : railRadius;
+      const chipRadius = "0 999px 999px 0";
+      const chipRect = {
+        left: isOpen ? fromLocalRect.left : toLocal.left,
+        top: isOpen ? toLocal.top + Math.max(0, (toLocal.height - compactSize) / 2) : fromLocalRect.top + Math.max(0, (fromLocalRect.height - compactSize) / 2),
+        width: compactSize,
+        height: compactSize
+      };
+      const frameFor = (rect, radius, opacity = 1)=>({
+        transform: `translate3d(${rect.left - toLocal.left}px, ${rect.top - toLocal.top}px, 0) scale(${rect.width / toLocal.width}, ${rect.height / toLocal.height})`,
+        borderRadius: radius,
+        opacity
       });
-      const compactFrame = frameFor({
-        left: compactLeft,
-        top: compactTop,
-        width: compactWidth,
-        height: compactHeight
-      }, midRadius);
+      const chipFrame = frameFor(chipRect, chipRadius, .98);
       const frames = isOpen
         ? [
-            { ...frameFor(fromRect, firstRadius), offset: 0, easing: "cubic-bezier(.62, 0, .2, 1)" },
-            { ...compactFrame, offset: .42, easing: "cubic-bezier(.16, 1, .3, 1)" },
-            { ...compactFrame, offset: .52, easing: "cubic-bezier(.16, 1, .3, 1)" },
-            { ...frameFor(toRect, finalRadius), offset: 1 }
+            { ...frameFor(fromLocalRect, startRadius), offset: 0, easing: commentTabMotion.foldEase },
+            { ...chipFrame, offset: .34, easing: commentTabMotion.settleEase },
+            { ...chipFrame, offset: .44, easing: commentTabMotion.settleEase },
+            { ...frameFor(toLocal, finalRadius), offset: 1 }
           ]
         : [
-            { ...frameFor(fromRect, firstRadius), offset: 0, easing: "cubic-bezier(.62, 0, .2, 1)" },
-            { ...compactFrame, offset: .44, easing: "cubic-bezier(.16, 1, .3, 1)" },
-            { ...compactFrame, offset: .52, easing: "cubic-bezier(.16, 1, .3, 1)" },
-            { ...frameFor(toRect, finalRadius), offset: 1 }
+            { ...frameFor(fromLocalRect, startRadius), offset: 0, easing: commentTabMotion.exitEase },
+            { ...chipFrame, offset: .24, easing: commentTabMotion.exitEase },
+            { ...chipFrame, offset: .34, easing: commentTabMotion.exitEase },
+            { ...frameFor(toLocal, finalRadius), offset: 1 }
           ];
+      const duration = isOpen ? commentTabMotion.openMs : commentTabMotion.closeMs;
       const animation = proxy.animate(frames, {
-        duration: isOpen ? 620 : 500
+        duration,
+        fill: "both"
       });
+      let cleanedUp = false;
       const cleanup = ()=>{
+        if(cleanedUp) return;
+        cleanedUp = true;
         proxy.remove();
         commentTab.classList.remove("is-rail-proxy-active");
       };
-      animation.finished.then(cleanup).catch(cleanup);
+      animation.onfinish = cleanup;
+      animation.oncancel = cleanup;
+      if(animation.finished && typeof animation.finished.then === "function"){
+        animation.finished.then(cleanup).catch(cleanup);
+      }
+      timerHost.setTimeout(cleanup, duration + 120);
     };
     if(typeof timerHost?.requestAnimationFrame === "function"){
       timerHost.requestAnimationFrame(run);
@@ -2164,10 +2898,24 @@ function openGame(initialGame, options = {}){
   };
 
   const applyTitle = ()=>{ if(modalTitle) modalTitle.textContent = currentGame?.title || "Sin título"; };
-  const renderDescription = ()=> setModalDescription(modalDesc, currentGame?.description, currentGame);
+  const renderDescription = ()=>{
+    setModalDescription(modalDesc, currentGame?.description, currentGame);
+    if(modalBody) modalBody.scrollTop = 0;
+    scheduleScrollCueSync();
+  };
   const updateCommentCounters = (total)=>{
-    if(commentCountBadge) commentCountBadge.textContent = String(total);
-    if(commentCountLabel) commentCountLabel.textContent = total === 1 ? "(1 comentario)" : `(${total} comentarios)`;
+    if(commentCountBadge){
+      commentCountBadge.hidden = total <= 0;
+      commentCountBadge.textContent = total > 0 ? String(total) : "";
+    }
+    if(commentCountLabel){
+      const label = total === 0
+        ? t("comments.countZero")
+        : total === 1
+          ? t("comments.countOne")
+          : t("comments.countMany", { count: total });
+      commentCountLabel.textContent = `(${label})`;
+    }
   };
   const closeOpenActionsMenu = ()=>{
     if(!openActionsMenu) return;
@@ -2498,6 +3246,7 @@ function openGame(initialGame, options = {}){
 
     replies.forEach((reply, index)=>{
       const replyEl = createCommentElement(reply, { isReply: true });
+      replyEl.style.setProperty("--comment-stagger", `${260 + Math.min(index, 4) * 16}ms`);
       if(!isExpanded && index >= visibleCount){
         replyEl.classList.add("is-collapsed");
         replyEl.hidden = true;
@@ -2531,9 +3280,9 @@ function openGame(initialGame, options = {}){
 
     if(!commentList || !commentEmpty){
       if(commentsState.loading){
-        setCommentStatus("Cargando comentarios…", { kind: "loading" });
+        setCommentStatus(t("comments.loading"), { kind: "loading" });
       }else if(commentsState.error){
-        setCommentStatus("No se pudieron cargar los comentarios.", { kind: "error", showRetry: true });
+        setCommentStatus(t("comments.loadError"), { kind: "error", showRetry: true });
       }else{
         setCommentStatus(null);
       }
@@ -2544,14 +3293,14 @@ function openGame(initialGame, options = {}){
     commentList.innerHTML = "";
 
     if(commentsState.loading){
-      setCommentStatus("Cargando comentarios…", { kind: "loading" });
+      setCommentStatus(t("comments.loading"), { kind: "loading" });
       commentEmpty.hidden = true;
       commentList.hidden = true;
       return;
     }
 
     if(commentsState.error){
-      setCommentStatus("No se pudieron cargar los comentarios.", { kind: "error", showRetry: true });
+      setCommentStatus(t("comments.loadError"), { kind: "error", showRetry: true });
       commentEmpty.hidden = true;
       commentList.hidden = true;
       return;
@@ -2569,8 +3318,9 @@ function openGame(initialGame, options = {}){
     commentList.hidden = false;
 
     const threads = buildCommentTree(items);
-    threads.forEach(comment => {
+    threads.forEach((comment, index) => {
       const node = createCommentElement(comment);
+      node.style.setProperty("--comment-stagger", `${240 + Math.min(index, 8) * 18}ms`);
       commentList.appendChild(node);
     });
 
@@ -2627,12 +3377,18 @@ function openGame(initialGame, options = {}){
     if(!commentTab || !commentToggle || !commentFormWrap) return;
     const isOpen = Boolean(open);
     const shouldAnimate = animate && commentTabOpenState !== isOpen;
-    const railFromRect = shouldAnimate && !commentSection?.classList.contains("is-stacked")
-      ? commentToggle.getBoundingClientRect()
+    const railFromGeometry = shouldAnimate && !commentSection?.classList.contains("is-stacked")
+      ? {
+          rect: commentToggle.getBoundingClientRect(),
+          hostRect: (modalShell || modalNode)?.getBoundingClientRect?.() || commentToggle.getBoundingClientRect()
+        }
       : null;
     commentTab.dataset.open = String(isOpen);
     commentToggle.setAttribute("aria-expanded", String(isOpen));
-    commentToggle.setAttribute("aria-label", isOpen ? "Cerrar comentarios" : "Abrir comentarios");
+    commentToggle.setAttribute("aria-label", isOpen
+      ? (currentLang === "en" ? "Close comments" : "Cerrar comentarios")
+      : (currentLang === "en" ? "Open comments" : "Abrir comentarios"));
+    modalNode?.classList.toggle("has-comments-open", isOpen);
     commentTab.classList.toggle("is-open", isOpen);
     commentTab.classList.remove("is-header-open");
     commentTabBody?.setAttribute("aria-hidden", String(!isOpen));
@@ -2644,9 +3400,10 @@ function openGame(initialGame, options = {}){
     }
     commentTabOpenState = isOpen;
     updateCommentLayout();
+    scheduleCommentJellyRefresh();
     if(shouldAnimate){
       triggerCommentTabAnimation(isOpen);
-      animateCommentRailTransition(railFromRect, isOpen);
+      animateCommentRailTransition(railFromGeometry, isOpen);
     }
   };
   setCommentTabState(false, { animate: false });
@@ -2711,8 +3468,14 @@ function openGame(initialGame, options = {}){
       if(commentSubmitButton) commentSubmitButton.disabled = false;
     }
   });
-  const showLoading = (message = "Cargando…")=> setModalDescription(modalDesc, `<p class="modal-status modal-status--loading">${message}</p>`, currentGame);
-  const showError = (message = "No se pudo cargar la información adicional. Intenta nuevamente.")=> setModalDescription(modalDesc, `<p class="modal-status modal-status--error">${message}</p>`, currentGame);
+  const showLoading = (message = "Cargando…")=> {
+    setModalDescription(modalDesc, `<p class="modal-status modal-status--loading">${message}</p>`, currentGame);
+    scheduleScrollCueSync();
+  };
+  const showError = (message = "No se pudo cargar la información adicional. Intenta nuevamente.")=> {
+    setModalDescription(modalDesc, `<p class="modal-status modal-status--error">${message}</p>`, currentGame);
+    scheduleScrollCueSync();
+  };
   const update = (data = {})=>{
     const previousId = currentGame?.id ?? null;
     currentGame = { ...currentGame, ...data };
@@ -2797,7 +3560,10 @@ function openGame(initialGame, options = {}){
   }
 
   const removeTrap = trapFocus(modalNode);
-  const handleResize = ()=> updateCommentLayout();
+  const handleResize = ()=>{
+    updateCommentLayout();
+    scheduleScrollCueSync();
+  };
   const cleanupModal = ()=>{
     if(typeof window !== "undefined"){
       window.removeEventListener("resize", handleResize);
@@ -2832,6 +3598,7 @@ function openGame(initialGame, options = {}){
   }
   if(modalClose) modalClose.addEventListener("click", ()=> performClose());
   openModalFragment(modalNode);
+  scheduleScrollCueSync();
 
   const discord = socials.find(s => /discord/i.test(s.name || s.url));
   if(discord && modalContent){
@@ -2889,9 +3656,11 @@ function initGameModal(initial = {}){
   const modalClose = fragment.querySelector(".tw-modal-close");
   const playerModeField = fragment.querySelector(".player-mode-field");
   const playerModeSelect = fragment.querySelector(".player-mode-select");
+  const publishingHelper = fragment.querySelector(".publishing-helper");
 
   const editorRoot = fragment.querySelector(".rich-editor");
   const editorAPI  = initRichEditor(editorRoot);
+  initPublishingHelper({ root: publishingHelper, editorRoot, titleInput });
 
   if(playerModeField){
     playerModeField.hidden = false;
@@ -3316,12 +4085,17 @@ function setupFaqButton(){
    ========================= */
 function ensureAuthTokenPrompt(){
   try{
-    let t = getAdminToken();
+    const t = getAdminToken();
     if(!t){
-      t = prompt("Pega tu AUTH_TOKEN de Netlify (solo para esta sesión):");
-      if(t) setAdminToken(t);
+      isAdmin = false;
+      persistAdmin(false);
+      setupAdminButton();
+      alert("Tu sesión admin no tiene AUTH_TOKEN. Vuelve a entrar como administrador.");
+      return false;
     }
+    return true;
   }catch (err) {}
+  return false;
 }
 
 function openAdminLoginModal(){
@@ -3335,37 +4109,201 @@ function openAdminLoginModal(){
   const modalClose    = modal.querySelector(".tw-modal-close");
 
   const imgDecor = node.querySelector(".tw-modal-image"); if (imgDecor) imgDecor.style.display = "none";
-
-  const accessWrap = document.createElement("label");
-  accessWrap.innerHTML = `Llave de acceso <input type="password" class="admin-access" required>
-    <span class="input-hint">Se valida contra el servidor y puede revocarse</span>`;
-  form.insertBefore(accessWrap, form.querySelector(".tw-modal-actions") || form.lastElementChild);
+  if(usernameInput){
+    usernameInput.autocomplete = "username";
+    usernameInput.autocapitalize = "none";
+    usernameInput.spellcheck = false;
+  }
+  if(pinInput){
+    pinInput.autocomplete = "current-password";
+  }
 
   const actions = form.querySelector(".tw-modal-actions") || form;
+
+  const accessWrap = document.createElement("label");
+  accessWrap.className = "admin-auth-field";
+  accessWrap.innerHTML = `<span data-i18n="admin.accessKey">${t("admin.accessKey")}</span>
+    <input type="password" class="admin-access" autocomplete="off" required>
+    <span class="input-hint" data-i18n="admin.accessHint">${t("admin.accessHint")}</span>`;
+  form.insertBefore(accessWrap, actions);
+
+  const tokenWrap = document.createElement("label");
+  tokenWrap.className = "admin-auth-field";
+  tokenWrap.innerHTML = `AUTH_TOKEN
+    <input type="password" class="admin-auth-token" autocomplete="off" required>
+    <span class="input-hint" data-i18n="admin.authTokenHint">${t("admin.authTokenHint")}</span>`;
+  form.insertBefore(tokenWrap, actions);
+  const tokenInput = tokenWrap.querySelector(".admin-auth-token");
+  if(tokenInput) tokenInput.value = getAdminToken();
+
+  const statusEl = document.createElement("p");
+  statusEl.className = "admin-login-status";
+  statusEl.setAttribute("role", "status");
+  statusEl.setAttribute("aria-live", "polite");
+  form.insertBefore(statusEl, actions);
+
+  const createGate = document.createElement("div");
+  createGate.className = "admin-create-gate";
+  createGate.innerHTML = `
+    <button type="button" class="admin-create-gate-toggle" data-i18n="admin.createToggle">${t("admin.createToggle")}</button>
+    <div class="admin-create-gate-panel" hidden>
+      <label><span data-i18n="admin.createPin">${t("admin.createPin")}</span>
+        <input type="password" class="admin-create-pin" inputmode="numeric" pattern="\\d{4,6}" minlength="4" maxlength="6" placeholder="pin" autocomplete="off">
+      </label>
+      <button type="button" class="admin-create-gate-submit" data-i18n="admin.validatePin">${t("admin.validatePin")}</button>
+      <span class="admin-create-gate-status" aria-live="polite"></span>
+    </div>`;
+  form.insertBefore(createGate, actions);
+
   const createBtn = document.createElement("button");
   createBtn.type = "button";
-  createBtn.className = "tw-btn-secondary is-gradient";
-  createBtn.textContent = "Crear usuario";
+  createBtn.className = "tw-btn-secondary is-gradient admin-create-user-btn";
+  createBtn.textContent = t("admin.createUser");
+  createBtn.dataset.i18n = "admin.createUser";
+  createBtn.hidden = true;
+  createBtn.disabled = true;
   actions.appendChild(createBtn);
 
   const confirmWrap = document.createElement("label");
-  confirmWrap.style.display = "none";
-  confirmWrap.innerHTML = `Confirmar PIN <input type="password" class="admin-pin2">
-    <span class="input-hint">4 a 6 dígitos</span>`;
+  confirmWrap.className = "admin-confirm-pin-wrap";
+  confirmWrap.hidden = true;
+  confirmWrap.innerHTML = `<span data-i18n="admin.confirmPin">${t("admin.confirmPin")}</span>
+    <input type="password" class="admin-pin2" inputmode="numeric" pattern="\\d{4,6}" minlength="4" maxlength="6" autocomplete="new-password">
+    <span class="input-hint" data-i18n="admin.confirmPinHint">${t("admin.confirmPinHint")}</span>`;
   form.insertBefore(confirmWrap, actions);
 
-  const savedHash = localStorage.getItem(LS_ADMIN_HASH);
-  const savedSalt = localStorage.getItem(LS_ADMIN_SALT);
-  const savedUser = localStorage.getItem(LS_ADMIN_USER);
+  const getSavedAdmin = () => ({
+    hash: localStorage.getItem(LS_ADMIN_HASH) || "",
+    salt: localStorage.getItem(LS_ADMIN_SALT) || "",
+    user: localStorage.getItem(LS_ADMIN_USER) || ""
+  });
+  const hasSavedAdmin = () => {
+    const saved = getSavedAdmin();
+    return Boolean(saved.hash && saved.salt && saved.user);
+  };
+
+  const protectedAdminFields = [
+    usernameInput?.closest("label"),
+    pinInput?.closest("label"),
+    accessWrap,
+    tokenWrap,
+    confirmWrap,
+    actions
+  ].filter(Boolean);
+
+  function setProtectedAdminFieldsVisible(flag){
+    protectedAdminFields.forEach((el)=> {
+      el.hidden = !flag;
+      if(el !== confirmWrap) el.style.display = flag ? "" : "none";
+    });
+    if(!flag){
+      confirmWrap.hidden = true;
+      confirmWrap.style.display = "none";
+    }
+    [usernameInput, pinInput, accessWrap.querySelector(".admin-access"), tokenInput, confirmWrap.querySelector(".admin-pin2"), submitBtn].forEach((el)=> {
+      if(el) el.disabled = !flag;
+    });
+  }
+
+  function setLoginStatus(text, tone = ""){
+    statusEl.textContent = text || "";
+    statusEl.dataset.tone = tone;
+  }
+
+  function setSubmitting(flag, label){
+    if(submitBtn){
+      submitBtn.disabled = Boolean(flag);
+      submitBtn.dataset.loading = flag ? "true" : "false";
+      submitBtn.textContent = flag ? (label || t("admin.validating")) : (isCreateMode.value ? t("admin.createAndEnter") : t("admin.enter"));
+    }
+  }
 
   const isCreateMode = { value: false };
-  function setModeCreate(flag){
-    isCreateMode.value = !!flag;
-    confirmWrap.style.display = flag ? "block" : "none";
-    if (h2) h2.textContent = flag ? "Crear usuario administrador" : "Entrar como administrador";
-    if (submitBtn) submitBtn.textContent = flag ? "Crear y entrar" : "Entrar";
+  const createGateToggle = createGate.querySelector(".admin-create-gate-toggle");
+  const createGatePanel = createGate.querySelector(".admin-create-gate-panel");
+  const createGatePin = createGate.querySelector(".admin-create-pin");
+  const createGateSubmit = createGate.querySelector(".admin-create-gate-submit");
+  const createGateStatus = createGate.querySelector(".admin-create-gate-status");
+  let createGateUnlocked = false;
+
+  function setGateStatus(text, tone = "") {
+    if(!createGateStatus) return;
+    createGateStatus.textContent = text || "";
+    createGateStatus.dataset.tone = tone;
   }
-  if (!savedHash || !savedSalt || !savedUser) setModeCreate(true);
+
+  function setModeCreate(flag){
+    const next = Boolean(flag && createGateUnlocked);
+    isCreateMode.value = next;
+    confirmWrap.hidden = !next;
+    if(confirmWrap) confirmWrap.style.display = next ? "flex" : "none";
+    if (h2) h2.textContent = next ? t("admin.createTitle") : t("admin.enterTitle");
+    if (submitBtn) submitBtn.textContent = next ? t("admin.createAndEnter") : t("admin.enter");
+    setLoginStatus(next ? t("admin.defineLocal") : "");
+  }
+
+  if(hasSavedAdmin()){
+    setProtectedAdminFieldsVisible(true);
+    setModeCreate(false);
+    if(h2) h2.textContent = t("admin.enterTitle");
+    createGateToggle.textContent = t("admin.createToggle");
+    setLoginStatus(t("admin.savedPrompt"));
+    usernameInput.value = getSavedAdmin().user;
+    pinInput?.focus();
+  }else{
+    setProtectedAdminFieldsVisible(false);
+    createGateToggle.textContent = t("admin.setupUser");
+    if(h2) h2.textContent = t("admin.verifyTitle");
+    setLoginStatus(t("admin.firstSetup"));
+  }
+
+  createGateToggle?.addEventListener("click", ()=> {
+    if(!createGatePanel) return;
+    createGatePanel.hidden = !createGatePanel.hidden;
+    if(!createGatePanel.hidden) createGatePin?.focus();
+  });
+
+  createGateSubmit?.addEventListener("click", async ()=> {
+    const createPin = (createGatePin?.value || "").trim();
+    if(!/^[0-9]{4,6}$/.test(createPin)){
+      setGateStatus("PIN numérico de 4 a 6 dígitos.", "error");
+      createGatePin?.focus();
+      return;
+    }
+    createGateSubmit.disabled = true;
+    setGateStatus(t("admin.validating"), "loading");
+    try{
+      await adminVerifyCreatePin(createPin);
+      createGateUnlocked = true;
+      setProtectedAdminFieldsVisible(true);
+      createBtn.hidden = false;
+      createBtn.disabled = false;
+      createGatePanel.hidden = true;
+      setGateStatus(t("admin.pinValidated"), "success");
+      setModeCreate(true);
+      usernameInput.value = "";
+      pinInput.value = "";
+      usernameInput?.focus();
+    }catch(err){
+      createGateUnlocked = false;
+      if(!hasSavedAdmin()) setProtectedAdminFieldsVisible(false);
+      createBtn.hidden = true;
+      createBtn.disabled = true;
+      setModeCreate(false);
+      if (h2) h2.textContent = hasSavedAdmin() ? t("admin.enterTitle") : t("admin.verifyTitle");
+      setGateStatus(err?.message || "PIN incorrecto", "error");
+      createGatePin?.focus();
+    }finally{
+      createGateSubmit.disabled = false;
+    }
+  });
+
+  createGatePin?.addEventListener("keydown", (e)=> {
+    if(e.key === "Enter"){
+      e.preventDefault();
+      createGateSubmit?.click();
+    }
+  });
   createBtn.addEventListener("click", ()=> setModeCreate(!isCreateMode.value));
 
   const removeTrap=trapFocus(node);
@@ -3377,34 +4315,53 @@ function openAdminLoginModal(){
     const user=(usernameInput.value||"").trim();
     const pin =(pinInput.value||"").trim();
     const accessPlain = node.querySelector(".admin-access")?.value?.trim();
-    if(!user || !pin || !accessPlain){ alert("Usuario, PIN y Llave son obligatorios."); return; }
-    if(!/^[0-9]{4,6}$/.test(pin)){ alert("PIN debe ser 4 a 6 dígitos."); return; }
+    const authToken = tokenInput?.value?.trim();
 
-    const accessHash = await sha256(accessPlain);
-    const res = await adminLoginByKeyHash(accessHash);
-    if(!res?.ok){ alert("Llave inválida o revocada."); return; }
+    if(!user || !pin || !accessPlain || !authToken){
+      setLoginStatus("Usuario, PIN, llave de acceso y AUTH_TOKEN son obligatorios.", "error");
+      return;
+    }
+    if(!/^[0-9]{4,6}$/.test(pin)){
+      setLoginStatus("PIN debe ser numérico de 4 a 6 dígitos.", "error");
+      pinInput?.focus();
+      return;
+    }
 
-    if(isCreateMode.value){
-      const pin2 = node.querySelector(".admin-pin2")?.value?.trim();
-      if(pin!==pin2){ alert("Los PIN no coinciden."); return; }
-      const salt=genSaltHex(16);
-      const hash=await hashCreds(user,pin,salt);
-      try{
+      setSubmitting(true);
+      setLoginStatus(t("admin.validating"), "loading");
+    try{
+      const accessHash = await sha256(accessPlain);
+      const res = await adminLoginByKeyHash(accessHash);
+      if(!res?.ok) throw new Error(res?.error || "Llave inválida o revocada.");
+
+      await adminVerifyAuthToken(authToken);
+
+      if(isCreateMode.value){
+        const pin2 = node.querySelector(".admin-pin2")?.value?.trim();
+        if(pin!==pin2) throw new Error("Los PIN no coinciden.");
+        const salt=genSaltHex(16);
+        const hash=await hashCreds(user,pin,salt);
         localStorage.setItem(LS_ADMIN_HASH,hash);
         localStorage.setItem(LS_ADMIN_SALT,salt);
         localStorage.setItem(LS_ADMIN_USER,user);
-      }catch (err) {}
-    } else {
-      if(user!==savedUser){ alert("Usuario o PIN incorrectos."); return; }
-      const hash=await hashCreds(user,pin,savedSalt);
-      if(hash!==savedHash){ alert("Usuario o PIN incorrectos."); return; }
-    }
+      } else {
+        const saved = getSavedAdmin();
+        if(!saved.hash || !saved.salt || !saved.user) throw new Error("Configura primero un usuario local.");
+        if(user!==saved.user) throw new Error("Usuario o PIN incorrectos.");
+        const hash=await hashCreds(user,pin,saved.salt);
+        if(hash!==saved.hash) throw new Error("Usuario o PIN incorrectos.");
+      }
 
-    isAdmin=true; persistAdmin(true);
-    closeModal(node, removeTrap, onEscape);
-    renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
-    ensureAuthTokenPrompt();
-    alert(isCreateMode.value ? "Usuario creado y sesión iniciada" : "¡Admin verificado!");
+      setAdminToken(authToken);
+      isAdmin=true; persistAdmin(true);
+      setLoginStatus(isCreateMode.value ? t("admin.createdEntering") : t("admin.entering"), "success");
+      renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
+      setTimeout(()=> closeModal(node, removeTrap, onEscape), 220);
+    }catch(err){
+      console.error("[admin login]", err);
+      setLoginStatus(err?.message || "No se pudo iniciar sesión.", "error");
+      setSubmitting(false);
+    }
   });
 
   openModalFragment(node);
@@ -3415,6 +4372,7 @@ function openAdminMenuModal(){
   const node = modal.querySelector(".tw-modal");
   const btnLogout = modal.querySelector(".admin-menu-logout");
   const btnKeys = modal.querySelector(".admin-menu-keys");
+  const btnForget = modal.querySelector(".admin-menu-forget");
   const modalClose = modal.querySelector(".tw-modal-close");
 
   const removeTrap = trapFocus(node);
@@ -3425,12 +4383,23 @@ function openAdminMenuModal(){
     isAdmin=false; persistAdmin(false);
     try {
       clearAdminToken();
+    } catch (err) {}
+    renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
+    alert("Sesión cerrada.");
+    closeModal(node, removeTrap, onEscape);
+  });
+
+  if(btnForget) btnForget.addEventListener("click", ()=>{
+    if(!confirm("Esto cerrará sesión y borrará el usuario/PIN local guardado en este navegador. ¿Continuar?")) return;
+    isAdmin=false; persistAdmin(false);
+    try {
+      clearAdminToken();
       localStorage.removeItem(LS_ADMIN_HASH);
       localStorage.removeItem(LS_ADMIN_SALT);
       localStorage.removeItem(LS_ADMIN_USER);
     } catch (err) {}
     renderRow(); renderHeroCarousel(); renderSocialBar(); setupAdminButton();
-    alert("Sesión cerrada.");
+    alert("Este dispositivo ya no recuerda el usuario administrador.");
     closeModal(node, removeTrap, onEscape);
   });
 
@@ -3814,7 +4783,13 @@ function setupAdminNotifications(){
 function setupAdminButton(){
   const btn=document.querySelector(".user-pill");
   if(btn){
-    btn.title = isAdmin ? "Cerrar sesión de administrador" : "Iniciar sesión de administrador";
+    const visible = shouldExposeAdminEntry();
+    btn.hidden = !visible;
+    btn.setAttribute("aria-hidden", String(!visible));
+    btn.tabIndex = visible ? 0 : -1;
+    btn.title = isAdmin
+      ? (currentLang === "en" ? "Open admin menu" : "Abrir menú administrador")
+      : (currentLang === "en" ? "Admin sign in" : "Iniciar sesión de administrador");
     btn.onclick = ()=>{
       if(isAdmin){
         openAdminMenuModal();
@@ -3823,17 +4798,306 @@ function setupAdminButton(){
       }
     };
   }
+  setupAdminShortcut();
   setupAdminNotifications();
 }
 
 /* =========================
    Botón footer → Descargas
    ========================= */
-function ensureDownloadsBadge(){
-  const pager = document.getElementById("gridPager");
-  if(!pager) return;
+function readDownloadsHistory(){
+  try{
+    const value = JSON.parse(localStorage.getItem(DOWNLOADS_HISTORY_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  }catch(err){
+    return [];
+  }
+}
 
-  let el = pager.querySelector(".pager-download-btn");
+function writeDownloadsHistory(downloads){
+  try{
+    localStorage.setItem(DOWNLOADS_HISTORY_KEY, JSON.stringify((downloads || []).slice(0, 50)));
+  }catch(err){ /* ignore */ }
+}
+
+function normalizeDownloadName(value){
+  return String(value || "").trim();
+}
+
+function isGenericDownloadName(value){
+  const name = normalizeDownloadName(value).toLowerCase();
+  if(!name) return true;
+  return (
+    name === "archivo" ||
+    name === "archivo.bin" ||
+    name === "file" ||
+    name === "download" ||
+    name === "descarga" ||
+    name === "torrent" ||
+    name.endsWith(".torrent")
+  );
+}
+
+function findGameTitleByDownloadId(downloadId){
+  const id = normalizeDownloadName(downloadId);
+  if(!id) return "";
+  const seen = new Set();
+  let foundTitle = "";
+  const matchesGame = (game) => {
+    if(!game || typeof game !== "object") return false;
+    const ids = [
+      game.drive_id,
+      game.gofile_id,
+      extractDriveId(game.first_link || ""),
+      extractGofileId(game.first_link || "")
+    ];
+    return ids.some(value => normalizeDownloadName(value) === id);
+  };
+  const readTitle = (game) => normalizeDownloadName(game?.title);
+  const scanGame = (game) => {
+    const title = readTitle(game);
+    if(!title) return "";
+    const key = game.id || `${title}:${game.drive_id || game.gofile_id || game.first_link || ""}`;
+    if(seen.has(key)) return "";
+    seen.add(key);
+    return matchesGame(game) ? title : "";
+  };
+
+  for(const game of recientes){
+    const title = scanGame(game);
+    if(title) return title;
+  }
+  postsCache.forEach(entry => {
+    if(foundTitle) return;
+    const items = Array.isArray(entry?.data?.items) ? entry.data.items : [];
+    for(const game of items){
+      const title = scanGame(game);
+      if(title){
+        foundTitle = title;
+        break;
+      }
+    }
+  });
+  if(foundTitle) return foundTitle;
+  fullCache.forEach(game => {
+    if(foundTitle) return;
+    const title = scanGame(game);
+    if(title) foundTitle = title;
+  });
+  return foundTitle;
+}
+
+function getDownloadDisplayName(entry = {}){
+  const explicitTitle = normalizeDownloadName(entry.gameTitle || entry.displayName || entry.title);
+  if(explicitTitle && !isGenericDownloadName(explicitTitle)) return explicitTitle;
+  const storedName = normalizeDownloadName(entry.name);
+  if(storedName && !isGenericDownloadName(storedName)) return storedName;
+  const inferredTitle = findGameTitleByDownloadId(entry.id);
+  if(inferredTitle) return inferredTitle;
+  return storedName || "Archivo";
+}
+
+function getDownloadFileName(entry = {}){
+  return normalizeDownloadName(entry.fileName || entry.filename || entry.name || entry.displayName);
+}
+
+function addDownloadHistory(entry){
+  const displayName = getDownloadDisplayName(entry);
+  const fileName = getDownloadFileName(entry);
+  const hist = readDownloadsHistory();
+  hist.unshift({ ...entry, name: displayName, displayName, fileName, date: entry?.date || Date.now() });
+  writeDownloadsHistory(hist);
+  syncDownloadsButtonState();
+  scheduleDownloadsPanelRender();
+}
+
+function getDownloadsPanel(){
+  return document.getElementById('downloads-panel');
+}
+
+function formatBytes(bytes){
+  const value = Number(bytes) || 0;
+  if(value <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const idx = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1024)));
+  return `${(value / Math.pow(1024, idx)).toFixed(idx > 1 ? 2 : 1)} ${units[idx]}`;
+}
+
+function getDownloadsSummary(){
+  const history = readDownloadsHistory();
+  const active = activeDownloads.length;
+  const paused = activeDownloads.filter(dl => dl.status === 'paused').length;
+  return { active, paused, history: history.length, total: active + history.length };
+}
+
+function syncDownloadsButtonState(){
+  const btn = document.querySelector('.pager-download-btn');
+  if(!btn) return;
+  const panel = getDownloadsPanel();
+  const isOpen = Boolean(panel?.classList.contains('open'));
+  const summary = getDownloadsSummary();
+  btn.classList.toggle('has-downloads', summary.total > 0);
+  btn.classList.toggle('has-active-downloads', summary.active > 0);
+  btn.setAttribute('aria-controls', 'downloads-panel');
+  btn.setAttribute('aria-haspopup', 'dialog');
+  btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  btn.setAttribute('aria-label', summary.active ? t("downloads.activeAria", { count: summary.active }) : t("downloads.title"));
+  const count = btn.querySelector('.download-button-count');
+  if(count){
+    count.hidden = summary.total <= 0;
+    count.textContent = summary.active ? String(summary.active) : String(summary.history);
+  }
+}
+
+function scheduleDownloadsPanelRender(panel = getDownloadsPanel()){
+  if(!panel || !panel.classList.contains('open')){
+    syncDownloadsButtonState();
+    return;
+  }
+  if(downloadsRenderFrame) return;
+  downloadsRenderFrame = requestAnimationFrame(()=>{
+    downloadsRenderFrame = 0;
+    renderDownloadsPanel(panel);
+  });
+}
+
+function ensureDownloadsPanel(){
+  let panel = getDownloadsPanel();
+  if(panel) return panel;
+
+  panel = document.createElement('aside');
+  panel.id = 'downloads-panel';
+  panel.className = 'downloads-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'false');
+  panel.setAttribute('aria-label', 'Descargas');
+  panel.setAttribute('aria-hidden', 'true');
+  panel.innerHTML = `
+    <div class="downloads-panel-head">
+      <div>
+        <h2>Descargas</h2>
+        <p class="downloads-summary">0 en historial</p>
+      </div>
+      <button type="button" class="downloads-close" aria-label="Cerrar descargas">×</button>
+    </div>
+    <div class="downloads-panel-actions">
+      <button type="button" class="clear-history">Limpiar historial</button>
+    </div>
+    <div class="downloads-content" aria-live="polite"></div>`;
+  document.body.appendChild(panel);
+
+  panel.querySelector('.clear-history').onclick = () => {
+    localStorage.removeItem(DOWNLOADS_HISTORY_KEY);
+    renderDownloadsPanel(panel);
+  };
+  panel.querySelector('.downloads-close').onclick = closeDownloadsPanel;
+  return panel;
+}
+
+function closeDownloadsPanel(){
+  const panel = getDownloadsPanel();
+  if(!panel) return;
+  panel.classList.remove('open');
+  panel.setAttribute('aria-hidden', 'true');
+  if(panel._outsideBindTimer){
+    clearTimeout(panel._outsideBindTimer);
+    panel._outsideBindTimer = 0;
+  }
+  if(panel._outsideHandler){
+    document.removeEventListener('click', panel._outsideHandler);
+    panel._outsideHandler = null;
+  }
+  if(panel._keyHandler){
+    document.removeEventListener('keydown', panel._keyHandler);
+    panel._keyHandler = null;
+  }
+  if(panel._resizeHandler){
+    window.removeEventListener('resize', panel._resizeHandler);
+    panel._resizeHandler = null;
+  }
+  syncDownloadsButtonState();
+}
+
+function openDownloadsPanel({ focus = false } = {}){
+  document.querySelector('.dl-tip')?.remove();
+  const panel = ensureDownloadsPanel();
+  const badge = document.querySelector('.pager-download-btn');
+
+  renderDownloadsPanel(panel);
+  positionDownloadsPanel(panel);
+
+  if(panel.classList.contains('open')){
+    if(focus) panel.querySelector('.downloads-close')?.focus();
+    return panel;
+  }
+
+  panel.classList.add('open');
+  panel.setAttribute('aria-hidden', 'false');
+  syncDownloadsButtonState();
+
+  if(panel._outsideBindTimer){
+    clearTimeout(panel._outsideBindTimer);
+    panel._outsideBindTimer = 0;
+  }
+  if(panel._outsideHandler){
+    document.removeEventListener('click', panel._outsideHandler);
+  }
+  if(panel._keyHandler){
+    document.removeEventListener('keydown', panel._keyHandler);
+  }
+  if(panel._resizeHandler){
+    window.removeEventListener('resize', panel._resizeHandler);
+  }
+
+  const onOutside = ev => {
+    if(panel.contains(ev.target) || (badge && badge.contains(ev.target))) return;
+    closeDownloadsPanel();
+  };
+  const onKey = ev => {
+    if(ev.key === 'Escape') closeDownloadsPanel();
+  };
+  const onResize = () => positionDownloadsPanel(panel);
+  panel._outsideHandler = onOutside;
+  panel._keyHandler = onKey;
+  panel._resizeHandler = onResize;
+  panel._outsideBindTimer = setTimeout(() => {
+    panel._outsideBindTimer = 0;
+    if(panel.classList.contains('open') && panel._outsideHandler === onOutside){
+      document.addEventListener('click', onOutside);
+    }
+  }, 0);
+  document.addEventListener('keydown', onKey);
+  window.addEventListener('resize', onResize, { passive: true });
+  if(focus) panel.querySelector('.downloads-close')?.focus();
+  return panel;
+}
+
+function positionDownloadsPanel(panel = getDownloadsPanel()){
+  if(!panel) return;
+  const badge = document.querySelector('.pager-download-btn');
+  const panelWidth = Math.min(460, Math.max(300, window.innerWidth * 0.9));
+  panel.style.width = `${panelWidth}px`;
+  if(!badge){
+    panel.style.left = '12px';
+    panel.style.bottom = '64px';
+    return;
+  }
+  const rect = badge.getBoundingClientRect();
+  const left = Math.min(window.innerWidth - panelWidth - 12, Math.max(12, rect.left + (rect.width / 2) - (panelWidth / 2)));
+  panel.style.left = `${left}px`;
+  panel.style.bottom = `${Math.max(58, window.innerHeight - rect.top + 10)}px`;
+}
+
+function removePausedDriveDownload(dl){
+  if(!dl) return;
+  try{ localStorage.removeItem(`${DRIVE_STATE_PREFIX}${dl.id}`); }catch(err){}
+  const idx = activeDownloads.indexOf(dl);
+  if(idx >= 0) activeDownloads.splice(idx, 1);
+  scheduleDownloadsPanelRender();
+}
+
+function ensureDownloadsBadge(){
+  let el = document.querySelector(".pager-download-btn");
   const svgMarkup = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16.5a1 1 0 0 1-.7-.29l-5-5a1 1 0 0 1 1.4-1.42L12 14.09l4.3-4.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-.7.29Z"/></svg>';
 
   // Si fuera <a>, lo convierto a <button> para abrir Descargas (sin romper estilos)
@@ -3850,28 +5114,37 @@ function ensureDownloadsBadge(){
     el = document.createElement("button");
     el.type = "button";
     el.className = "pager-download-btn";
-    const dashes = pager.querySelector(".pager-dashes");
-    if(dashes){
-      pager.insertBefore(el, dashes);
-    }else{
-      pager.appendChild(el);
-    }
   }
-  el.innerHTML = `${svgMarkup}<span>Descargas</span>`;
-  el.setAttribute("aria-label", "Descargas");
+  if(el.parentElement !== document.body) document.body.appendChild(el);
+  el.innerHTML = `${svgMarkup}<span data-i18n="downloads.title">${t("downloads.title")}</span><span class="download-button-count" hidden></span>`;
+  el.setAttribute("aria-label", t("downloads.title"));
   el.onclick = toggleDownloadsPanel;
+  syncDownloadsButtonState();
   return el;
 }
 
 function renderDownloadsPanel(panel){
-  panel = panel || document.getElementById('downloads-panel');
+  panel = panel || getDownloadsPanel();
   if(!panel) return;
   const desc = panel.querySelector('.downloads-content');
+  const summaryEl = panel.querySelector('.downloads-summary');
+  const clearBtn = panel.querySelector('.clear-history');
   if(!desc) return;
+
+  const downloads = readDownloadsHistory();
+  const summary = getDownloadsSummary();
+  if(summaryEl){
+    const pieces = [];
+    if(summary.active) pieces.push(`${summary.active} activas`);
+    if(summary.paused) pieces.push(`${summary.paused} pausadas`);
+    pieces.push(`${summary.history} en historial`);
+    summaryEl.textContent = pieces.join(' · ');
+  }
+  if(clearBtn){
+    clearBtn.hidden = downloads.length === 0;
+  }
+
   desc.innerHTML = '';
-  let downloads = [];
-  try{ downloads = JSON.parse(localStorage.getItem('tgx_downloads') || '[]'); }
-  catch(err){ downloads = []; }
 
   if (activeDownloads.length) {
     const aTitle = document.createElement('h3');
@@ -3882,28 +5155,40 @@ function renderDownloadsPanel(panel){
       const li = document.createElement('li');
       li.className = 'download-item active';
       const name = document.createElement('strong');
-      name.textContent = dl.name || 'Archivo';
+      name.textContent = getDownloadDisplayName(dl);
       const prog = document.createElement('progress');
       prog.className = 'download-progress';
       prog.max = dl.total || 1;
-      prog.value = dl.loaded;
+      prog.value = dl.loaded || 0;
       const status = document.createElement('div');
       status.className = 'download-status';
       const pct = document.createElement('span');
-      pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
+      const meta = document.createElement('span');
+      meta.className = 'download-meta';
       const speedEl = document.createElement('span');
       speedEl.className = 'download-speed';
       const toMBps = (bytesPerSecond) => (bytesPerSecond || 0) / (1024 * 1024);
       let shownSpeed = toMBps(dl.speed);
-      speedEl.textContent = shownSpeed.toFixed(2) + ' MB/s';
+      let paintPending = false;
+      const paint = () => {
+        prog.max = dl.total || 1;
+        prog.value = dl.loaded || 0;
+        const loaded = dl.loaded || 0;
+        const total = dl.total || 0;
+        pct.textContent = total ? `${Math.floor((loaded / total) * 100)}%` : 'Preparando';
+        meta.textContent = total ? `${formatBytes(loaded)} / ${formatBytes(total)}` : formatBytes(loaded);
+        const current = toMBps(dl.speed);
+        shownSpeed = shownSpeed * 0.8 + current * 0.2;
+        speedEl.textContent = dl.status === 'paused' ? 'Pausada' : `${shownSpeed.toFixed(2)} MB/s`;
+      };
       if (dl.status === 'paused') {
         const resumeBtn = document.createElement('button');
         resumeBtn.type = 'button';
         resumeBtn.classList.add('resume-btn');
         resumeBtn.textContent = 'Continuar';
         resumeBtn.addEventListener('click', () => {
-          downloadFromDrive({ id: dl.id, name: dl.name, dl, resume: true });
-          renderDownloadsPanel();
+          downloadFromDrive({ id: dl.id, name: getDownloadDisplayName(dl), dl, resume: true });
+          scheduleDownloadsPanelRender(panel);
         });
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
@@ -3911,27 +5196,28 @@ function renderDownloadsPanel(panel){
         deleteBtn.textContent = 'Eliminar';
         deleteBtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
-          dl.remove?.();
-          setTimeout(() => li.remove(), 0);
+          if(typeof dl.remove === 'function') dl.remove();
+          else removePausedDriveDownload(dl);
         });
-        status.append(pct, speedEl, resumeBtn, deleteBtn);
+        status.append(pct, meta, speedEl, resumeBtn, deleteBtn);
       } else {
         const actionBtn = document.createElement('button');
         actionBtn.type = 'button';
         actionBtn.classList.add('cancel-btn');
         actionBtn.textContent = 'Cancelar';
-        actionBtn.addEventListener('click', () => { dl.cancel?.({ purge: true }); li.remove(); });
-        status.append(pct, speedEl, actionBtn);
+        actionBtn.addEventListener('click', () => { dl.cancel?.({ purge: true }); });
+        status.append(pct, meta, speedEl, actionBtn);
       }
       li.append(name, prog, status);
       aList.appendChild(li);
+      paint();
       dl.onupdate = () => {
-        prog.max = dl.total || 1;
-        prog.value = dl.loaded;
-        pct.textContent = dl.total ? `${Math.floor((dl.loaded/dl.total)*100)}%` : '0%';
-        const current = toMBps(dl.speed);
-        shownSpeed = shownSpeed * 0.8 + current * 0.2;
-        speedEl.textContent = shownSpeed.toFixed(2) + ' MB/s';
+        if(paintPending) return;
+        paintPending = true;
+        requestAnimationFrame(()=>{
+          paintPending = false;
+          paint();
+        });
       };
     });
     desc.appendChild(aList);
@@ -3952,15 +5238,14 @@ function renderDownloadsPanel(panel){
       d.platform = platform;
       li.dataset.platform = platform;
       const name = document.createElement('strong');
-      name.textContent = d.name || 'Archivo';
+      name.textContent = getDownloadDisplayName(d);
       const date = document.createElement('span');
       const dt = d.created_at || d.date;
-      date.textContent = dt ? ` – ${new Date(dt).toLocaleString()} – ` : ' ';
+      date.className = 'download-date';
+      date.textContent = dt ? new Date(dt).toLocaleString() : '';
       const status = document.createElement('div');
-      status.className = 'download-status';
-      status.textContent = 'Descarga exitosa';
-      // TODO: si se desea reintentar en el futuro, almacenar un campo `status`
-      // y mostrar el botón solo para elementos fallidos.
+      status.className = 'download-status download-status--done';
+      status.textContent = platform === 'gofile' ? 'Link abierto' : 'Descarga completada';
       li.append(name, date, status);
       list.appendChild(li);
     });
@@ -3977,71 +5262,37 @@ function renderDownloadsPanel(panel){
       desc.appendChild(tBtn);
     }
   } else if(!activeDownloads.length) {
-    desc.textContent = 'No hay descargas.';
+    const empty = document.createElement('p');
+    empty.className = 'downloads-empty';
+    empty.textContent = 'Cuando descargues algo, aparecerá aquí con progreso, velocidad e historial.';
+    desc.appendChild(empty);
   }
+  syncDownloadsButtonState();
 }
 
 function toggleDownloadsPanel(){
-  document.querySelector('.dl-tip')?.remove();
-  let panel = document.getElementById('downloads-panel');
-  if(!panel){
-    panel = document.createElement('aside');
-    panel.id = 'downloads-panel';
-    panel.className = 'downloads-panel';
-    panel.innerHTML = `
-      <h2>Descargas</h2>
-      <button type="button" class="clear-history">Limpiar historial</button>
-      <div class="downloads-content"></div>`;
-    document.body.appendChild(panel);
-  }
-
-  const badge = document.querySelector('.pager-download-btn');
-
-  panel.querySelector('.clear-history').onclick = () => {
-    localStorage.removeItem('tgx_downloads');
-    renderDownloadsPanel(panel);
-  };
-
-  const onOutside = ev => {
-    if(panel.contains(ev.target) || (badge && badge.contains(ev.target))) return;
-    panel.classList.remove('open');
-    document.removeEventListener('click', onOutside);
-    panel._outsideHandler = null;
-  };
-
+  const panel = ensureDownloadsPanel();
   if(panel.classList.contains('open')){
-    panel.classList.remove('open');
-    if(panel._outsideHandler) document.removeEventListener('click', panel._outsideHandler);
-    panel._outsideHandler = null;
+    closeDownloadsPanel();
     return;
   }
-
-  renderDownloadsPanel(panel);
-  if(badge){
-    const rect = badge.getBoundingClientRect();
-    const panelWidth = Math.min(460, Math.max(280, window.innerWidth * 0.9));
-    panel.style.width = `${panelWidth}px`;
-    const left = Math.min(window.innerWidth - panelWidth - 12, Math.max(12, rect.left + (rect.width / 2) - (panelWidth / 2)));
-    panel.style.left = `${left}px`;
-    panel.style.bottom = `${Math.max(56, window.innerHeight - rect.top + 10)}px`;
-  }
-  panel.classList.add('open');
-  panel._outsideHandler = onOutside;
-  document.addEventListener('click', onOutside);
+  openDownloadsPanel({ focus: true });
 }
 document.addEventListener('DOMContentLoaded', resumeDriveDownloads);
 function resumeDriveDownloads(){
   for(let i=0; i<localStorage.length; i++){
     const key = localStorage.key(i);
-    if(!key || !key.startsWith('tgx_drive_')) continue;
+    if(!key || !key.startsWith(DRIVE_STATE_PREFIX)) continue;
     try{
       const state = JSON.parse(localStorage.getItem(key) || '{}');
       if(!state || !Array.isArray(state.completed)) continue;
-      const id = key.slice('tgx_drive_'.length);
-      const name = state.name || 'Archivo';
+      const id = key.slice(DRIVE_STATE_PREFIX.length);
+      const name = getDownloadDisplayName({ id, name: state.name, displayName: state.displayName });
       const dl = {
         id,
         name,
+        displayName: name,
+        fileName: state.fileName || state.name || "",
         total: state.total || 0,
         loaded: state.loaded || 0,
         progress: state.total ? state.loaded / state.total : 0,
@@ -4049,13 +5300,16 @@ function resumeDriveDownloads(){
         status: 'paused',
         speed: 0,
         onupdate: null,
-        cancel: null
+        cancel: null,
+        remove: null
       };
+      dl.remove = () => removePausedDriveDownload(dl);
       activeDownloads.push(dl);
     }catch(err){ /* ignore */ }
   }
+  syncDownloadsButtonState();
   if(activeDownloads.length){
-    renderDownloadsPanel();
+    scheduleDownloadsPanelRender();
   }
 }
 ensureDownloadsBadge();
@@ -4091,7 +5345,7 @@ async function openGofileFolder(id, title){
       link.textContent = file.name || 'Archivo';
       link.addEventListener('click', ev => {
         ev.preventDefault();
-        downloadFromGofile({ id: file.id, name: file.name });
+        downloadFromGofile({ id: file.id, name: title || file.name, fileName: file.name, gameTitle: title });
       });
       li.appendChild(link);
       list.appendChild(li);
@@ -4116,10 +5370,15 @@ async function downloadFromGofile(item){
     if(!data.url) throw new Error('no url');
 
     try{
-      const hist = JSON.parse(localStorage.getItem('tgx_downloads') || '[]');
-      hist.unshift({ id:item.id, name:item.name||item.title||null, date:Date.now(), url:data.url, platform:'gofile' });
-      hist.splice(50);
-      localStorage.setItem('tgx_downloads', JSON.stringify(hist));
+      addDownloadHistory({
+        id: item.id,
+        name: item.gameTitle || item.title || item.name || null,
+        fileName: item.fileName || item.name || null,
+        gameTitle: item.gameTitle || item.title || "",
+        url: data.url,
+        platform:'gofile'
+      });
+      openDownloadsPanel();
     }catch(err){ /* ignore */ }
 
     window.open(data.url, '_blank');
@@ -4131,10 +5390,16 @@ async function downloadFromGofile(item){
 
 async function downloadSingleFile(f, dl){
   const size = parseInt(f.size || '0', 10);
-  const stateKey = `tgx_drive_${dl.id}`;
+  const stateKey = `${DRIVE_STATE_PREFIX}${dl.id}`;
   const persist = () => {
     try {
-      localStorage.setItem(stateKey, JSON.stringify({ loaded: dl.loaded, total: dl.total, name: dl.name }));
+      localStorage.setItem(stateKey, JSON.stringify({
+        loaded: dl.loaded,
+        total: dl.total,
+        name: getDownloadDisplayName(dl),
+        displayName: getDownloadDisplayName(dl),
+        fileName: dl.fileName || ""
+      }));
     } catch (_) {}
   };
   const startLoaded = dl.loaded;
@@ -4144,14 +5409,28 @@ async function downloadSingleFile(f, dl){
     dl.progress = dl.total ? dl.loaded / dl.total : 0;
     persist();
     dl.onupdate && dl.onupdate(dl);
-    renderDownloadsPanel();
   }};
-  dl.cancel = (opts) => subDl.cancel?.(opts);
+  dl.cancel = (opts) => {
+    subDl.cancel?.(opts);
+    if(opts?.purge){
+      const idx = activeDownloads.indexOf(dl);
+      if(idx >= 0) activeDownloads.splice(idx, 1);
+      try{ localStorage.removeItem(stateKey); }catch(_){}
+      scheduleDownloadsPanelRender();
+    }
+  };
   await downloadFromDrive({ id: f.id, name: f.name, dl: subDl, skipHistory: true });
   dl.loaded = startLoaded + size;
   dl.progress = dl.total ? dl.loaded / dl.total : 0;
   persist();
-  renderDownloadsPanel();
+  scheduleDownloadsPanelRender();
+}
+
+async function recordDriveDownload(id){
+  if(!id) return;
+  try{
+    await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}&log=1`, { cache: 'no-store' });
+  }catch(err){ /* no bloquea la descarga local */ }
 }
 
 async function downloadFromDrive(input){
@@ -4161,23 +5440,52 @@ async function downloadFromDrive(input){
   try {
     let parts = Array.isArray(input) ? input : input?.parts;
     let id    = Array.isArray(input) ? input[0]?.id : input?.id;
-    const resume = !!input?.resume;
     const skipHistory = !!input?.skipHistory;
+    const requestedName = normalizeDownloadName(Array.isArray(input) ? input[0]?.name : input?.name);
+    const requestedTitle = normalizeDownloadName(input?.gameTitle || input?.title || requestedName);
     let makeUrl;
     if(!id) throw new Error('missing id');
     const meta = await fetch(`/.netlify/functions/drive?id=${encodeURIComponent(id)}`);
-    if(!meta.ok) throw new Error('meta failed');
+    if(!meta.ok){
+      const detail = await meta.json().catch(()=> ({}));
+      throw new Error(detail?.detail || detail?.error || 'No se pudo leer el archivo de Drive');
+    }
     const m = await meta.json();
     if (m.mimeType === 'application/vnd.google-apps.folder') {
       const r = await fetch(`/.netlify/functions/drive?list=${encodeURIComponent(id)}`);
+      if(!r.ok){
+        const detail = await r.json().catch(()=> ({}));
+        throw new Error(detail?.detail || detail?.error || 'No se pudo listar la carpeta de Drive');
+      }
       const data = await r.json();
       const files = data.files || [];
+      if(!files.length){
+        throw new Error('La carpeta de Drive no tiene archivos visibles para descargar');
+      }
       const total = files.reduce((s,f)=>s + parseInt(f.size||0,10),0);
       const existing = input?.dl;
-      const dl = existing || { id, name: m.name, total, loaded: 0, progress: 0, status: 'downloading', speed: 0, onupdate: null };
+      const folderName = normalizeDownloadName(m.name);
+      const displayName = requestedTitle || (!isGenericDownloadName(folderName) ? folderName : getDownloadDisplayName({ id, name: folderName }));
+      const dl = existing || {
+        id,
+        name: displayName,
+        displayName,
+        fileName: folderName,
+        total,
+        loaded: 0,
+        progress: 0,
+        status: 'downloading',
+        speed: 0,
+        onupdate: null
+      };
+      if(existing){
+        dl.name = getDownloadDisplayName({ ...dl, id, name: dl.name || displayName, displayName });
+        dl.displayName = dl.name;
+        dl.fileName = dl.fileName || folderName;
+      }
       dl.total = total;
       if(!existing) activeDownloads.push(dl);
-      renderDownloadsPanel();
+      openDownloadsPanel();
       for (const f of files) {
         await downloadSingleFile(f, dl);
       }
@@ -4185,16 +5493,22 @@ async function downloadFromDrive(input){
       const idx = activeDownloads.indexOf(dl);
       if(idx>=0) activeDownloads.splice(idx,1);
       try {
-        const hist = JSON.parse(localStorage.getItem('tgx_downloads')||'[]');
-        hist.unshift({ id, name: dl.name, date: Date.now(), platform: 'drive' });
-        hist.splice(50);
-        localStorage.setItem('tgx_downloads', JSON.stringify(hist));
+        addDownloadHistory({
+          id,
+          name: getDownloadDisplayName(dl),
+          displayName: getDownloadDisplayName(dl),
+          fileName: dl.fileName || folderName,
+          gameTitle: requestedTitle || getDownloadDisplayName(dl),
+          platform: 'drive'
+        });
+        void recordDriveDownload(id);
       } catch (_) {}
-      localStorage.removeItem(`tgx_drive_${dl.id}`);
-      renderDownloadsPanel();
+      localStorage.removeItem(`${DRIVE_STATE_PREFIX}${dl.id}`);
+      scheduleDownloadsPanelRender();
       return;
     }
-    const name = m.name || input?.name || 'archivo.bin';
+    const fileName = normalizeDownloadName(m.name) || requestedName || 'archivo.bin';
+    const displayName = requestedTitle || (!isGenericDownloadName(fileName) ? fileName : getDownloadDisplayName({ id, name: fileName }));
     makeUrl = (start, end) =>
       `/.netlify/functions/drive?id=${encodeURIComponent(id)}&range=${start}-${end}`;
     if(!parts){
@@ -4221,9 +5535,26 @@ async function downloadFromDrive(input){
       } catch (_) { resolve(null); }
     });
     const controller = new AbortController();
-    const stateKey = `tgx_drive_${id}`;
+    const stateKey = `${DRIVE_STATE_PREFIX}${id}`;
     const existing = input?.dl;
-    const dl = existing || { id, name, total:0, loaded:0, progress:0, completed:[], status:'downloading', speed:0, onupdate:null };
+    const dl = existing || {
+      id,
+      name: displayName,
+      displayName,
+      fileName,
+      total:0,
+      loaded:0,
+      progress:0,
+      completed:[],
+      status:'downloading',
+      speed:0,
+      onupdate:null
+    };
+    if(existing){
+      dl.name = getDownloadDisplayName({ ...dl, id, name: dl.name || displayName, displayName });
+      dl.displayName = dl.name;
+      dl.fileName = dl.fileName || fileName;
+    }
 
     const stopActiveDownload = () => {
       try { controller.abort(); } catch (_) {}
@@ -4257,7 +5588,7 @@ async function downloadFromDrive(input){
       dl.status = status;
       void purgePersistedState();
       removeFromActive();
-      renderDownloadsPanel();
+      scheduleDownloadsPanelRender();
     };
 
     dl.status = 'downloading';
@@ -4269,26 +5600,13 @@ async function downloadFromDrive(input){
       stopActiveDownload();
       dl.status = 'paused';
       persist();
-      renderDownloadsPanel();
+      scheduleDownloadsPanelRender();
     };
     dl.remove = () => {
       cleanupAndRemove('removed');
     };
     if(!existing) activeDownloads.push(dl);
-    const badge = document.querySelector('.pager-download-btn');
-    if (badge && !resume) {
-      document.querySelector('.dl-tip')?.remove();
-      const tip = document.createElement('div');
-      tip.className = 'dl-tip';
-      tip.textContent = 'Tu descarga ya está en progreso';
-      document.body.appendChild(tip);
-      const rect = badge.getBoundingClientRect();
-      const tipRect = tip.getBoundingClientRect();
-      const left = Math.min(window.innerWidth - tipRect.width - 8, Math.max(8, rect.left + (rect.width / 2) - (tipRect.width / 2)));
-      tip.style.left = `${left}px`;
-      tip.style.top = `${Math.max(8, rect.top - tipRect.height - 8)}px`;
-      setTimeout(() => tip.remove(), 4000);
-    }
+    openDownloadsPanel();
 
     dl.completed = Array(parts.length).fill(false);
     dl.loaded = 0;
@@ -4324,7 +5642,7 @@ async function downloadFromDrive(input){
 
     dl.total = parts.reduce((s,p)=> s + ((p.end!=null?p.end:p.start) - (p.start||0) + 1),0);
     const saver = await loadStreamSaver();
-    const fileStream = saver.createWriteStream(name, { size: dl.total });
+    const fileStream = saver.createWriteStream(fileName, { size: dl.total });
     writer = fileStream.getWriter();
 
     let lastTime = performance.now(), lastLoaded = dl.loaded, lastSpeedTime = lastTime;
@@ -4338,7 +5656,9 @@ async function downloadFromDrive(input){
           completed: dl.completed,
           loaded: dl.loaded,
           partCount: parts.length,
-          name,
+          name: getDownloadDisplayName(dl),
+          displayName: getDownloadDisplayName(dl),
+          fileName,
           total: dl.total
         }));
       } catch (err) {}
@@ -4465,23 +5785,29 @@ async function downloadFromDrive(input){
       }
       localStorage.removeItem(stateKey);
     if(!skipHistory){
-      const hist = JSON.parse(localStorage.getItem('tgx_downloads')||'[]');
-      hist.unshift({ id, name, date: Date.now(), platform:'drive' });
-      hist.splice(50);
-      localStorage.setItem('tgx_downloads', JSON.stringify(hist));
+      addDownloadHistory({
+        id,
+        name: getDownloadDisplayName(dl),
+        displayName: getDownloadDisplayName(dl),
+        fileName,
+        gameTitle: requestedTitle || getDownloadDisplayName(dl),
+        platform:'drive'
+      });
+      void recordDriveDownload(id);
     }
     dl.status='done';
     const idx = activeDownloads.indexOf(dl);
     if(idx>=0) activeDownloads.splice(idx,1);
     if (speedTimer) clearInterval(speedTimer);
     emit(true);
-    renderDownloadsPanel();
+    scheduleDownloadsPanelRender();
   } catch(err){
     console.error('[downloadFromDrive]', err);
     if(writer && !writerClosed){ try{ await writer.abort(); }catch(_){ } writerClosed = true; }
     if (speedTimer) clearInterval(speedTimer);
-    alert('No se pudo descargar');
-    renderDownloadsPanel();
+    const reason = err?.message ? `: ${err.message}` : '';
+    alert(`No se pudo descargar${reason}`);
+    scheduleDownloadsPanelRender();
   }
 }
 
@@ -4586,7 +5912,10 @@ async function reloadData(){
   await loadPostsPage({ force: true });
 }
 async function initData(){
+  setupLanguageToggle();
+  setupGridResizeObserver();
   const postsPromise = loadPostsPage();
+  requestAnimationFrame(()=> requestAnimationFrame(()=> schedulePageSizeSync(0)));
 
   renderSocialBar();
   const socialsPromise = (async ()=>{
@@ -4608,7 +5937,9 @@ async function initData(){
 
   await Promise.allSettled([postsPromise, socialsPromise]);
 }
+setupGridResizeObserver();
 recalcPageSize();
+renderHeroCarousel();
 let resizeRenderTimer = null;
 window.addEventListener('resize', ()=>{
   if(resizeRenderTimer) clearTimeout(resizeRenderTimer);
@@ -4623,62 +5954,6 @@ window.addEventListener('resize', ()=>{
   }, 120);
 });
 initData();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

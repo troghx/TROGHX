@@ -7,7 +7,7 @@
   <meta name="description" content="TGX reúne publicaciones de juegos con enlaces verificados, descripciones y comentarios de la comunidad." />
   <meta name="theme-color" content="#05070f" />
   <link rel="icon" href="assets/images/favicon.png" type="image/png" />
-  <link rel="stylesheet" href="styles.css?v=20260506-3" />
+  <link rel="stylesheet" href="styles.css?v=20260523-6" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600&display=swap" rel="stylesheet" />
@@ -21,16 +21,20 @@
       </div>
       <div class="search-box">
         <label class="search">
-          <input type="search" id="searchInput" placeholder="Buscar juegos…" aria-label="Buscar" />
+          <input type="search" id="searchInput" placeholder="Buscar juegos…" aria-label="Buscar" data-i18n-placeholder="search.placeholder" data-i18n-aria="search.aria" />
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16a6.471 6.471 0 004.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM9.5 14C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         </label>
         <div class="info-btns">
           <button class="dmca-btn" type="button">DMCA</button>
-          <button class="dmca-btn faq-btn" type="button">FAQ</button>
+          <button class="dmca-btn faq-btn" type="button" data-i18n="nav.faq">FAQ</button>
         </div>
       </div>
       <div class="admin-controls">
-        <button class="user-pill" aria-label="Iniciar sesión como administrador">
+        <button class="lang-toggle" type="button" aria-label="Cambiar idioma" data-i18n-aria="lang.toggle">
+          <span aria-hidden="true">🌐</span>
+          <span class="lang-toggle-code">ES</span>
+        </button>
+        <button class="user-pill" aria-label="Iniciar sesión como administrador" data-i18n-aria="admin.loginAria" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
         </button>
         <div class="admin-notify" hidden>
@@ -42,10 +46,10 @@
           </button>
           <div class="admin-notify-panel" id="adminNotifyPanel" role="dialog" aria-modal="false" aria-label="Notificaciones de comentarios" hidden tabindex="-1">
             <div class="admin-notify-header">
-              <h3>Notificaciones</h3>
-              <button type="button" class="admin-notify-refresh">Actualizar</button>
+              <h3 data-i18n="admin.notifications">Notificaciones</h3>
+              <button type="button" class="admin-notify-refresh" data-i18n="admin.refresh">Actualizar</button>
             </div>
-            <p class="admin-notify-empty">Sin comentarios nuevos.</p>
+            <p class="admin-notify-empty" data-i18n="admin.noNewComments">Sin comentarios nuevos.</p>
             <ul class="admin-notify-list" role="list"></ul>
           </div>
         </div>
@@ -55,8 +59,8 @@
     <section id="hero" class="hero card" aria-label="Destacado">
       <div class="hero-copy hero-banner">
         <div class="hero-message">
-          <h1>Descargas sin acortadores, verificadas y limpias</h1>
-          <p>Contáctanos en nuestras redes sociales para sugerir contenido o reportar problemas.</p>
+          <h1 data-i18n="hero.title">Juegos listos para descargar, sin vueltas</h1>
+          <p data-i18n="hero.subtitle">Contenido revisado, enlaces claros y soporte directo con la comunidad TGX.</p>
           <div class="socials">
             <div class="social-bar" aria-label="Redes sociales"></div>
           </div>
@@ -66,19 +70,19 @@
 
     <section class="row section-grid" id="recientes">
       <div class="row-head">
-        <h3>Recientes</h3>
+        <h3 data-i18n="section.recent">Recientes</h3>
         <div class="row-tools"></div>
       </div>
 
       <div class="grid" id="gridRecientes" data-grid="recientes"></div>
 
       <nav class="pager" id="gridPager" aria-label="Paginación de recientes">
-        <span class="sr-only pager-live" aria-live="polite">Página 1 de 1</span>
-        <button class="pager-download-btn" type="button" aria-label="Descargas">
+        <span class="sr-only pager-live" aria-live="polite" data-i18n="pager.initial">Página 1 de 1</span>
+        <button class="pager-download-btn" type="button" aria-label="Descargas" data-i18n-aria="downloads.title">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 16.5a1 1 0 0 1-.7-.29l-5-5a1 1 0 0 1 1.4-1.42L12 14.09l4.3-4.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-.7.29Z"/>
           </svg>
-          <span>Descargas</span>
+          <span data-i18n="downloads.title">Descargas</span>
         </button>
         <div class="pager-dashes" aria-hidden="true">
           <span class="pager-dash">—</span>
@@ -90,13 +94,14 @@
     </main>
 
     <footer class="site-footer">
-      At TGX &copy;, we do not host or store direct content, only public links on the web.
+      <span data-i18n="footer.disclaimer">TGX no aloja archivos. Organizamos enlaces públicos y reportes de la comunidad.</span>
     </footer>
 
     <template id="tile-template">
-    <article class="tile" tabindex="0" role="button" aria-label="Abrir juego">
+    <article class="tile" tabindex="0" role="button" aria-label="Abrir juego" data-i18n-aria="game.open">
       <div class="player-mode-badge" data-mode="" hidden aria-hidden="true">
         <img src="" alt="" loading="lazy" aria-hidden="true" />
+        <span class="player-mode-label"></span>
       </div>
       <div class="cover"></div>
 
@@ -105,31 +110,31 @@
 
       <div class="tile-info">
         <h3 class="title"></h3>
-        <span class="badge">Listo para jugar</span>
+        <span class="badge" data-i18n="game.ready">Listo para jugar</span>
       </div>
     </article>
   </template>
 
   <template id="new-social-modal-template">
-    <div class="tw-modal" role="dialog" aria-label="Añadir red social">
+    <div class="tw-modal new-social-modal" role="dialog" aria-label="Gestionar red social" data-i18n-aria="social.addTitle">
       <div class="tw-modal-content">
-        <button class="tw-modal-close" aria-label="Cerrar">×</button>
-        <h2>Añadir red social</h2>
+        <button class="tw-modal-close" aria-label="Cerrar" data-i18n-aria="modal.close">×</button>
+        <h2 data-i18n="social.addTitle">Gestionar red social</h2>
         <form class="new-social-form">
           <label>
-            Nombre (opcional)
-            <input type="text" class="new-social-name" placeholder="Instagram, X, TikTok…" />
+            <span data-i18n="social.name">Nombre (opcional)</span>
+            <input type="text" class="new-social-name" placeholder="Instagram, X, TikTok…" data-i18n-placeholder="social.namePlaceholder" />
           </label>
           <label>
-            Imagen de la red (icono o logo)
+            <span data-i18n="social.image">Imagen de la red (icono o logo)</span>
             <input type="file" class="new-social-image-file" accept="image/*" required />
-            <small class="input-hint">Se recomienda imagen cuadrada. Se ajustará al cuadro con recorte.</small>
+            <small class="input-hint" data-i18n="social.imageHint">Se recomienda imagen cuadrada. Se ajustará al cuadro con recorte.</small>
           </label>
           <label>
-            Enlace a la red
-            <input type="url" class="new-social-url" placeholder="https://..." required />
+            <span data-i18n="social.url">Enlace a la red</span>
+            <input type="url" class="new-social-url" placeholder="https://..." required data-i18n-placeholder="common.urlPlaceholder" />
           </label>
-          <button type="submit" class="tw-modal-download">Guardar</button>
+          <button type="submit" class="tw-modal-download" data-i18n="common.save">Guardar</button>
         </form>
       </div>
     </div>
@@ -139,52 +144,62 @@
     <div class="tw-modal game-modal" role="dialog" aria-label="Detalles del juego">
       <div class="game-modal-shell">
         <div class="tw-modal-content">
-          <button class="tw-modal-close" aria-label="Cerrar">×</button>
+          <button class="tw-modal-close" aria-label="Cerrar" data-i18n-aria="modal.close">×</button>
           <h2 class="tw-modal-title"></h2>
           <div class="tw-modal-description" id="gameModalContent">
             <div class="game-modal-body" aria-live="polite"></div>
           </div>
+          <button class="game-scroll-cue" type="button" aria-label="Bajar para ver más contenido" hidden data-i18n-aria="game.moreContent">
+            <span class="game-scroll-cue-line game-scroll-cue-line--top"></span>
+            <span class="game-scroll-cue-line game-scroll-cue-line--mid"></span>
+            <span class="game-scroll-cue-line game-scroll-cue-line--bottom"></span>
+          </button>
         </div>
-        <aside class="game-modal-comments" aria-label="Comentarios del juego">
+        <aside class="game-modal-comments" aria-label="Comentarios del juego" data-i18n-aria="comments.area">
           <div class="comment-tab" data-open="false">
             <button class="comment-tab-toggle" type="button" aria-expanded="false" aria-describedby="commentIntro">
-              <span class="comment-tab-label">Comentarios</span>
+              <span class="comment-jelly-goo" aria-hidden="true">
+                <span class="comment-jelly-body"></span>
+                <span class="comment-jelly-blob"></span>
+              </span>
+              <span class="comment-jelly-volume" aria-hidden="true"></span>
+              <span class="comment-tab-label" data-i18n="comments.title">Comentarios</span>
               <span class="comment-count" aria-hidden="true">0</span>
               <span class="sr-only comment-count-label">(0 comentarios)</span>
             </button>
             <div class="comment-tab-body" aria-hidden="true">
               <div class="comment-panel">
-                <p class="comment-help" id="commentIntro">Comparte tu experiencia con otros jugadores.</p>
+                <p class="comment-help" id="commentIntro" data-i18n="comments.help">Comparte tu experiencia con otros jugadores.</p>
                 <div class="comment-status" hidden>
                   <span class="comment-status-text"></span>
-                  <button type="button" class="comment-retry" aria-label="Reintentar carga de comentarios">Reintentar</button>
+                  <button type="button" class="comment-retry" aria-label="Reintentar carga de comentarios" data-i18n="common.retry" data-i18n-aria="comments.retryAria">Reintentar</button>
                 </div>
                 <ul class="comment-list" aria-live="polite"></ul>
-                <p class="comment-empty">Sé el primero en dejar un comentario.</p>
+                <p class="comment-empty" hidden data-i18n="comments.empty">Todavía no hay comentarios.</p>
               </div>
               <div class="comment-form-wrap" aria-hidden="true" data-form-open="false">
-                <button type="button" class="comment-form-toggle" aria-expanded="false">Comentar</button>
-                <button type="button" class="comment-form-handle" hidden aria-label="Ocultar cuadro de comentario">
+                <button type="button" class="comment-form-toggle" aria-expanded="false" data-i18n="comments.comment">Comentar</button>
+                <button type="button" class="comment-form-handle" hidden aria-label="Ocultar cuadro de comentario" data-i18n-aria="comments.hideBox">
                   <span aria-hidden="true"></span>
                 </button>
                 <form class="comment-form" hidden>
                   <div class="comment-form-replying" hidden>
-                    <span>Respondiendo a <strong class="comment-form-reply-target"></strong></span>
-                    <button type="button" class="comment-form-cancel-reply">Cancelar</button>
+                    <span data-i18n="comments.replying">Respondiendo a</span> <strong class="comment-form-reply-target"></strong>
+                    <button type="button" class="comment-form-cancel-reply" data-i18n="common.cancel">Cancelar</button>
                   </div>
                   <label class="comment-field">
-                    Comentario
-                    <textarea name="comment" rows="4" required placeholder="Escribe tu comentario…"></textarea>
+                    <span data-i18n="comments.fieldComment">Comentario</span>
+                    <textarea name="comment" rows="4" required placeholder="Escribe tu comentario…" data-i18n-placeholder="comments.placeholder"></textarea>
                   </label>
                   <label class="comment-field">
-                    Alias
-                    <input type="text" name="alias" maxlength="32" placeholder="Tu nickname" />
+                    <span data-i18n="comments.alias">Alias</span>
+                    <input type="text" name="alias" maxlength="32" placeholder="Tu nickname" data-i18n-placeholder="comments.aliasPlaceholder" />
                   </label>
                   <label class="comment-field">
-                    Correo
-                    <input type="email" name="email" inputmode="email" placeholder="tucorreo@example.com" />
+                    <span data-i18n="comments.email">Correo</span>
+                    <input type="email" name="email" inputmode="email" placeholder="tucorreo@example.com" data-i18n-placeholder="comments.emailPlaceholder" />
                   </label>
-                  <button type="submit" class="comment-submit">Publicar</button>
+                  <button type="submit" class="comment-submit" data-i18n="comments.publish">Publicar</button>
                 </form>
               </div>
             </div>
@@ -195,9 +210,9 @@
   </template>
 
   <template id="dmca-modal-template">
-    <div class="tw-modal" role="dialog" aria-label="Aviso DMCA">
+    <div class="tw-modal" role="dialog" aria-label="Aviso DMCA" data-i18n-aria="dmca.notice">
       <div class="tw-modal-content">
-        <button class="tw-modal-close" aria-label="Cerrar">×</button>
+        <button class="tw-modal-close" aria-label="Cerrar" data-i18n-aria="modal.close">×</button>
         <div class="dmca-header">
           <h2 class="tw-modal-title">DMCA</h2>
           <button class="dmca-lang-toggle" type="button">EN</button>
@@ -208,9 +223,9 @@
   </template>
 
   <template id="faq-modal-template">
-    <div class="tw-modal" role="dialog" aria-label="FAQ">
+    <div class="tw-modal" role="dialog" aria-label="FAQ" data-i18n-aria="nav.faq">
       <div class="tw-modal-content">
-        <button class="tw-modal-close" aria-label="Cerrar">×</button>
+        <button class="tw-modal-close" aria-label="Cerrar" data-i18n-aria="modal.close">×</button>
         <h2 class="tw-modal-title">FAQ</h2>
         <div class="tw-modal-description">
           <div class="faq-content"></div>
@@ -220,25 +235,57 @@
   </template>
   
   <template id="new-game-modal-template">
-    <div class="tw-modal" role="dialog" aria-label="Añadir nuevo juego">
+    <div class="tw-modal new-game-modal" role="dialog" aria-label="Publicar juego" data-i18n-aria="game.addTitle">
       <div class="tw-modal-content">
-        <button class="tw-modal-close" aria-label="Cerrar">×</button>
-        <h2>Añadir nuevo juego</h2>
+        <button class="tw-modal-close" aria-label="Cerrar" data-i18n-aria="modal.close">×</button>
+        <h2 data-i18n="game.addTitle">Publicar juego</h2>
         <form class="new-game-form" novalidate>
           <label>
-            Título
+            <span data-i18n="game.titleField">Título</span>
             <input type="text" class="new-game-title" required />
           </label>
 
           <label class="player-mode-field" hidden>
-            Modo de juego
+            <span data-i18n="game.mode">Modo de juego</span>
             <select class="player-mode-select">
               <option value="single" data-icon="assets/images/player-modes/single.png">single</option>
               <option value="multi" data-icon="assets/images/player-modes/multi.png">multi</option>
             </select>
           </label>
+
+          <section class="publishing-helper" aria-label="Asistente de publicación con Drive" data-i18n-aria="drive.helper">
+            <div class="publishing-helper-head">
+              <div>
+                <strong data-i18n="drive.title">Asistente Drive</strong>
+                <span data-i18n="drive.copy">Para contenido autorizado: crea carpeta, sube el archivo y pega aquí el ID.</span>
+              </div>
+              <a href="https://drive.google.com/drive/folders/1viQ-s3cclgOwm_4KDxKqFKCw-khvkaPZ?usp=drive_link" target="_blank" rel="noopener" data-i18n="drive.openRoot">Abrir Drive raíz</a>
+            </div>
+            <div class="publishing-helper-grid">
+              <label>
+                <span data-i18n="drive.idOrUrl">ID o URL de Drive</span>
+                <input type="text" class="drive-helper-id" placeholder="1AbC... o URL de carpeta/archivo" />
+              </label>
+              <label>
+                <span data-i18n="drive.type">Tipo</span>
+                <select class="drive-helper-kind">
+                  <option value="folder" data-i18n="drive.folder">Carpeta</option>
+                  <option value="file" data-i18n="drive.file">Archivo</option>
+                </select>
+              </label>
+              <label>
+                <span data-i18n="drive.buttonText">Texto del botón</span>
+                <input type="text" class="drive-helper-label" value="DRIVE" />
+              </label>
+            </div>
+            <div class="publishing-helper-actions">
+              <button type="button" class="drive-helper-insert" data-i18n="drive.insertLink">Insertar link Drive</button>
+              <button type="button" class="drive-helper-template" data-i18n="drive.insertTemplate">Insertar plantilla</button>
+              <span class="drive-helper-status" aria-live="polite"></span>
+            </div>
+          </section>
           
-          <label>Descripción</label>
+          <label data-i18n="game.description">Descripción</label>
           <div class="rich-editor">
             <div class="rich-toolbar" role="toolbar" aria-label="Editor de texto">
               <button type="button" class="rtb-btn" data-cmd="bold" title="Negritas (Ctrl+B)"><b>B</b></button>
@@ -253,7 +300,7 @@
               <span class="rtb-sep"></span>
 
               <label class="rtb-inline">
-                Fuente
+                <span data-i18n="editor.font">Fuente</span>
                 <select class="rtb-font">
                   <option value="">Sistema</option>
                   <option value="Segoe UI">Segoe UI</option>
@@ -266,13 +313,13 @@
 
               <span class="rtb-sep"></span>
 
-              <button type="button" class="rtb-btn" data-list="ul" title="Lista con viñetas">• Lista</button>
+              <button type="button" class="rtb-btn" data-list="ul" title="Lista con viñetas" data-i18n="editor.list">• Lista</button>
 
               <span class="rtb-sep"></span>
 
-              <button type="button" class="rtb-btn rtb-link"  title="Insertar enlace">Enlace</button>
-              <button type="button" class="rtb-btn rtb-video" title="Insertar video">▶ Video</button>
-              <button type="button" class="rtb-btn rtb-color" title="Color de texto">Color</button>
+              <button type="button" class="rtb-btn rtb-link"  title="Insertar enlace" data-i18n="editor.link">Enlace</button>
+              <button type="button" class="rtb-btn rtb-video" title="Insertar video" data-i18n="editor.video">▶ Video</button>
+              <button type="button" class="rtb-btn rtb-color" title="Color de texto" data-i18n="editor.color">Color</button>
               <input type="color" class="rtb-color-input" value="#cfe3ff" hidden />
             </div>
 
@@ -280,65 +327,66 @@
           </div>
 
           <label>
-            Imagen de portada
+            <span data-i18n="game.cover">Imagen de portada</span>
             <input type="file" class="new-game-image-file" accept="image/*" required />
           </label>
 
           <label>
-            Trailer (archivo .mp4, opcional)
+            <span data-i18n="game.trailerFile">Trailer (archivo .mp4, opcional)</span>
             <input type="file" accept="video/mp4,video/webm" class="new-game-trailer-file" />
             <small class="input-hint"> </small>
           </label>
 
           <label>
-            URL del trailer (opcional)
+            <span data-i18n="game.trailerUrl">URL del trailer (opcional)</span>
             <input type="text" class="new-game-trailer-url"
                    inputmode="url"
                    placeholder="https://... o /assets/video/astroneer/trailer.mp4" hidden>
           </label>
-          <button type="submit" class="tw-modal-download">Guardar y mandar al principio</button>
+          <button type="submit" class="tw-modal-download" data-i18n="game.publish">Publicar</button>
         </form>
       </div>
     </div>
   </template>
 
   <template id="admin-menu-modal-template">
-    <div class="tw-modal admin-menu-modal" role="dialog" aria-label="Menú administrador">
+    <div class="tw-modal admin-menu-modal" role="dialog" aria-label="Menú administrador" data-i18n-aria="admin.menuTitle">
       <div class="tw-modal-content">
-        <button class="tw-modal-close" aria-label="Cerrar">×</button>
-        <h2 class="tw-modal-title">Menú administrador</h2>
+        <button class="tw-modal-close" aria-label="Cerrar" data-i18n-aria="modal.close">×</button>
+        <h2 class="tw-modal-title" data-i18n="admin.menuTitle">Menú administrador</h2>
         <div class="tw-modal-actions">
-          <button type="button" class="tw-btn-secondary is-gradient admin-menu-logout">Cerrar sesión</button>
-          <button type="button" class="tw-modal-download admin-menu-keys">Ver llaves de acceso</button>
+          <button type="button" class="tw-btn-secondary is-gradient admin-menu-logout" data-i18n="admin.logout">Cerrar sesión</button>
+          <button type="button" class="tw-modal-download admin-menu-keys" data-i18n="admin.keys">Ver llaves de acceso</button>
+          <button type="button" class="tw-modal-secondary admin-menu-forget" data-i18n="admin.forget">Olvidar este dispositivo</button>
         </div>
       </div>
     </div>
   </template>
 
   <template id="admin-login-modal-template">
-    <div class="tw-modal" role="dialog" aria-label="Iniciar sesión administrador">
+    <div class="tw-modal admin-login-modal" role="dialog" aria-label="Iniciar sesión administrador" data-i18n-aria="admin.loginTitle">
       <div class="tw-modal-content">
-        <button class="tw-modal-close" aria-label="Cerrar">×</button>
+        <button class="tw-modal-close" aria-label="Cerrar" data-i18n-aria="modal.close">×</button>
         <img class="tw-modal-image" src="assets/images/ui/admin-login.svg" alt="" loading="lazy" decoding="async" />
-        <h2 class="tw-modal-title">Acceso administrador</h2>
+        <h2 class="tw-modal-title" data-i18n="admin.accessTitle">Acceso administrador</h2>
         <form class="admin-login-form" autocomplete="off">
           <label>
-            Usuario
+            <span data-i18n="admin.user">Usuario</span>
             <input type="text" class="admin-username" placeholder="user" required />
           </label>
           <label>
             PIN
             <input type="password" class="admin-pin" inputmode="numeric" pattern="\d{4,6}" minlength="4" maxlength="6" placeholder="pin" required aria-describedby="admin-pin-help" />
-            <small id="admin-pin-help" class="input-hint">PIN numérico de 4 a 6 dígitos.</small>
+            <small id="admin-pin-help" class="input-hint" data-i18n="admin.pinHint">PIN numérico de 4 a 6 dígitos.</small>
           </label>
           <div class="tw-modal-actions">
-            <button type="submit" class="tw-modal-download">Entrar</button>
+            <button type="submit" class="tw-modal-download" data-i18n="admin.enter">Entrar</button>
           </div>
         </form>
       </div>
     </div>
   </template>
 
-  <script src="script.js?v=20260506-3"></script>
+  <script src="script.js?v=20260523-6"></script>
 </body>
 </html>
